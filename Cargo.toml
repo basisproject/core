@@ -1,0 +1,23 @@
+[package]
+name = "basis-core"
+version = "0.1.0"
+authors = ["Andrew Danger Lyon <orthecreedence@gmail.com>"]
+edition = "2018"
+license-file = "LICENSE"
+description = "The core datastructures, algorithms, and logic for the Basis system"
+homepage = "https://basisproject.gitlab.io/public/"
+repository = "https://gitlab.com/basisproject/core"
+readme = "README.md"
+keywords = ["economics", "socialism", "communism", "democracy"]
+categories = ["algorithms", "data-structures"]
+
+[dependencies]
+chrono = { version = "0.4.11", features = ["serde"] }
+derive_builder = "0.9.0"
+getset = "0.1.0"
+om2 = "0.1.1"
+serde = "1.0.105"
+serde_derive = "1.0.106"
+thiserror = "1.0.16"
+vf-rs = "0.3.7"
+
