@@ -18,4 +18,6 @@
   `can()` function
   - create a `CanAccess` trait, which objects with roles (users, members) implement
   and just requires retuning a set of roles implementing `RoleHasPermission`
+- om2: export `TimeUnit` and `MeasureTime` (ie, subclasses for certain measurements)
+  - ??? tried looking at om to figure this out and stumped (it's a beast)
 

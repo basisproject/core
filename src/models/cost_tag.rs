@@ -1,4 +1,5 @@
 use crate::{
+    models::company::CompanyID,
     models::costs::Costs,
 };
 use getset::{Getters, CopyGetters};
@@ -7,9 +8,12 @@ use std::collections::HashMap;
 
 basis_model!{
     pub struct CostTag {
-        company_id: String,
+        company_id: CompanyID,
+        #[builder(default)]
+        amortization_id: Option<String>,
         name: String,
     }
+    CostTagID
     CostTagBuilder
 }
 

@@ -7,6 +7,7 @@ basis_model! {
         email: String,
         name: String,
     }
+    UserID
     UserBuilder
 }
 
