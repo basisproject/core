@@ -46,6 +46,10 @@ pub enum Permission {
     OrderCreate,
     OrderUpdate,
     OrderAdminUpdate,
+
+    WalletCreate,
+    WalletUpdate,
+    WalletDelete,
 }
 
 /// Define the system-wide roles users can have.
@@ -130,6 +134,9 @@ impl Role {
                     Permission::CostTagDelete,
                     Permission::OrderCreate,
                     Permission::OrderUpdate,
+                    Permission::WalletCreate,
+                    Permission::WalletUpdate,
+                    Permission::WalletDelete,
                 ]
             }
         }

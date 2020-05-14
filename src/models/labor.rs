@@ -1,21 +1,24 @@
 use chrono::{DateTime, Utc};
 use crate::{
-    models::company_member::CompanyMemberID,
-    models::cost_tag::{CostTagLink, Costable},
-    models::costs::Costs,
+    models::{
+        agent::AgentID,
+        agreement::AgreementID,
+        company_member::CompanyMemberID,
+        cost_tag::{CostTagLink, Costable},
+        costs::Costs,
+        process::ProcessID,
+    },
 };
+use vf_rs::vf;
 
 basis_model! {
     pub struct Labor {
         member_id: CompanyMemberID,
+        event: vf::EconomicEvent<ProcessID, AgentID, AgreementID, (), (), ()>,
         occupation: String,
         wage: f64,
         #[builder(default)]
         cost_tags: Vec<CostTagLink>,
-        #[builder(default)]
-        start: Option<DateTime<Utc>>,
-        #[builder(default)]
-        end: Option<DateTime<Utc>>,
     }
     LaborID
     LaborBuilder
