@@ -21,14 +21,14 @@ basis_model!{
 #[derive(Clone, Debug, PartialEq, Getters, CopyGetters, Serialize, Deserialize)]
 pub struct CostTagLink {
     #[getset(get = "pub")]
-    pub cost_tag_id: String,
+    pub cost_tag_id: CostTagID,
     #[getset(get_copy = "pub")]
     pub weight: u64,
 }
 
 impl CostTagLink {
     pub fn new<T>(cost_tag_id: T, weight: u64) -> Self
-        where T: Into<String>
+        where T: Into<CostTagID>
     {
         Self {
             cost_tag_id: cost_tag_id.into(),
@@ -57,7 +57,7 @@ pub trait Costable {
         let cost_tag_sum = cost_tags.iter().fold(0, |acc, x| acc + x.weight) as f64;
         for cost_tag in &cost_tags {
             let ratio = (cost_tag.weight as f64) / cost_tag_sum;
-            let current = cost_collection.entry(cost_tag.cost_tag_id.clone()).or_insert(Default::default());
+            let current = cost_collection.entry(cost_tag.cost_tag_id.clone().into()).or_insert(Default::default());
             *current = current.clone() + (object_costs.clone() * ratio);
         }
     }
