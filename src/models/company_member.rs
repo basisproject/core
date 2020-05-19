@@ -3,8 +3,8 @@ use crate::{
         account::AccountID,
         agent::AgentID,
         company::{Permission, Role},
-        cost_tag::CostTagLink,
         occupation::OccupationID,
+        process::ProcessID,
     },
 };
 use getset::{Getters, CopyGetters};
@@ -91,8 +91,7 @@ basis_model! {
         #[builder(default)]
         roles: Vec<Role>,
         compensation: Compensation,
-        #[builder(default)]
-        default_cost_tags: Vec<CostTagLink>,
+        process_id: ProcessID,
     }
     CompanyMemberID
     CompanyMemberBuilder
@@ -136,7 +135,8 @@ mod test {
             )
             .active(true)
             .roles(vec![Role::MemberAdmin])
-            .compensation(Compensation::hourly(0.0))
+            .compensation(Compensation::hourly(0.0, "12345"))
+            .process_id("1234444")
             .created(util::time::now())
             .updated(util::time::now())
             .build().unwrap()
