@@ -136,7 +136,7 @@ mod test {
             )
             .active(true)
             .roles(vec![Role::MemberAdmin])
-            .compensation(Compensation::hourly(0.0))
+            .compensation(Compensation::hourly(0.0, "12345"))
             .created(util::time::now())
             .updated(util::time::now())
             .build().unwrap()
