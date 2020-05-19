@@ -1,12 +1,15 @@
 use crate::{
-    models::company::CompanyID,
-    models::process_spec::ProcessSpecID,
+    models::{
+        company::CompanyID,
+        process_spec::ProcessSpecID,
+    },
 };
+use url::Url;
 use vf_rs::vf;
 
 basis_model! {
     pub struct Process {
-        process: vf::Process<ProcessSpecID, CompanyID, ()>,
+        process: vf::Process<ProcessSpecID, Url, CompanyID, (), ()>,
     }
     ProcessID
     ProcessBuilder

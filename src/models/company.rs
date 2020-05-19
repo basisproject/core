@@ -192,7 +192,6 @@ basis_model! {
         /// The Agent object for this company, stores its name, image, location,
         /// etc.
         agent: vf::Agent,
-        scenario: vf::Scenario<(), ()>,
         /// What type of company
         ty: CompanyType,
         /// Primary email address

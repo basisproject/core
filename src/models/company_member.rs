@@ -1,5 +1,6 @@
 use crate::{
     models::{
+        account::AccountID,
         agent::AgentID,
         company::{Permission, Role},
         cost_tag::CostTagLink,
@@ -20,7 +21,8 @@ pub enum PayrollSchedule {
     SemiMonthly,
 }
 
-/// Defines compensation types for a member.
+/// Defines compensation for a member. Handles wage, payment schedule, and
+/// account information.
 ///
 /// Can account for hourly wages or salary.
 #[derive(Clone, Debug, PartialEq, Getters, CopyGetters, Serialize, Deserialize)]
@@ -28,6 +30,8 @@ pub enum PayrollSchedule {
 pub struct Compensation {
     /// A measure of value per time (ie, credits per hour, or credits per year)
     wage: Measure,
+    /// Pay into this account
+    pay_into: AccountID,
     /// Our payroll schedule (biweekly, semimonthly, etc)
     schedule: PayrollSchedule,
     /// If the `period` is not hourly, we can give an estimate for the number of
@@ -38,35 +42,41 @@ pub struct Compensation {
 
 impl Compensation {
     /// Create a standard hourly wage, paid biweekly
-    pub fn hourly<T>(wage: T) -> Self
-        where T: Into<f64>
+    pub fn hourly<T, A>(wage: T, pay_into: A) -> Self
+        where T: Into<f64>,
+              A: Into<AccountID>,
     {
-        Self::hourly_with_schedule(wage, PayrollSchedule::BiWeekly)
+        Self::hourly_with_schedule(wage, pay_into, PayrollSchedule::BiWeekly)
     }
 
     /// Create an hourly wage
-    pub fn hourly_with_schedule<T>(wage: T, schedule: PayrollSchedule) -> Self
-        where T: Into<f64>
+    pub fn hourly_with_schedule<T, A>(wage: T, pay_into: A, schedule: PayrollSchedule) -> Self
+        where T: Into<f64>,
+              A: Into<AccountID>,
     {
         Self {
             wage: Measure::new(NumericUnion::Double(wage.into()), Unit::Hour),
+            pay_into: pay_into.into(),
             schedule: schedule,
             est_hours_per_week: None,
         }
     }
 
     /// Create a standard yearly salary, paid semimonthly
-    pub fn salary<T>(wage: T, est_hours_per_week: f64) -> Self
-        where T: Into<f64>
+    pub fn salary<T, A>(wage: T, pay_into: A, est_hours_per_week: f64) -> Self
+        where T: Into<f64>,
+              A: Into<AccountID>,
     {
-        Self::salary_with_schedule(wage, PayrollSchedule::SemiMonthly, est_hours_per_week)
+        Self::salary_with_schedule(wage, pay_into, PayrollSchedule::SemiMonthly, est_hours_per_week)
     }
 
-    pub fn salary_with_schedule<T>(wage: T, schedule: PayrollSchedule, est_hours_per_week: f64) -> Self
-        where T: Into<f64>
+    pub fn salary_with_schedule<T, A>(wage: T, pay_into: A, schedule: PayrollSchedule, est_hours_per_week: f64) -> Self
+        where T: Into<f64>,
+              A: Into<AccountID>,
     {
         Self {
             wage: Measure::new(NumericUnion::Double(wage.into()), Unit::Year),
+            pay_into: pay_into.into(),
             schedule: schedule,
             est_hours_per_week: Some(est_hours_per_week),
         }
@@ -77,7 +87,7 @@ basis_model! {
     /// A member of a company. Links a user to a company, and has other attached
     /// information like compensation, permission roles, etc.
     pub struct CompanyMember {
-        agent_relationship: AgentRelationship<AgentID, OccupationID>,
+        agent_relationship: AgentRelationship<(), AgentID, OccupationID>,
         #[builder(default)]
         roles: Vec<Role>,
         compensation: Compensation,
@@ -112,13 +122,13 @@ mod test {
         util,
     };
     use super::*;
-    use vf_rs::vf::AgentRelationship;
+    use vf_rs::vf;
 
     fn make_member() -> CompanyMember {
         CompanyMember::builder()
             .id("zing")
             .agent_relationship(
-                AgentRelationship::builder()
+                vf::AgentRelationship::builder()
                     .subject(UserID::from("jerry"))
                     .object(CompanyID::from("jerry's widgets ultd"))
                     .relationship("CEO")
