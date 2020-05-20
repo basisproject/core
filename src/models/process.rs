@@ -18,3 +18,21 @@ basis_model! {
     ProcessBuilder
 }
 
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn cost_tracking() {
+        // TODO: take the following:
+        //
+        // - inputs
+        // - outputs
+        // - cost tags ...or something similar?
+        // - amortization
+        //
+        // assign the costs of the inputs to the outputs either equally or in
+        // proportion to the cost tags.
+    }
+}
+
