@@ -44,10 +44,10 @@ pub enum Permission {
     LaborTagCost,
     LaborSetWage,
 
-    ProductCreate,
-    ProductUpdate,
-    ProductDelete,
-    ProductTagCost,
+    ResourceSpecCreate,
+    ResourceSpecUpdate,
+    ResourceSpecDelete,
+    ResourceSpecTagCost,
 
     OrderCreate,
     OrderUpdateProcessStatus,
@@ -70,11 +70,11 @@ pub enum Role {
     Admin,
     MemberAdmin,
     LaborAdmin,
-    ProductAdmin,
+    ResourceSpecAdmin,
     CostTagAdmin,
     CostTaggerAdmin,
     CostTaggerLabor,
-    CostTaggerProduct,
+    CostTaggerResourceSpec,
     CostTaggerOrder,
     Purchaser,
     Supplier,
@@ -105,11 +105,11 @@ impl Role {
                     Permission::LaborSetWage,
                 ]
             }
-            Role::ProductAdmin => {
+            Role::ResourceSpecAdmin => {
                 vec![
-                    Permission::ProductCreate,
-                    Permission::ProductUpdate,
-                    Permission::ProductDelete,
+                    Permission::ResourceSpecCreate,
+                    Permission::ResourceSpecUpdate,
+                    Permission::ResourceSpecDelete,
                 ]
             }
             Role::CostTagAdmin => {
@@ -122,7 +122,7 @@ impl Role {
             Role::CostTaggerAdmin => {
                 vec![
                     Permission::LaborTagCost,
-                    Permission::ProductTagCost,
+                    Permission::ResourceSpecTagCost,
                     Permission::OrderTagCost,
                 ]
             }
@@ -131,9 +131,9 @@ impl Role {
                     Permission::LaborTagCost,
                 ]
             }
-            Role::CostTaggerProduct => {
+            Role::CostTaggerResourceSpec => {
                 vec![
-                    Permission::ProductTagCost,
+                    Permission::ResourceSpecTagCost,
                 ]
             }
             Role::CostTaggerOrder => {
@@ -214,9 +214,9 @@ pub mod tests {
         assert!(owner.can(&Permission::MemberCreate));
         assert!(owner.can(&Permission::MemberSetRoles));
         assert!(owner.can(&Permission::MemberDelete));
-        assert!(owner.can(&Permission::ProductCreate));
-        assert!(owner.can(&Permission::ProductUpdate));
-        assert!(owner.can(&Permission::ProductDelete));
+        assert!(owner.can(&Permission::ResourceSpecCreate));
+        assert!(owner.can(&Permission::ResourceSpecUpdate));
+        assert!(owner.can(&Permission::ResourceSpecDelete));
         assert!(owner.can(&Permission::OrderCreate));
         assert!(owner.can(&Permission::OrderUpdateProcessStatus));
         assert!(owner.can(&Permission::OrderUpdateCostTags));
@@ -228,9 +228,9 @@ pub mod tests {
         assert!(admin.can(&Permission::MemberCreate));
         assert!(admin.can(&Permission::MemberSetRoles));
         assert!(admin.can(&Permission::MemberDelete));
-        assert!(admin.can(&Permission::ProductCreate));
-        assert!(admin.can(&Permission::ProductUpdate));
-        assert!(admin.can(&Permission::ProductDelete));
+        assert!(admin.can(&Permission::ResourceSpecCreate));
+        assert!(admin.can(&Permission::ResourceSpecUpdate));
+        assert!(admin.can(&Permission::ResourceSpecDelete));
         assert!(admin.can(&Permission::OrderCreate));
         assert!(admin.can(&Permission::OrderUpdateProcessStatus));
         assert!(admin.can(&Permission::OrderUpdateCostTags));
@@ -242,9 +242,9 @@ pub mod tests {
         assert!(member_admin.can(&Permission::MemberCreate));
         assert!(member_admin.can(&Permission::MemberSetRoles));
         assert!(member_admin.can(&Permission::MemberDelete));
-        assert!(!member_admin.can(&Permission::ProductCreate));
-        assert!(!member_admin.can(&Permission::ProductUpdate));
-        assert!(!member_admin.can(&Permission::ProductDelete));
+        assert!(!member_admin.can(&Permission::ResourceSpecCreate));
+        assert!(!member_admin.can(&Permission::ResourceSpecUpdate));
+        assert!(!member_admin.can(&Permission::ResourceSpecDelete));
         assert!(!member_admin.can(&Permission::OrderCreate));
         assert!(!member_admin.can(&Permission::OrderUpdateProcessStatus));
         assert!(!member_admin.can(&Permission::OrderUpdateCostTags));

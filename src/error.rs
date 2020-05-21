@@ -4,12 +4,6 @@ use thiserror::Error;
 pub enum Error {
     #[error("invalid role")]
     InvalidRole,
-
-    #[error("missing product in costing data")]
-    CostMissingProduct,
-
-    #[error("missing tag in costing data")]
-    CostMissingTag,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

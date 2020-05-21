@@ -1,3 +1,3 @@
 #[macro_use]
-mod basis_model;
+pub mod basis_model;
 

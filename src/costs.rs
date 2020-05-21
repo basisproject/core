@@ -1,165 +1,415 @@
-//! This library holds the algorithm that costs products and services.
+//! Costs are a way to model disaggregate tracking of labor and resources while
+//! treating the result like any number that can be added, subtracted,
+//! multiplied, or divided.
+//!
+//! ```rust
+//! use basis_core::costs::Costs;
+//! use rust_decimal::prelude::*;
+//!
+//! let mut costs = Costs::new();
+//! costs.track_resource("gasoline", 0.4);
+//! costs.track_resource("iron", 2.2);
+//! costs.track_labor("ceo", 42.0);
+//! costs.track_labor("machinist", 122.0);
+//! costs.track_labor_hours("ceo", 2.0);
+//! costs.track_labor_hours("machinist", 8.0);
+//! costs.track_currency("usd", Decimal::new(4200, 2));
+//!
+//! let costs2 = costs * 2.5;
+//! assert_eq!(costs2.get_resource("gasoline"), 0.4 * 2.5);
+//! assert_eq!(costs2.get_resource("iron"), 2.2 * 2.5);
+//! assert_eq!(costs2.get_labor("ceo"), 42.0 * 2.5);
+//! assert_eq!(costs2.get_labor("machinist"), 122.0 * 2.5);
+//! assert_eq!(costs2.get_labor_hours("ceo"), 2.0 * 2.5);
+//! assert_eq!(costs2.get_labor_hours("machinist"), 8.0 * 2.5);
+//! assert_eq!(costs2.get_currency("usd"), Decimal::new(4200, 2) * Decimal::from_f64(2.5).unwrap());
+//!
+//! let costs3 = costs2 / 3.2;
+//! assert_eq!(costs3.get_resource("gasoline"), (0.4 * 2.5) / 3.2);
+//! assert_eq!(costs3.get_resource("iron"), (2.2 * 2.5) / 3.2);
+//! assert_eq!(costs3.get_labor("ceo"), (42.0 * 2.5) / 3.2);
+//! assert_eq!(costs3.get_labor("machinist"), (122.0 * 2.5) / 3.2);
+//! assert_eq!(costs3.get_labor_hours("ceo"), (2.0 * 2.5) / 3.2);
+//! assert_eq!(costs3.get_labor_hours("machinist"), (8.0 * 2.5) / 3.2);
+//! assert_eq!(costs3.get_currency("usd"), (Decimal::new(4200, 2) * Decimal::from_f64(2.5).unwrap()) / Decimal::from_f64(3.2).unwrap());
+//! ```
+//!
+//! In effect, Costs are an abstraction around Basis' view of production. While
+//! costs themselves can be derived via walking the graph, traversing the total
+//! economic graph is almost an infinite traversal, even for the most simple
+//! items.
+//!
+//! Take the classic douchey capitalist pencil example. We can reduce it to
+//! graphite, wood, the machines used to process both, the labor to extract the
+//! wood/graphite, and the process of shipping the materials to their various
+//! destinations along the supply chain. Or can we? The axe that cuts down the
+//! tree used to make the wood in the pencil has its own supply chain story. The
+//! truck that ships the pencil to the art store has a vast number of hops on
+//! its own supply chain. The axe was needed to make the pencil, and in a sense
+//! the axe's costs are imbued in the pencil's. So in a well-functioning cost
+//! tracking system, the pencil would show the iron/steel content of that axe,
+//! albeit a small amount. Now, maybe the truck that ships the pencil uses tires
+//! from a company that processes rubber. Maybe that company uses pencils in
+//! their daily activities. Uh oh, an infinite circular reference.
+//!
+//! Costs cannot be effectively "walked" because the graph is too vast and in
+//! some cases, recursively infinite. Instead what we do is aggregate the costs
+//! at the output of each economic node (company-product pair). When another
+//! company orders that product, those costs are added to theirs and move
+//! through until *they* have an output, to which costs are attributed.
+//!
+//! So in a sense, companies are aggregators (on the input side) and dividers
+//! (on the output side) of costs.
+//!
+//! The best way we can represent this without having enormous tree structures
+//! that are the size of the economy itself is through the Costs object which
+//! aggregates costs on the level of three hash objects:
+//!
+//! - **labor-occupation-wage** (`labor`) -- How much total cost *in wages* it
+//! took to make something, per-occupation.
+//! - **labor-occupation-hours** (`labor_hours`) -- How many *total hours* it
+//! took to make something, per-occupation.
+//! - **resource-unit** (`resource`) -- The amount of each resource, measured
+//! in a standard unit, it took to make something.
+//! - **currency** (`currency`) -- The amount of currency that went into
+//! purchasing inputs, useful for pricing either within or without the network.
+//!
+//! Labor hours are not used for cost/price value when charging consumers for
+//! end products (we use the wage value), but are there to track the actual cost
+//! of human labor time outside of the negotiations and fluctiations of wages.
+//! This also makes it so in a future society where all wages are zero
+//! (communism) we can *still track labor costs in units of hours*.
+//!
+//! Resources are interesting, because the ultimate goal is to track them *as
+//! close to raw materials as possible* while still being useful. For instance,
+//! crude oil in itself is good to track as a resource, but it might also be
+//! just as useful to track gasoline, jet fuel, kerosene, etc. Thus we make it
+//! possible to have standard resource transformations, applied on a limited
+//! basis, in order to account for not just raw materials but semi-raw
+//! materials. That said, tracking the widget-content of some product isn't
+//! especially useful, nor the yards of linen imbued in it (sorry, Marx). The
+//! ultimate goal is to track resources such that we're more globally aware of
+//! our depletion rates of resources vs their renewal/recycle rates. This mostly
+//! involves tracking the contituent resources, not the higher-level products.
+//! What products are defined as raw/semi-raw materials (aka "resources") is a
+//! systemwide, collective decision. It will be a function of governance, not
+//! code.
 
-use std::collections::HashMap;
-use error::{BResult, BError};
-use models::{
-    costs::Costs,
-    cost_tag::{CostTagEntry, Costable},
-    order::Order,
-    amortization::Amortization,
-    product::Product,
-    labor::Labor,
+use costs_derive::Costs;
+use crate::{
+    models::{
+        currency::CurrencyID,
+        occupation::OccupationID,
+        resource_spec::ResourceSpecID,
+    },
 };
+use getset::{Getters, MutGetters};
+use rust_decimal::prelude::*;
+use serde::{Serialize, Deserialize};
+use std::collections::HashMap;
+use std::ops::{Add, Sub, Mul, Div};
 
-/// Takes two sets of orders: a company's incoming orders ("sales" in the
-/// current vernacular) and outgoing orders ("purchases").
+/// A struct that acts as a container for the various types of disaggregate
+/// costs we want to store and track.
 ///
-/// The orders *must* be filtered such that both sets are a particular window
-/// in time (ex, the last 365 days) and must be ordered from oldest to newest.
-pub fn calculate_costs(orders_incoming: &Vec<Order>, orders_outgoing: &Vec<Order>, labor: &Vec<Labor>, _wamortization: &HashMap<String, Amortization>, products: &HashMap<String, Product>) -> BResult<HashMap<String, Costs>> {
-    // holds a mapping for cost_tag -> sum costs for all of our cost tags
-    let mut sum_costs: HashMap<String, Costs> = HashMap::new();
-    // maps product_id -> number produced over order period
-    let mut sum_produced: HashMap<String, f64> = HashMap::new();
-
-    // add our labor costs into the totals
-    for entry in labor {
-        entry.tally_tagged_costs(&mut sum_costs);
-    }
-
-    // add all outgoing orders into the cost totals
-    for order in orders_outgoing {
-        order.tally_tagged_costs(&mut sum_costs);
-    }
-
-    // sum how many of each product we have produced
-    for order in orders_incoming {
-        for prod in &order.products {
-            let current = sum_produced.entry(prod.product_id.clone()).or_insert(Default::default());
-            *current += prod.quantity;
-        }
-    }
-
-    calculate_costs_with_aggregates(products, &sum_costs, &sum_produced)
+/// The majority of this struct's implementation is under the `#[derive(Costs)]`
+/// macro. This implements a number of utility functions that would otherwise be
+/// a huge pain to type out over and over. It also implements some math for our
+/// Cost (Add, Sub, Mul, Div).
+///
+/// Note that if this type were somehow iterable, a proc macro wouldn't even be
+/// needed, but the types would then be more difficult to look at and
+/// immediately recognize what we're trying to do, and littering generics all
+/// over the place isn't my cup of tea for an object that's supposed to be
+/// conceptually and operationally simple.
+#[derive(Costs, Clone, Debug, Default, PartialEq, Getters, MutGetters, Serialize, Deserialize)]
+#[getset(get = "pub", get_mut)]
+pub struct Costs {
+    /// Stores resource content. Resources are ResourceSpec instances that have
+    /// a resource tracking information attached, so we link to them via their
+    /// ResourceSpecID
+    resource: HashMap<ResourceSpecID, f64>,
+    /// Stores labor *as is has been paid in credits* per-occupation. In other
+    /// words, we don't track raw hours here, but rather the social labor value
+    /// as negotiated between workers and their companies.
+    labor: HashMap<OccupationID, f64>,
+    /// Stores raw labor hours per-occupation. This information might be more
+    /// useful in the future, as it's a measure of the occupation-time that went
+    /// into building something, as opposed to the credits paid out. Cases where
+    /// this might be handy is a system where all wages are 0, but we still want
+    /// to track labor content.
+    labor_hours: HashMap<OccupationID, f64>,
+    /// Stores currency values of products. This is a strange one to have in a
+    /// moneyless system, but supports the banking process of the system by
+    /// tracking how much money it cost to purchase some asset from the larger
+    /// market. This allows the system to know how much currency is needed to
+    /// recoup the expenses on some item when selling it back into the market
+    /// (or how many credits to destroy if being purchased internally). The idea
+    /// is that in a hopeful future, this bucket will be obsolete and always
+    /// empty as currency-based markets are phased out.
+    currency: HashMap<CurrencyID, Decimal>,
 }
 
-pub fn calculate_costs_with_aggregates(products: &HashMap<String, Product>, sum_costs: &HashMap<String, Costs>, sum_produced: &HashMap<String, f64>) -> BResult<HashMap<String, Costs>> {
-    let mut tag_tracker: HashMap<String, bool> = HashMap::new();
-    let mut final_costs: HashMap<String, Costs> = HashMap::new();
-    let mut product_tag_totals: HashMap<String, u64> = HashMap::new();
-    let mut products = products.clone();
-
-    // track which cost tags are present in the products
-    for (prod_id, product) in products.iter() {
-        if sum_produced.get(prod_id).unwrap_or(&0.0) == &0.0 {
-            // products that were not ordered/produced won't get costs
-            continue;
-        }
-        for tag in &product.cost_tags {
-            if tag.weight == 0 {
-                continue;
-            }
-            tag_tracker.insert(tag.id.clone(), true);
-        }
+impl Costs {
+    /// Creates an empty cost object.
+    pub fn new() -> Self {
+        Self::default()
     }
-    // check for missing tags.
-    //
-    // if we have costs assigned to a tag, but no products are assigned that tag
-    // then potentially we'd have unaccounted for costs. so what we do is find
-    // tags that HAVE costs but are NOT assigned and assign them to each product
-    // equally.
-    for (tag_id, _costs) in sum_costs.iter() {
-        if tag_tracker.contains_key(tag_id) {
-            continue;
-        }
-        // if a tag with costs associated to it is missing from the product
-        // assignments, assign that cost tag to all products equally
-        for (_prod_id, product) in products.iter_mut() {
-            product.cost_tags.push(CostTagEntry::new(&tag_id, 1));
-        }
-    }
-    // for each product, tally up the sum of the cost tags (bucketed by cost
-    // tag)
-    for (_, product) in products.iter() {
-        for tag in &product.cost_tags {
-            let current = product_tag_totals.entry(tag.id.clone()).or_insert(0);
-            *current = tag.weight;
-        }
-    }
-    // for each product, divvy up the costs of each of its cost tags via the
-    // tag ratio (as compared to other products) and then divide by the amount
-    // produced.
-    //
-    // this gives a per-unit cost to each product based on the flow of costs
-    // through the cost tags.
-    for (prod_id, product) in products.iter() {
-        let num_produced: f64 = sum_produced.get(prod_id).unwrap_or(&0.0).clone();
-        if num_produced == 0.0 {
-            // products that were not produced have no cost (and will not have
-            // their cost tags tallied in the totals, meaning they will not
-            // "steal" costs from products that were actively produced)
-            final_costs.insert(prod_id.clone(), Costs::new());
-        } else {
-            let mut prod_cost_sum = Costs::new();
-            for tag in &product.cost_tags {
-                let total: f64 = product_tag_totals.get(&tag.id).ok_or_else(|| BError::CostMissingTag)?.clone() as f64;
-                let tag_ratio: f64 = tag.weight as f64 / total;
-                let tag_costs = sum_costs.get(&tag.id).map(|x| x.clone()).unwrap_or(Costs::new());
-                prod_cost_sum = prod_cost_sum + (tag_costs * tag_ratio);
-            }
-            final_costs.insert(prod_id.clone(), prod_cost_sum / num_produced);
-        }
-    }
-    Ok(final_costs)
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
-    use exonum::crypto::Hash;
-    use std::collections::HashMap;
-    use models::order::{Order, ProcessStatus, ProductEntry};
-    use models::labor::Labor;
-    use models::product::{Product, Unit, Dimensions};
-    use util::time;
 
-    fn make_hash() -> Hash {
-        Hash::new([1, 28, 6, 4, 1, 27, 6, 4, 1, 27, 6, 4, 1, 27, 6, 4, 1, 27, 6, 4, 1, 27, 6, 4, 1, 27, 6, 4, 1, 27, 6, 4])
+    #[test]
+    fn add() {
+        let mut costs1 = Costs::new();
+        let mut costs2 = Costs::new();
+
+        costs1.track_labor("miner", 6.0);
+        costs1.track_resource("widget", 3.1);
+        costs1.track_resource("iron", 8.5);
+        costs1.track_labor_hours("miner", 0.5);
+        costs1.track_currency("usd", Decimal::new(500, 2));
+        costs2.track_currency("eur", Decimal::new(230, 2));
+        costs2.track_labor("miner", 2.0);
+        costs2.track_labor("widgetmaker", 3.0);
+        costs2.track_resource("widget", 1.8);
+        costs2.track_resource("oil", 5.6);
+        costs2.track_labor_hours("miner", 0.7);
+        costs2.track_labor_hours("birthday clown", 0.3);
+        costs2.track_currency("usd", Decimal::new(1490, 2));
+        costs2.track_currency("cny", Decimal::new(3000, 0));
+
+        let costs = costs1 + costs2;
+        assert_eq!(costs.get_labor("miner"), 6.0 + 2.0);
+        assert_eq!(costs.get_labor("widgetmaker"), 3.0);
+        assert_eq!(costs.get_labor("joker"), 0.0);
+        assert_eq!(costs.get_labor_hours("miner"), 0.5 + 0.7);
+        assert_eq!(costs.get_labor_hours("birthday clown"), 0.3);
+        assert_eq!(costs.get_labor_hours("magical wish pony"), 0.0);
+        assert_eq!(costs.get_resource("widget"), 3.1 + 1.8);
+        assert_eq!(costs.get_resource("iron"), 8.5 + 0.0);
+        assert_eq!(costs.get_resource("oil"), 5.6 + 0.0);
+        assert_eq!(costs.get_currency("usd"), Decimal::new(500, 2) + Decimal::new(1490, 2));
+        assert_eq!(costs.get_currency("eur"), Decimal::new(230, 2));
+        assert_eq!(costs.get_currency("cny"), Decimal::new(3000, 0));
+        assert_eq!(costs.get_currency("btc"), Zero::zero());
     }
 
     #[test]
-    fn calculates() {
-        let orders_incoming = test_orders_incoming();
-        let orders_outgoing = test_orders_outgoing();
-        let labor = test_labor();
-        let amortization = HashMap::new();
-        let products = test_products();
-        let costs = calculate_costs(&orders_incoming, &orders_outgoing, &labor, &amortization, &products).expect("costs failed");
-        println!(">>> final costs: {:?}", costs);
+    fn mul() {
+        let mut costs1 = Costs::new();
+        costs1.track_labor("miner", 6.0);
+        costs1.track_labor("widgetmaker", 3.0);
+        costs1.track_resource("widget", 3.1);
+        costs1.track_resource("iron", 8.5);
+        costs1.track_labor_hours("miner", 3.0);
+        costs1.track_currency("cny", Decimal::new(140000, 2));
+
+        let costs = costs1 * 5.2;
+        assert_eq!(costs.get_labor("miner"), 6.0 * 5.2);
+        assert_eq!(costs.get_labor("widgetmaker"), 3.0 * 5.2);
+        assert_eq!(costs.get_resource("widget"), 3.1 * 5.2);
+        assert_eq!(costs.get_resource("iron"), 8.5 * 5.2);
+        assert_eq!(costs.get_labor_hours("miner"), 3.0 * 5.2);
+        assert_eq!(costs.get_currency("cny"), Decimal::new(140000, 2) * Decimal::from_f64(5.2).unwrap());
+
+        let mut costs1 = Costs::new();
+        let mut costs2 = Costs::new();
+        costs1.track_labor("miner", 1.3);
+        costs1.track_resource("widget", 8.7);
+        costs1.track_labor_hours("miner", 42.0);
+        costs1.track_currency("usd", Decimal::new(1300, 2));
+        costs1.track_currency("eur", Decimal::new(6900, 2));
+        costs2.track_labor("miner", 6.0);
+        costs2.track_labor("widgetmaker", 5.0);
+        costs2.track_resource("widget", 3.1);
+        costs2.track_resource("iron", 8.5);
+        costs2.track_labor_hours("miner", 3.0);
+        costs2.track_labor_hours("axe murdererer", 3.0);
+        costs2.track_currency("usd", Decimal::new(4200, 2));
+
+        let costs = costs1 * costs2;
+        assert_eq!(costs.get_labor("miner"), 1.3 * 6.0);
+        assert_eq!(costs.get_labor("widgetmaker"), 0.0 * 5.0);
+        assert_eq!(costs.get_resource("widget"), 8.7 * 3.1);
+        assert_eq!(costs.get_resource("iron"), 0.0 * 8.5);
+        assert_eq!(costs.get_labor_hours("miner"), 42.0 * 3.0);
+        assert_eq!(costs.get_labor_hours("axe murdererer"), 0.0);
+        assert_eq!(costs.get_currency("usd"), Decimal::new(1300, 2) * Decimal::new(4200, 2));
+        assert_eq!(costs.get_currency("eur"), Zero::zero());
     }
 
-    fn test_orders_incoming() -> Vec<Order> {
-        let fakehash = make_hash();
-        vec![
-        ]
+    #[test]
+    fn div_costs() {
+        let mut costs1 = Costs::new();
+        let mut costs2 = Costs::new();
+
+        costs1.track_labor("miner", 6.0);
+        costs1.track_labor("singer", 2.0);
+        costs1.track_resource("widget", 3.1);
+        costs1.track_labor_hours("dog walker", 5.2);
+        costs1.track_currency("usd", Decimal::new(7800, 2));
+        costs2.track_labor("miner", 2.0);
+        costs2.track_labor("singer", 6.0);
+        costs2.track_resource("widget", 1.8);
+        costs2.track_resource("oil", 5.6);
+        costs2.track_labor_hours("dog walker", 2.2);
+        costs2.track_currency("usd", Decimal::new(1200, 2));
+
+        let costs = costs1 / costs2;
+        assert_eq!(costs.get_labor("miner"), 6.0 / 2.0);
+        assert_eq!(costs.get_labor("singer"), 2.0 / 6.0);
+        assert_eq!(costs.get_resource("widget"), 3.1 / 1.8);
+        assert_eq!(costs.get_resource("oil"), 0.0 / 5.6);
+        assert_eq!(costs.get_labor_hours("dog walker"), 5.2 / 2.2);
+        assert_eq!(costs.get_currency("usd"), Decimal::new(7800, 2) / Decimal::new(1200, 2));
     }
 
-    fn test_orders_outgoing() -> Vec<Order> {
-        let fakehash = make_hash();
-        vec![
-        ]
+    #[test]
+    fn div_f64() {
+        let mut costs1 = Costs::new();
+
+        costs1.track_labor("widgetmaker", 6.0);
+        costs1.track_resource("widget", 3.1);
+        costs1.track_resource("oil", 5.6);
+        costs1.track_labor_hours("doctor", 14.0);
+        costs1.track_currency("eur", Decimal::new(43301, 2));
+
+        let costs = costs1 / 1.3;
+        assert_eq!(costs.get_labor("widgetmaker"), 6.0 / 1.3);
+        assert_eq!(costs.get_resource("widget"), 3.1 / 1.3);
+        assert_eq!(costs.get_resource("oil"), 5.6 / 1.3);
+        assert_eq!(costs.get_labor_hours("doctor"), 14.0 / 1.3);
+        assert_eq!(costs.get_currency("eur"), Decimal::new(43301, 2) / Decimal::from_f64(1.3).unwrap());
     }
 
-    fn test_labor() -> Vec<Labor> {
-        let fakehash = make_hash();
-        vec![
-        ]
+    #[test]
+    fn div_0_by_0() {
+        let costs1 = Costs::new_with_labor("clown", 0.0);
+        let costs2 = Costs::new();
+
+        let costs = costs1 / costs2;
+        assert_eq!(costs.get_labor("clown"), 0.0);
     }
 
-    fn test_products() -> HashMap<String, Product> {
-        let fakehash = make_hash();
-        let mut products = HashMap::new();
-        products
+    #[test]
+    fn is_div_0() {
+        let costs1 = Costs::new_with_labor("clown", 0.0);
+        let costs2 = Costs::new();
+        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), false);
+
+        let costs1 = Costs::new_with_labor("clown", 0.0);
+        let costs2 = Costs::new_with_labor("clown", 0.0);
+        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), false);
+
+        let costs1 = Costs::new_with_labor("violinist", 5.2);
+        let costs2 = Costs::new();
+        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), true);
+
+        let costs1 = Costs::new_with_labor("violinist", 5.2);
+        let costs2 = Costs::new_with_labor("violinist", 0.0);
+        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), true);
+
+        let mut costs1 = Costs::new();
+        costs1.track_resource("iron", 4.2);
+        costs1.track_labor("clown", 69.0);
+        costs1.track_labor_hours("clown", 1.1);
+        costs1.track_currency("usd", Decimal::new(1300, 2));
+        let mut costs2 = Costs::new();
+        costs2.track_resource("iron", 4.2);
+        costs2.track_labor("clown", 69.0);
+        costs2.track_labor_hours("clown", 1.1);
+        costs2.track_currency("usd", Decimal::new(1300, 2));
+        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), false);
+
+        let mut costs1 = Costs::new();
+        costs1.track_resource("iron", 4.2);
+        costs1.track_labor("clown", 69.0);
+        costs1.track_labor_hours("clown", 0.0);
+        costs1.track_currency("usd", Decimal::new(1300, 2));
+        let mut costs2 = Costs::new();
+        costs2.track_resource("iron", 4.2);
+        costs2.track_labor("clown", 69.0);
+        costs2.track_labor_hours("clown", 0.0);
+        costs2.track_currency("usd", Decimal::new(1200, 2));
+        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), false);
+
+        let mut costs1 = Costs::new();
+        costs1.track_resource("iron", 4.2);
+        costs1.track_labor("clown", 69.0);
+        costs1.track_labor_hours("clown", 1.1);
+        costs1.track_currency("usd", Decimal::new(1300, 2));
+        costs1.track_currency("cny", Decimal::new(1, 2));
+        let mut costs2 = Costs::new();
+        costs2.track_resource("iron", 4.2);
+        costs2.track_labor("clown", 69.0);
+        costs2.track_labor_hours("clown", 1.1);
+        costs2.track_currency("usd", Decimal::new(1300, 2));
+        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), true);
+
+        let mut costs1 = Costs::new();
+        costs1.track_resource("iron", 4.2);
+        costs1.track_labor("clown", 69.0);
+        costs1.track_labor_hours("clown", 1.1);
+        costs1.track_currency("usd", Decimal::new(1300, 2));
+        costs1.track_currency("cny", Decimal::new(1, 2));
+        let mut costs2 = Costs::new();
+        costs2.track_resource("iron", 4.2);
+        costs2.track_labor("clown", 69.0);
+        costs2.track_labor_hours("clown", 1.1);
+        costs2.track_currency("usd", Decimal::new(0, 2));
+        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), true);
+
+        let mut costs1 = Costs::new();
+        costs1.track_resource("iron", 4.2);
+        costs1.track_labor("clown", 69.0);
+        costs1.track_labor_hours("clown", 1.1);
+        costs1.track_currency("usd", Decimal::new(1300, 2));
+        costs1.track_currency("cny", Decimal::new(1, 2));
+        let mut costs2 = Costs::new();
+        costs2.track_resource("iron", 4.2);
+        costs2.track_labor("clown", 69.0);
+        costs2.track_labor_hours("clown", 0.0);
+        costs2.track_currency("usd", Decimal::new(1200, 2));
+        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), true);
+    }
+
+    #[test]
+    #[should_panic]
+    fn div_by_0() {
+        let mut costs1 = Costs::new();
+        let costs2 = Costs::new();
+
+        costs1.track_resource("iron", 8.5);
+
+        let costs = costs1 / costs2;
+        assert_eq!(costs.get_resource("iron"), 8.5 / 0.0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn div_f64_by_0() {
+        let mut costs1 = Costs::new();
+
+        costs1.track_labor("dancer", 6.0);
+        costs1.track_resource("widget", 3.1);
+        costs1.track_resource("oil", 5.6);
+
+        let costs = costs1 / 0.0;
+        assert_eq!(costs.get_labor("dancer"), 6.0 / 0.0);
+        assert_eq!(costs.get_resource("widget"), 3.1 / 0.0);
+        assert_eq!(costs.get_resource("oil"), 5.6 / 0.0);
+    }
+
+    #[test]
+    fn is_zero() {
+        let mut costs = Costs::new();
+        assert!(costs.is_zero());
+        costs.track_resource("widget", 5.0);
+        assert!(!costs.is_zero());
+        assert!(!Costs::new_with_labor("dictator", 4.0).is_zero());
     }
 }
 

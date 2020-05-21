@@ -30,11 +30,11 @@ pub enum Permission {
     CompanySetLaborWage,
     CompanyAdminClock,
 
-    ProductCreate,
-    ProductUpdate,
-    ProductDelete,
-    ProductAdminUpdate,
-    ProductAdminDelete,
+    ResourceSpecCreate,
+    ResourceSpecUpdate,
+    ResourceSpecDelete,
+    ResourceSpecAdminUpdate,
+    ResourceSpecAdminDelete,
 
     CostTagCreate,
     CostTagUpdate,
@@ -59,7 +59,7 @@ pub enum Role {
     TimeTraveler,
     IdentityAdmin,
     CompanyAdmin,
-    ProductAdmin,
+    ResourceSpecAdmin,
     TagAdmin,
     OrderAdmin,
     Bank,
@@ -93,10 +93,10 @@ impl Role {
                     Permission::CompanyAdminDelete,
                 ]
             }
-            Role::ProductAdmin => {
+            Role::ResourceSpecAdmin => {
                 vec![
-                    Permission::ProductAdminUpdate,
-                    Permission::ProductAdminDelete,
+                    Permission::ResourceSpecAdminUpdate,
+                    Permission::ResourceSpecAdminDelete,
                 ]
             }
             Role::TagAdmin => {
@@ -126,9 +126,9 @@ impl Role {
                     Permission::CompanyClockIn,
                     Permission::CompanyClockOut,
                     Permission::CompanySetLaborWage,
-                    Permission::ProductCreate,
-                    Permission::ProductUpdate,
-                    Permission::ProductDelete,
+                    Permission::ResourceSpecCreate,
+                    Permission::ResourceSpecUpdate,
+                    Permission::ResourceSpecDelete,
                     Permission::CostTagCreate,
                     Permission::CostTagUpdate,
                     Permission::CostTagDelete,
@@ -212,7 +212,7 @@ pub mod tests {
         assert!(comp_admin.can(&Permission::CompanyAdminDelete));
         assert!(!comp_admin.can(&Permission::CompanySetType));
 
-        // TODO: ProductAdmin
+        // TODO: ResourceSpecAdmin
         // TODO: OrderAdmin
     }
 }

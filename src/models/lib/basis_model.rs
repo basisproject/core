@@ -1,3 +1,7 @@
+/// A trait that all model IDs implement.
+pub trait ModelID: Into<String> + From<String> + Clone + PartialEq + Eq + std::hash::Hash {
+}
+
 #[macro_export]
 macro_rules! basis_model {
     (
@@ -9,7 +13,7 @@ macro_rules! basis_model {
         $builder:ident
 
     ) => {
-        #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
         #[serde(transparent)]
         pub struct $id(String);
 
@@ -47,6 +51,8 @@ macro_rules! basis_model {
                 Self(id.to_string())
             }
         }
+
+        impl crate::models::lib::basis_model::ModelID for $id {}
 
         $(#[$struct_meta])*
         #[derive(Clone, Debug, PartialEq, getset::Getters, getset::Setters, derive_builder::Builder, serde::Serialize, serde::Deserialize)]

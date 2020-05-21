@@ -10,7 +10,7 @@ use crate::{
 use getset::{Getters, CopyGetters};
 use om2::{Measure, Unit, NumericUnion};
 use serde::{Serialize, Deserialize};
-use vf_rs::vf::AgentRelationship;
+use vf_rs::vf;
 
 /// How often we pay workers.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -87,7 +87,7 @@ basis_model! {
     /// A member of a company. Links a user to a company, and has other attached
     /// information like compensation, permission roles, etc.
     pub struct CompanyMember {
-        agent_relationship: AgentRelationship<(), AgentID, OccupationID>,
+        agent_relationship: vf::AgentRelationship<(), AgentID, OccupationID>,
         #[builder(default)]
         roles: Vec<Role>,
         compensation: Compensation,
