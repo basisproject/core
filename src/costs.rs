@@ -63,7 +63,7 @@
 //!
 //! The best way we can represent this without having enormous tree structures
 //! that are the size of the economy itself is through the Costs object which
-//! aggregates costs on the level of three hash objects:
+//! aggregates costs on the level of four hash objects:
 //!
 //! - **labor-occupation-wage** (`labor`) -- How much total cost *in wages* it
 //! took to make something, per-occupation.
@@ -128,16 +128,19 @@ pub struct Costs {
     /// Stores resource content. Resources are ResourceSpec instances that have
     /// a resource tracking information attached, so we link to them via their
     /// ResourceSpecID
+    #[serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty")]
     resource: HashMap<ResourceSpecID, f64>,
     /// Stores labor *as is has been paid in credits* per-occupation. In other
     /// words, we don't track raw hours here, but rather the social labor value
     /// as negotiated between workers and their companies.
+    #[serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty")]
     labor: HashMap<OccupationID, f64>,
     /// Stores raw labor hours per-occupation. This information might be more
     /// useful in the future, as it's a measure of the occupation-time that went
     /// into building something, as opposed to the credits paid out. Cases where
     /// this might be handy is a system where all wages are 0, but we still want
     /// to track labor content.
+    #[serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty")]
     labor_hours: HashMap<OccupationID, f64>,
     /// Stores currency values of products. This is a strange one to have in a
     /// moneyless system, but supports the banking process of the system by
@@ -147,6 +150,7 @@ pub struct Costs {
     /// (or how many credits to destroy if being purchased internally). The idea
     /// is that in a hopeful future, this bucket will be obsolete and always
     /// empty as currency-based markets are phased out.
+    #[serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty")]
     currency: HashMap<CurrencyID, Decimal>,
 }
 
@@ -194,6 +198,43 @@ mod tests {
         assert_eq!(costs.get_currency("usd"), Decimal::new(500, 2) + Decimal::new(1490, 2));
         assert_eq!(costs.get_currency("eur"), Decimal::new(230, 2));
         assert_eq!(costs.get_currency("cny"), Decimal::new(3000, 0));
+        assert_eq!(costs.get_currency("btc"), Zero::zero());
+    }
+
+    #[test]
+    fn sub() {
+        let mut costs1 = Costs::new();
+        let mut costs2 = Costs::new();
+
+        costs1.track_labor("miner", 6.0);
+        costs1.track_resource("widget", 3.1);
+        costs1.track_resource("iron", 8.5);
+        costs1.track_labor_hours("miner", 0.5);
+        costs1.track_currency("usd", Decimal::new(500, 2));
+        costs2.track_currency("eur", Decimal::new(230, 2));
+        costs2.track_labor("miner", 2.0);
+        costs2.track_labor("widgetmaker", 3.0);
+        costs2.track_resource("widget", 1.8);
+        costs2.track_resource("oil", 5.6);
+        costs2.track_labor_hours("miner", 0.7);
+        costs2.track_labor_hours("birthday clown", 0.3);
+        costs2.track_currency("usd", Decimal::new(1490, 2));
+        costs2.track_currency("cny", Decimal::new(3000, 0));
+
+        // negatives are ok
+        let costs = costs1 - costs2;
+        assert_eq!(costs.get_labor("miner"), 6.0 - 2.0);
+        assert_eq!(costs.get_labor("widgetmaker"), -3.0);
+        assert_eq!(costs.get_labor("joker"), 0.0);
+        assert_eq!(costs.get_labor_hours("miner"), 0.5 - 0.7);
+        assert_eq!(costs.get_labor_hours("birthday clown"), -0.3);
+        assert_eq!(costs.get_labor_hours("magical wish pony"), 0.0);
+        assert_eq!(costs.get_resource("widget"), 3.1 - 1.8);
+        assert_eq!(costs.get_resource("iron"), 8.5 - 0.0);
+        assert_eq!(costs.get_resource("oil"), -5.6);
+        assert_eq!(costs.get_currency("usd"), Decimal::new(500, 2) - Decimal::new(1490, 2));
+        assert_eq!(costs.get_currency("eur"), Decimal::new(-230, 2));
+        assert_eq!(costs.get_currency("cny"), Decimal::new(-3000, 0));
         assert_eq!(costs.get_currency("btc"), Zero::zero());
     }
 
@@ -410,6 +451,13 @@ mod tests {
         costs.track_resource("widget", 5.0);
         assert!(!costs.is_zero());
         assert!(!Costs::new_with_labor("dictator", 4.0).is_zero());
+    }
+
+    #[test]
+    fn serialize() {
+        let costs = Costs::new();
+        let ser = serde_json::to_string(&costs).unwrap();
+        assert_eq!(ser, "{}");
     }
 }
 

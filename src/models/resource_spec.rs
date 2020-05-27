@@ -28,7 +28,7 @@ impl Dimensions {
 
 basis_model! {
     pub struct ResourceSpec {
-        resource_specification: vf::ResourceSpecification<Url>,
+        inner: vf::ResourceSpecification<Url>,
         /// products are namespaced by company_id. we have no interest in trying
         /// to classify some chair as a Chair that anyone can build, but rather
         /// only as a chair built by a specific company.

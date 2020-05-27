@@ -1,7 +1,7 @@
 use vf_rs::vf;
 basis_model! {
     pub struct Agreement {
-        agreement: vf::Agreement,
+        inner: vf::Agreement,
     }
     AgreementID
     AgreementBuilder

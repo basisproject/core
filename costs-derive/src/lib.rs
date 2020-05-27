@@ -107,7 +107,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             #(
                 #[doc = #fn_track_comment]
                 pub fn #fn_track<T: Into<#field_hashkey>>(&mut self, id: T, val: #field_hashval) {
-                    if val < Zero::zero() {
+                    if val < #field_hashval::zero() {
                         panic!(#fn_track_panic);
                     }
                     let entry = self.#field_name_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
@@ -117,7 +117,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             #(
                 #[doc = #fn_get_comment]
                 pub fn #fn_get<T: Into<#field_hashkey>>(&self, id: T) -> #field_hashval {
-                    *self.#field_name().get(&id.into()).unwrap_or(&rust_decimal::prelude::Zero::zero())
+                    *self.#field_name().get(&id.into()).unwrap_or(&#field_hashval::zero())
                 }
             )*
 
@@ -125,7 +125,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             pub fn is_zero(&self) -> bool {
                 #(
                     for (_, val) in self.#field_name().iter() {
-                        if val > &rust_decimal::prelude::Zero::zero() {
+                        if val > &#field_hashval::zero() {
                             return false;
                         }
                     }
@@ -140,7 +140,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 let mut new_costs = Costs::new();
                 #(
                     for (k, lval) in self.#field_name_mut().iter_mut() {
-                        let mut rval = costs.#field_name().get(k).unwrap_or(&Zero::zero()).clone();
+                        let mut rval = costs.#field_name().get(k).unwrap_or(&#field_hashval::zero()).clone();
                         let val = if lval > &mut rval { rval } else { lval.clone() };
                         *lval -= val;
                         new_costs.#fn_track(k.clone(), val.clone());
@@ -154,11 +154,11 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             pub fn is_div_by_0(costs1: &Costs, costs2: &Costs) -> bool {
                 #(
                     for (k, v) in costs1.#field_name().iter() {
-                        let div = costs2.#field_name().get(k).map(|x| x.clone()).unwrap_or(Zero::zero());
-                        if v == &Zero::zero() {
+                        let div = costs2.#field_name().get(k).map(|x| x.clone()).unwrap_or(#field_hashval::zero());
+                        if v == &#field_hashval::zero() {
                             continue;
                         }
-                        if div == Zero::zero() {
+                        if div == #field_hashval::zero() {
                             return true;
                         }
                     }
@@ -173,7 +173,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             fn add(mut self, other: Self) -> Self {
                 #(
                     for k in other.#field_name().keys() {
-                        let entry = self.#field_name_mut().entry(k.clone()).or_insert(Zero::zero());
+                        let entry = self.#field_name_mut().entry(k.clone()).or_insert(#field_hashval::zero());
                         *entry += other.#field_name().get(k).unwrap();
                     }
                 )*
@@ -187,7 +187,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             fn sub(mut self, other: Self) -> Self {
                 #(
                     for k in other.#field_name().keys() {
-                        let entry = self.#field_name_mut().entry(k.clone()).or_insert(Zero::zero());
+                        let entry = self.#field_name_mut().entry(k.clone()).or_insert(#field_hashval::zero());
                         *entry -= other.#field_name().get(k).unwrap();
                     }
                 )*
@@ -201,7 +201,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             fn mul(mut self, rhs: Self) -> Self {
                 #(
                     for (k, val) in self.#field_name_mut().iter_mut() {
-                        *val *= rhs.#field_name().get(k).unwrap_or(&Zero::zero());
+                        *val *= rhs.#field_name().get(k).unwrap_or(&#field_hashval::zero());
                     }
                 )*
                 self
@@ -227,11 +227,11 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             fn div(mut self, rhs: Self) -> Self::Output {
                 #(
                     for (k, v) in self.#field_name_mut().iter_mut() {
-                        let div = rhs.#field_name().get(k).map(|x| x.clone()).unwrap_or(Zero::zero());
-                        if v == &Zero::zero() {
+                        let div = rhs.#field_name().get(k).map(|x| x.clone()).unwrap_or(#field_hashval::zero());
+                        if v == &#field_hashval::zero() {
                             continue;
                         }
-                        if div == Zero::zero() {
+                        if div == #field_hashval::zero() {
                             panic!(#fn_div_panic, k);
                         }
                         *v /= div;
@@ -239,7 +239,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                     for (k, _) in rhs.#field_name().iter() {
                         match self.#field_name().get(k) {
                             None => {
-                                self.#field_name_mut().insert(k.clone(), Zero::zero());
+                                self.#field_name_mut().insert(k.clone(), #field_hashval::zero());
                             }
                             _ => {}
                         }
@@ -253,7 +253,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
            type Output = Self;
 
            fn div(mut self, rhs: f64) -> Self::Output {
-               if rhs == Zero::zero() {
+               if rhs == f64::zero() {
                    panic!("Costs::div() -- divide by zero");
                }
                #(

@@ -10,30 +10,18 @@ use vf_rs::vf;
 
 basis_model! {
     pub struct Process {
-        process: vf::Process<ProcessSpecID, Url, CompanyID, (), ()>,
+        /// The inner VF process
+        inner: vf::Process<ProcessSpecID, Url, CompanyID, (), ()>,
+        /// Our costs tally for this process
         costs: Costs,
     }
     ProcessID
     ProcessBuilder
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn cost_tracking() {
-        let costs = Costs::new();
-
-        // TODO: take the following:
-        //
-        // - inputs
-        // - outputs
-        // - cost tags ...or something similar?
-        // - amortization
-        //
-        // assign the costs of the inputs to the outputs either equally or in
-        // proportion to the cost tags.
+impl Process {
+    pub fn track_costs(&mut self, costs: Costs) {
+        self.costs = self.costs.clone() + costs;
     }
 }
 

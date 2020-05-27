@@ -4,7 +4,7 @@ use crate::{
         agent::AgentID,
         company::{Permission, Role},
         occupation::OccupationID,
-        process::ProcessID,
+        process_spec::ProcessSpecID,
     },
 };
 use getset::{Getters, CopyGetters};
@@ -70,6 +70,7 @@ impl Compensation {
         Self::salary_with_schedule(wage, pay_into, PayrollSchedule::SemiMonthly, est_hours_per_week)
     }
 
+    /// Create a salary
     pub fn salary_with_schedule<T, A>(wage: T, pay_into: A, schedule: PayrollSchedule, est_hours_per_week: f64) -> Self
         where T: Into<f64>,
               A: Into<AccountID>,
@@ -87,17 +88,26 @@ basis_model! {
     /// A member of a company. Links a user to a company, and has other attached
     /// information like compensation, permission roles, etc.
     pub struct CompanyMember {
-        agent_relationship: vf::AgentRelationship<(), AgentID, OccupationID>,
+        /// Our inner VF relationship (stores both the UserID and CompanyID
+        /// under the `AgentID` generic type)
+        inner: vf::AgentRelationship<(), AgentID, OccupationID>,
+        /// The roles this member has at their company
         #[builder(default)]
         roles: Vec<Role>,
+        /// Describes how the member is compensated for their labor
         compensation: Compensation,
-        process_id: ProcessID,
+        /// A process spec that the member attributes their labor to by default.
+        /// This allows some amount of automation when determining what inner
+        /// process to count their labor towards. We use a ProcessSpec instead
+        /// of a Process here because Process is generally ephemeral.
+        process_spec_id: ProcessSpecID,
     }
     CompanyMemberID
     CompanyMemberBuilder
 }
 
 impl CompanyMember {
+    /// Determines if a member (based on their roles) can perform an action.
     pub fn can(&self, permission: &Permission) -> bool {
         if !self.is_active() {
             return false;
@@ -126,7 +136,7 @@ mod test {
     fn make_member() -> CompanyMember {
         CompanyMember::builder()
             .id("zing")
-            .agent_relationship(
+            .inner(
                 vf::AgentRelationship::builder()
                     .subject(UserID::from("jerry"))
                     .object(CompanyID::from("jerry's widgets ultd"))
@@ -136,7 +146,7 @@ mod test {
             .active(true)
             .roles(vec![Role::MemberAdmin])
             .compensation(Compensation::hourly(0.0, "12345"))
-            .process_id("1234444")
+            .process_spec_id("1234444")
             .created(util::time::now())
             .updated(util::time::now())
             .build().unwrap()
