@@ -18,6 +18,10 @@ pub enum CompanyType {
     /// For worker-owned companies that operate within a single region.
     ///
     /// Example: A local, worker-owned widget factory
+    ///
+    /// TODO!
+    /// TODO! a company should be able to span multiple regions
+    /// TODO!
     Syndicate(RegionID),
     /// For companies that exist outside of the Basis system.
     ///

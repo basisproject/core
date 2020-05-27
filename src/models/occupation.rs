@@ -1,8 +1,8 @@
-use vf_rs::vf::AgentRelationshipRole;
+use vf_rs;
 
 basis_model! {
     pub struct Occupation {
-        agent_relationship_role: AgentRelationshipRole,
+        inner: vf::AgentRelationshipRole,
     }
     OccupationID
     OccupationBuilder
