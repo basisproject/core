@@ -42,15 +42,15 @@ pub struct Compensation {
 
 impl Compensation {
     /// Create a standard hourly wage, paid biweekly
-    pub fn hourly<T, A>(wage: T, pay_into: A) -> Self
+    pub fn new_hourly<T, A>(wage: T, pay_into: A) -> Self
         where T: Into<f64>,
               A: Into<AccountID>,
     {
-        Self::hourly_with_schedule(wage, pay_into, PayrollSchedule::BiWeekly)
+        Self::new_hourly_with_schedule(wage, pay_into, PayrollSchedule::BiWeekly)
     }
 
     /// Create an hourly wage
-    pub fn hourly_with_schedule<T, A>(wage: T, pay_into: A, schedule: PayrollSchedule) -> Self
+    pub fn new_hourly_with_schedule<T, A>(wage: T, pay_into: A, schedule: PayrollSchedule) -> Self
         where T: Into<f64>,
               A: Into<AccountID>,
     {
@@ -63,15 +63,15 @@ impl Compensation {
     }
 
     /// Create a standard yearly salary, paid semimonthly
-    pub fn salary<T, A>(wage: T, pay_into: A, est_hours_per_week: f64) -> Self
+    pub fn new_salary<T, A>(wage: T, pay_into: A, est_hours_per_week: f64) -> Self
         where T: Into<f64>,
               A: Into<AccountID>,
     {
-        Self::salary_with_schedule(wage, pay_into, PayrollSchedule::SemiMonthly, est_hours_per_week)
+        Self::new_salary_with_schedule(wage, pay_into, PayrollSchedule::SemiMonthly, est_hours_per_week)
     }
 
     /// Create a salary
-    pub fn salary_with_schedule<T, A>(wage: T, pay_into: A, schedule: PayrollSchedule, est_hours_per_week: f64) -> Self
+    pub fn new_salary_with_schedule<T, A>(wage: T, pay_into: A, schedule: PayrollSchedule, est_hours_per_week: f64) -> Self
         where T: Into<f64>,
               A: Into<AccountID>,
     {
@@ -145,7 +145,7 @@ mod test {
             )
             .active(true)
             .roles(vec![Role::MemberAdmin])
-            .compensation(Compensation::hourly(0.0, "12345"))
+            .compensation(Compensation::new_hourly(0.0, "12345"))
             .process_spec_id("1234444")
             .created(util::time::now())
             .updated(util::time::now())
