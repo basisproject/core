@@ -140,7 +140,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 let mut new_costs = Costs::new();
                 #(
                     for (k, lval) in self.#field_name_mut().iter_mut() {
-                        let mut rval = costs.#field_name().get(k).unwrap_or(&#field_hashval::zero()).clone();
+                        let mut rval = costs.#fn_get(k.clone());
                         let val = if lval > &mut rval { rval } else { lval.clone() };
                         *lval -= val;
                         new_costs.#fn_track(k.clone(), val.clone());
@@ -149,12 +149,26 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 new_costs
             }
 
+            /// Determine if subtracting one set of costs from another results
+            /// in any negative values
+            pub fn is_sub_lt_0(costs1: &Costs, costs2: &Costs) -> bool {
+                let costs3 = costs1.clone() - costs2.clone();
+                #(
+                    for (_, v) in costs3.#field_name().iter() {
+                        if *v < #field_hashval::zero() {
+                            return true;
+                        }
+                    }
+                )*
+                false
+            }
+
             /// Determine if dividing one set of costs by another will result in
             /// a divide-by-zero panic.
             pub fn is_div_by_0(costs1: &Costs, costs2: &Costs) -> bool {
                 #(
                     for (k, v) in costs1.#field_name().iter() {
-                        let div = costs2.#field_name().get(k).map(|x| x.clone()).unwrap_or(#field_hashval::zero());
+                        let div = costs2.#fn_get(k.clone());
                         if v == &#field_hashval::zero() {
                             continue;
                         }
