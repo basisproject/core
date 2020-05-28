@@ -97,6 +97,7 @@
 
 use costs_derive::Costs;
 use crate::{
+    error::{Error, Result},
     models::{
         currency::CurrencyID,
         occupation::OccupationID,
@@ -158,6 +159,51 @@ impl Costs {
     /// Creates an empty cost object.
     pub fn new() -> Self {
         Self::default()
+    }
+}
+
+/// A standard interface around moving costs from one object to another.
+pub trait CostMover {
+    /// Get the costs associated with this object
+    fn costs(&self) -> &Costs;
+
+    /// Set the costs associated with this object
+    fn set_costs(&mut self, costs: Costs);
+
+    /// When called on an object, the object releases (gives) the costs in the
+    /// amount specified (reducing its internal costs amount) and returns a
+    /// result with the released costs.
+    ///
+    /// This method can fail if the costs for any reason fall below zero.
+    fn release_costs(&mut self, costs_to_release: &Costs) -> Result<Costs> {
+        let mut costs = self.costs().clone();
+        if Costs::is_sub_lt_0(&costs, costs_to_release) {
+            Err(Error::NegativeCosts)?;
+        }
+        let taken = costs.take(costs_to_release);
+        self.set_costs(costs);
+        Ok(taken)
+    }
+
+    /// When called on an object, the object receives (takes) the costs in the
+    /// amount specified (incrementing its internal costs amount).
+    ///
+    /// Returns true if the costs on the receiving object are changed.
+    fn receive_costs(&mut self, costs_to_receive: &Costs) -> Result<bool> {
+        if costs_to_receive.is_zero() {
+            return Ok(false);
+        }
+        let negative = costs_to_receive.clone() * -1.0;
+        if Costs::is_sub_lt_0(self.costs(), &negative) {
+            Err(Error::NegativeCosts)?;
+        }
+        self.set_costs(self.costs().clone() + costs_to_receive.clone());
+        Ok(true)
+    }
+
+    /// Move costs between two CostMover objects
+    fn move_costs_to<T: CostMover>(&mut self, to: &mut T, costs: &Costs) -> Result<bool> {
+        to.receive_costs(&self.release_costs(costs)?)
     }
 }
 
@@ -336,6 +382,38 @@ mod tests {
     }
 
     #[test]
+    fn is_sub_lt_0() {
+        let costs1 = Costs::new_with_labor("clown", 0.0);
+        let costs2 = Costs::new();
+        assert_eq!(Costs::is_sub_lt_0(&costs1, &costs2), false);
+        assert_eq!(Costs::is_sub_lt_0(&costs2, &costs1), false);
+
+        let costs1 = Costs::new_with_labor("clown", 32.0);
+        let costs2 = Costs::new();
+        assert_eq!(Costs::is_sub_lt_0(&costs1, &costs2), false);
+        assert_eq!(Costs::is_sub_lt_0(&costs2, &costs1), true);
+
+        let costs1 = Costs::new_with_labor("machinist", 42.0);
+        let costs2 = Costs::new_with_resource("steel", 13.0);
+        assert_eq!(Costs::is_sub_lt_0(&costs1, &costs2), true);
+        assert_eq!(Costs::is_sub_lt_0(&costs2, &costs1), true);
+
+        let mut costs1 = Costs::new();
+        costs1.track_labor("machinist", 42.0);
+        costs1.track_labor("janitor", 16.0);
+        costs1.track_labor("doctor", 49.0);
+        costs1.track_labor_hours("machinist", 3.001);
+        costs1.track_labor_hours("janitor", 1.2);
+        costs1.track_labor_hours("doctor", 0.89002);
+        costs1.track_resource("steel", 13.0002292);
+        costs1.track_resource("crude oil", 1.34411);
+        costs1.track_currency("usd", Decimal::new(4298, 2));
+        let costs2 = costs1.clone();
+        assert_eq!(Costs::is_sub_lt_0(&costs1, &costs2), false);
+        assert_eq!(Costs::is_sub_lt_0(&costs2, &costs1), false);
+    }
+
+    #[test]
     fn is_div_0() {
         let costs1 = Costs::new_with_labor("clown", 0.0);
         let costs2 = Costs::new();
@@ -455,9 +533,51 @@ mod tests {
 
     #[test]
     fn serialize() {
+        // yes, this seems dumb, but in the past has failed to even compile so
+        // this is more of a "does this compile?" test than a "ah ha! an empty
+        // Costs object serializes to '{}'!!!" test
         let costs = Costs::new();
         let ser = serde_json::to_string(&costs).unwrap();
         assert_eq!(ser, "{}");
+    }
+
+    #[test]
+    fn cost_mover() {
+        #[derive(Default)]
+        struct Process {
+            costs: Costs,
+        }
+        #[derive(Default)]
+        struct Resource {
+            costs: Costs,
+        }
+
+        impl CostMover for Process {
+            fn costs(&self) -> &Costs { &self.costs }
+            fn set_costs(&mut self, costs: Costs) { self.costs = costs; }
+        }
+        impl CostMover for Resource {
+            fn costs(&self) -> &Costs { &self.costs }
+            fn set_costs(&mut self, costs: Costs) { self.costs = costs; }
+        }
+
+        let mut rec = Resource::default();
+        let mut proc = Process::default();
+
+        match rec.release_costs(&Costs::new_with_labor("jumper", 34.2)) {
+            Err(Error::NegativeCosts) => {}
+            _ => panic!("should have gotten NegativeCosts error"),
+        }
+
+        rec.costs.track_labor("firefighter", 12.1);
+        match rec.move_costs_to(&mut proc, &Costs::new_with_labor("firefighter", 12.2)) {
+            Err(Error::NegativeCosts) => {}
+            _ => panic!("should have gotten NegativeCosts error"),
+        }
+
+        rec.move_costs_to(&mut proc, &Costs::new_with_labor("firefighter", 12.0)).unwrap();
+        assert_eq!(rec.costs, Costs::new_with_labor("firefighter", 12.1 - 12.0));
+        assert_eq!(proc.costs, Costs::new_with_labor("firefighter", 12.0));
     }
 }
 
