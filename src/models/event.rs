@@ -28,6 +28,7 @@ use crate::{
     util::measure,
 };
 use derive_builder::Builder;
+use om2::{Measure, NumericUnion, Unit};
 use serde::{Serialize, Deserialize};
 use std::convert::TryInto;
 use vf_rs::vf::{self, Action};
@@ -36,15 +37,45 @@ use vf_rs::vf::{self, Action};
 /// wages, labor hours, or both. This lets our event processor know.
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum LaborType {
-    /// This event signifies a wage cost
+    /// This event signifies a wage cost.
+    ///
+    /// We would use this if we want to record a wage cost (ie, `Costs.labor`)
+    /// but not a labor hour cost. For instance, if a worker is on salary but
+    /// they also record their hours (ie via clocking in/out) separately, they
+    /// would create two separate work events with `LaborType::Wage` and
+    /// `LaborType::Hours` to represent both.
     Wage,
     /// This event signifies a labor hour cost
+    ///
+    /// We would use this if we want to record a labor our cost (ie
+    /// `Costs.labor_hours`) but not a labor age cost.
     Hours,
-    /// This event should be counted toward both wages and hours
+    /// This event should be counted toward both wages and hours.
+    ///
+    /// This can be used for an hourly worker that records hours worked and
+    /// hourly wage at the same time, or it can be used for a salaried worker
+    /// that doesn't track their hours at all and wants to create automatic
+    /// entries for their labor hours that also signify their labor wage.
     WageAndHours,
 }
 
+/// When creating a `transfer` event, we need to know if that event transfers
+/// costs internally between processes or if it transfers resources between
+/// different agents.
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum TransferType {
+    /// This is an internal cost transfer
+    InternalCostTransfer,
+    /// This transfers a resource to another company (the original intended
+    /// purpose of the vf::Action::Transfer type)
+    ResourceTransfer,
+}
+
 basis_model! {
+    /// Events really tie the room together.
+    ///
+    /// They are the piece that represent the flow of resources and costs both
+    /// through and between economic entities.
     pub struct Event {
         /// The event's core VF type
         inner: vf::EconomicEvent<AgreementID, AgentID, ProcessID, AgentID, AgreementID, (), ResourceSpecID, ResourceID, EventID>,
@@ -55,6 +86,16 @@ basis_model! {
         /// When recording a work event, this lets us know if it should apply to
         /// the `labor` and/or `labor_hours` buckets of our Costs object.
         labor_type: Option<LaborType>,
+        /// The type of transfer (if using `Action::Transfer`). Can be internal
+        /// (exclusively for moving costs between processes) or external (giving
+        /// all rights and custody of a resource to another company).
+        ///
+        /// We could just measure whether or not the event has a ResourceID, but
+        /// being explicit is probably a better choice, especially when going
+        /// outside of the intended purpose of the `Transfer` event. It also
+        /// makes things more clear when creating the event whether it should be
+        /// allowed or not.
+        transfer_type: Option<TransferType>,
     }
     EventID
     EventBuilder
@@ -155,6 +196,10 @@ impl Event {
     ///
     /// This method returns an array of events that should be created as a
     /// result of processing this event.
+    ///
+    /// Note that this method *assumes the event is legitimate* and doesn't do
+    /// any kind of checking as to whether or not the event should exist. That
+    /// should happen when the event is created.
     pub fn process(&self, state: EventProcessState, now: &DateTime<Utc>) -> Result<EventProcessResult> {
         // some low-hanging fruit error checking. hackers HATE him!!1
         if self.inner().output_of().as_ref() != state.output_of.as_ref().map(|x| x.id()) {
@@ -179,38 +224,52 @@ impl Event {
             Action::Accept => {}
             Action::Cite => {}
             Action::Consume => {
-                let resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
+                let mut resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                 let mut resource_measure = resource.inner().accounting_quantity().clone()
                     .ok_or(Error::EventMissingResourceQuantity)?;
                 let event_measure = self.inner().resource_quantity().clone()
                     .ok_or(Error::EventMissingResourceQuantity)?;
 
                 let mut should_save_resource = false;
-                let mut resource_mod = resource.clone();
                 if measure::dec_measure(&mut resource_measure, &event_measure)? {
-                    resource_mod.inner_mut().set_accounting_quantity(Some(resource_measure));
+                    resource.inner_mut().set_accounting_quantity(Some(resource_measure));
                     should_save_resource = true;
                 }
                 if let Some(move_costs) = self.move_costs().as_ref() {
-                    let mut input_process = state.input_of.clone().ok_or(Error::EventMissingInputProcess)?.clone();
-                    if resource_mod.move_costs_to(&mut input_process, &move_costs)? {
+                    let mut input_process = state.input_of.clone().ok_or(Error::EventMissingInputProcess)?;
+                    if resource.move_costs_to(&mut input_process, &move_costs)? {
                         res.modify_process(input_process);
                         should_save_resource = true;
                     }
                 }
                 if should_save_resource {
-                    res.modify_resource(resource_mod);
+                    res.modify_resource(resource);
                 }
             }
             Action::DeliverService => {
+                let mut output_process = state.output_of.clone().ok_or(Error::EventMissingOutputProcess)?;
+                let mut input_process = state.input_of.clone().ok_or(Error::EventMissingInputProcess)?;
+                let move_costs = self.move_costs.clone().ok_or(Error::EventMissingCosts)?;
+                if output_process.move_costs_to(&mut input_process, &move_costs)? {
+                    res.modify_process(output_process);
+                    res.modify_process(input_process);
+                }
             }
             Action::Dropoff => {}
             Action::Lower => {}
-            Action::Modify => {}
+            Action::Modify => {
+                let mut output_process = state.output_of.clone().ok_or(Error::EventMissingOutputProcess)?;
+                let mut resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
+                let move_costs = self.move_costs.clone().ok_or(Error::EventMissingCosts)?;
+                if output_process.move_costs_to(&mut resource, &move_costs)? {
+                    res.modify_process(output_process);
+                    res.modify_resource(resource);
+                }
+            }
             Action::Move => {}
             Action::Pickup => {}
             Action::Produce => {
-                let resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
+                let mut resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                 // grab the resource's current accounting quantity and
                 // add the event's quantity to it. if the resource
                 // doesn't have a quantity, then just default to using
@@ -226,54 +285,99 @@ impl Event {
                     None => event_measure,
                 };
                 let company_id = self.inner().provider().clone();
-                let mut resource_mod = resource.clone();
-                resource_mod.inner_mut().set_accounting_quantity(Some(new_resource_measure));
-                resource_mod.inner_mut().set_primary_accountable(Some(company_id.clone().into()));
-                resource_mod.set_in_custody_of(company_id.into());
+                resource.inner_mut().set_accounting_quantity(Some(new_resource_measure));
+                resource.inner_mut().set_primary_accountable(Some(company_id.clone().into()));
+                resource.set_in_custody_of(company_id.into());
                 if let Some(move_costs) = self.move_costs().as_ref() {
-                    let mut output_process = state.output_of.clone().ok_or(Error::EventMissingOutputProcess)?.clone();
-                    if output_process.move_costs_to(&mut resource_mod, move_costs)? {
+                    let mut output_process = state.output_of.clone().ok_or(Error::EventMissingOutputProcess)?;
+                    if output_process.move_costs_to(&mut resource, move_costs)? {
                         res.modify_process(output_process);
                     }
                 }
-                res.modify_resource(resource_mod);
+                res.modify_resource(resource);
             }
             Action::Raise => {}
             Action::Transfer => {
-                let resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
-                let company_id: CompanyID = self.inner().receiver().clone().try_into()?;
-                let mut new_resource = resource.clone();
-                new_resource.inner_mut().set_primary_accountable(Some(company_id.clone().into()));
-                new_resource.set_in_custody_of(company_id.into());
-                res.modify_resource(new_resource);
+                // transfer is interesting because we can use it to move a
+                // particular resource between entities, but we can also use it
+                // to move costs internally between processes.
+                match self.transfer_type.clone().ok_or(Error::EventMissingTransferType)? {
+                    TransferType::InternalCostTransfer => {
+                        let mut output_process = state.output_of.clone().ok_or(Error::EventMissingOutputProcess)?;
+                        let mut input_process = state.input_of.clone().ok_or(Error::EventMissingInputProcess)?;
+                        let move_costs = self.move_costs.clone().ok_or(Error::EventMissingCosts)?;
+                        if output_process.move_costs_to(&mut input_process, &move_costs)? {
+                            res.modify_process(output_process);
+                            res.modify_process(input_process);
+                        }
+                    }
+                    TransferType::ResourceTransfer => {
+                        let mut resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
+                        let company_id: CompanyID = self.inner().receiver().clone().try_into()?;
+                        resource.inner_mut().set_primary_accountable(Some(company_id.clone().into()));
+                        resource.set_in_custody_of(company_id.into());
+                        res.modify_resource(resource);
+                    }
+                }
             }
             Action::TransferAllRights => {
-                let resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
+                let mut resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                 let company_id: CompanyID = self.inner().receiver().clone().try_into()?;
-                let mut new_resource = resource.clone();
-                new_resource.inner_mut().set_primary_accountable(Some(company_id.into()));
-                res.modify_resource(new_resource);
+                resource.inner_mut().set_primary_accountable(Some(company_id.into()));
+                res.modify_resource(resource);
             }
             Action::TransferCustody => {
-                let resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
+                let mut resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                 let company_id: CompanyID = self.inner().receiver().clone().try_into()?;
-                let mut new_resource = resource.clone();
-                new_resource.set_in_custody_of(company_id.into());
-                res.modify_resource(new_resource);
+                resource.set_in_custody_of(company_id.into());
+                res.modify_resource(resource);
             }
             Action::Use => {
-                let resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
-                let mut resource_mod = resource.clone();
+                let mut resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                 if let Some(move_costs) = self.move_costs().as_ref() {
-                    let mut input_process = state.input_of.clone().ok_or(Error::EventMissingInputProcess)?.clone();
-                    if resource_mod.move_costs_to(&mut input_process, &move_costs)? {
-                        res.modify_resource(resource_mod);
+                    let mut input_process = state.input_of.clone().ok_or(Error::EventMissingInputProcess)?;
+                    if resource.move_costs_to(&mut input_process, &move_costs)? {
+                        res.modify_resource(resource);
                         res.modify_process(input_process);
                     }
                 }
             }
             Action::Work => {
-                //let mut input_process = input_of.ok_or(Error::EventMissingInputProcess)?.clone();
+                let mut input_process = state.input_of.clone().ok_or(Error::EventMissingInputProcess)?;
+                let member = state.provider.clone().ok_or(Error::EventMissingProvider)?;
+                let labor_type = self.labor_type.clone().ok_or(Error::EventMissingLaborType)?;
+                let occupation_id = member.inner().relationship().clone();
+                let get_hours = || -> Result<f64> {
+                    match self.inner().effort_quantity() {
+                        Some(Measure { has_unit: Unit::Hour, has_numerical_value: hours }) => {
+                            let num_hours = NumericUnion::Double(0.0).add(hours.clone())
+                                .map_err(|e| Error::NumericUnionOpError(e))?;
+                            match num_hours {
+                                NumericUnion::Double(val) => Ok(val),
+                                _ => Err(Error::NumericUnionOpError(format!("error converting to f64: {:?}", num_hours)))?,
+                            }
+                        }
+                        _ => Err(Error::EventLaborMustBeHours)?,
+                    }
+                };
+                match labor_type {
+                    // for wage costs, we effectively use `Event.move_costs` 
+                    LaborType::Wage => {
+                        let costs = self.move_costs.clone().ok_or(Error::EventMissingCosts)?;
+                        input_process.receive_costs(&costs)?;
+                    }
+                    LaborType::Hours => {
+                        let hours = get_hours()?;
+                        input_process.receive_costs(&Costs::new_with_labor_hours(occupation_id, hours))?;
+                    }
+                    LaborType::WageAndHours => {
+                        let hours = get_hours()?;
+                        let mut costs = self.move_costs.clone().ok_or(Error::EventMissingCosts)?;
+                        costs.track_labor_hours(occupation_id, hours);
+                        input_process.receive_costs(&costs)?;
+                    }
+                }
+                res.modify_process(input_process);
             }
         }
         Ok(res)
@@ -286,9 +390,11 @@ mod tests {
     use crate::{
         costs::Costs,
         models::{
-            company::CompanyID,
+            company::{CompanyID, Role},
+            company_member::{Compensation, CompanyMember},
             process::Process,
             resource::Resource,
+            user::UserID,
         },
         util,
     };
@@ -296,18 +402,7 @@ mod tests {
     use rust_decimal::prelude::*;
     use vf_rs::vf;
 
-    #[test]
-    fn consume() {
-    }
-
-    #[test]
-    fn deliver_service() {
-    }
-
-    #[test]
-    fn produce() {
-        let company_id: CompanyID = "6969".into();
-        let now = util::time::now();
+    fn test_init(company_id: &CompanyID, now: &DateTime<Utc>) -> (Process, Process, Resource, CompanyMember) {
         let process_from = Process::builder()
             .id("1111")
             .inner(vf::Process::builder().name("Make widgets").build().unwrap())
@@ -335,6 +430,38 @@ mod tests {
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();
+        let member = CompanyMember::builder()
+            .id("5555")
+            .inner(
+                vf::AgentRelationship::builder()
+                    .subject(UserID::from("jerry"))
+                    .object(CompanyID::from("jerry's widgets ultd"))
+                    .relationship("CEO")
+                    .build().unwrap()
+            )
+            .active(true)
+            .roles(vec![Role::MemberAdmin])
+            .compensation(Compensation::new_hourly(0.0, "12345"))
+            .process_spec_id("1234444")
+            .created(now.clone())
+            .updated(now.clone())
+            .build().unwrap();
+        (process_from, process_to, resource, member)
+    }
+
+    #[test]
+    fn consume() {
+    }
+
+    #[test]
+    fn deliver_service() {
+    }
+
+    #[test]
+    fn produce() {
+        let now = util::time::now();
+        let company_id: CompanyID = "6969".into();
+        let (process_from, process_to, resource, _) = test_init(&company_id, &now);
 
         let event = Event::builder()
             .id(EventID::create())
@@ -352,6 +479,7 @@ mod tests {
             )
             .move_costs(Costs::new_with_labor("machinist", 42.0))
             .labor_type(None)
+            .transfer_type(None)
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();
@@ -404,6 +532,7 @@ mod tests {
             )
             .move_costs(Costs::new_with_labor("machinist", 100.000001))
             .labor_type(None)
+            .transfer_type(None)
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();

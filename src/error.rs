@@ -14,6 +14,10 @@ pub enum Error {
     EventMismatchedResourceID,
     #[error("event `provider` object does not match ID")]
     EventMismatchedProviderID,
+    #[error("event is missing costs")]
+    EventMissingCosts,
+    #[error("event is missing `labor_type`")]
+    EventMissingLaborType,
     #[error("event is missing resource quantity measurement")]
     EventMissingResourceQuantity,
     #[error("event missing resource")]
@@ -22,8 +26,14 @@ pub enum Error {
     EventMissingOutputProcess,
     #[error("event missing `input_of` process")]
     EventMissingInputProcess,
+    #[error("event missing `provider` member")]
+    EventMissingProvider,
+    #[error("event missing `transfer_type`")]
+    EventMissingTransferType,
     #[error("event creates negative resource amount")]
     EventCreatesNegativeResourceAmount,
+    #[error("event labor effort must be recorded in hours")]
+    EventLaborMustBeHours,
     #[error("operation on measurement with mismatched units")]
     MeasureUnitsMismatched,
     #[error("missing measure object")]
