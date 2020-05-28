@@ -16,6 +16,7 @@ pub mod agreement;
 pub mod account;
 pub mod resource_spec;
 pub mod resource;
+pub mod commitment;
 //pub mod resource_group;
 //pub mod resource_group_link;
 

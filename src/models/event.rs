@@ -18,6 +18,7 @@ use crate::{
     error::{Error, Result},
     models::{
         agent::AgentID,
+        agreement::AgreementID,
         company::CompanyID,
         company_member::CompanyMember,
         process::{Process, ProcessID},
@@ -26,6 +27,7 @@ use crate::{
     },
     util::measure,
 };
+use derive_builder::Builder;
 use serde::{Serialize, Deserialize};
 use std::convert::TryInto;
 use vf_rs::vf::{self, Action};
@@ -45,7 +47,7 @@ pub enum LaborType {
 basis_model! {
     pub struct Event {
         /// The event's core VF type
-        inner: vf::EconomicEvent<(), CompanyID, ProcessID, AgentID, (), (), ResourceSpecID, ResourceID, EventID>,
+        inner: vf::EconomicEvent<AgreementID, AgentID, ProcessID, AgentID, AgreementID, (), ResourceSpecID, ResourceID, EventID>,
         /// If this event is an output of a process, move some fixed amount of
         /// the process' costs and transfer them either into another Process or
         /// into a Resource
@@ -66,6 +68,29 @@ pub enum Saver {
     CreateResource(Resource),
     ModifyProcess(Process),
     ModifyResource(Resource),
+}
+
+/// A set of data that the event processor needs to do its thing. Generally this
+/// acts as a container for objects that the event only has *references* to and
+/// wouldn't otherwise be able to access.
+#[derive(Debug, Default, Builder)]
+#[builder(pattern = "owned", setter(into, strip_option), default)]
+pub struct EventProcessState {
+    /// The process this event is an output of
+    output_of: Option<Process>,
+    /// The process this event is an input of
+    input_of: Option<Process>,
+    /// The resource this event operates on (Consume/Produce/etc)
+    resource: Option<Resource>,
+    /// The provider (if a member) performing an action (generally `Work`)
+    provider: Option<CompanyMember>,
+}
+
+impl EventProcessState {
+    /// Create a state builder
+    pub fn builder() -> EventProcessStateBuilder {
+        EventProcessStateBuilder::default()
+    }
 }
 
 /// A standard result set our event processor can return, including the items
@@ -130,31 +155,31 @@ impl Event {
     ///
     /// This method returns an array of events that should be created as a
     /// result of processing this event.
-    pub fn process(&self, output_of: Option<Process>, input_of: Option<Process>, resource: Option<Resource>, provider: Option<&CompanyMember>, updated: &DateTime<Utc>) -> Result<EventProcessResult> {
-        // some low-hanging fruit error checking
-        if self.inner().output_of().as_ref() != output_of.as_ref().map(|x| x.id()) {
+    pub fn process(&self, state: EventProcessState, now: &DateTime<Utc>) -> Result<EventProcessResult> {
+        // some low-hanging fruit error checking. hackers HATE him!!1
+        if self.inner().output_of().as_ref() != state.output_of.as_ref().map(|x| x.id()) {
             Err(Error::EventMismatchedOutputProcessID)?;
         }
-        if self.inner().input_of().as_ref() != input_of.as_ref().map(|x| x.id()) {
+        if self.inner().input_of().as_ref() != state.input_of.as_ref().map(|x| x.id()) {
             Err(Error::EventMismatchedInputProcessID)?;
         }
-        if self.inner().resource_inventoried_as().as_ref() != resource.as_ref().map(|x| x.id()) {
+        if self.inner().resource_inventoried_as().as_ref() != state.resource.as_ref().map(|x| x.id()) {
             Err(Error::EventMismatchedResourceID)?;
         }
-        if let Some(provider) = provider.as_ref() {
+        if let Some(provider) = state.provider.as_ref() {
             if self.inner().provider() != &provider.id().clone().into() {
                 Err(Error::EventMismatchedProviderID)?;
             }
         }
 
         // create our result set
-        let mut res = EventProcessResult::new(&self.id, updated);
+        let mut res = EventProcessResult::new(&self.id, now);
 
         match self.inner().action() {
             Action::Accept => {}
             Action::Cite => {}
             Action::Consume => {
-                let resource = resource.ok_or(Error::EventMissingResource)?;
+                let resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                 let mut resource_measure = resource.inner().accounting_quantity().clone()
                     .ok_or(Error::EventMissingResourceQuantity)?;
                 let event_measure = self.inner().resource_quantity().clone()
@@ -167,7 +192,7 @@ impl Event {
                     should_save_resource = true;
                 }
                 if let Some(move_costs) = self.move_costs().as_ref() {
-                    let mut input_process = input_of.ok_or(Error::EventMissingInputProcess)?.clone();
+                    let mut input_process = state.input_of.clone().ok_or(Error::EventMissingInputProcess)?.clone();
                     if resource_mod.move_costs_to(&mut input_process, &move_costs)? {
                         res.modify_process(input_process);
                         should_save_resource = true;
@@ -185,7 +210,7 @@ impl Event {
             Action::Move => {}
             Action::Pickup => {}
             Action::Produce => {
-                let resource = resource.ok_or(Error::EventMissingResource)?;
+                let resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                 // grab the resource's current accounting quantity and
                 // add the event's quantity to it. if the resource
                 // doesn't have a quantity, then just default to using
@@ -206,7 +231,7 @@ impl Event {
                 resource_mod.inner_mut().set_primary_accountable(Some(company_id.clone().into()));
                 resource_mod.set_in_custody_of(company_id.into());
                 if let Some(move_costs) = self.move_costs().as_ref() {
-                    let mut output_process = output_of.ok_or(Error::EventMissingOutputProcess)?.clone();
+                    let mut output_process = state.output_of.clone().ok_or(Error::EventMissingOutputProcess)?.clone();
                     if output_process.move_costs_to(&mut resource_mod, move_costs)? {
                         res.modify_process(output_process);
                     }
@@ -215,7 +240,7 @@ impl Event {
             }
             Action::Raise => {}
             Action::Transfer => {
-                let resource = resource.ok_or(Error::EventMissingResource)?;
+                let resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                 let company_id: CompanyID = self.inner().receiver().clone().try_into()?;
                 let mut new_resource = resource.clone();
                 new_resource.inner_mut().set_primary_accountable(Some(company_id.clone().into()));
@@ -223,24 +248,24 @@ impl Event {
                 res.modify_resource(new_resource);
             }
             Action::TransferAllRights => {
-                let resource = resource.ok_or(Error::EventMissingResource)?;
+                let resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                 let company_id: CompanyID = self.inner().receiver().clone().try_into()?;
                 let mut new_resource = resource.clone();
                 new_resource.inner_mut().set_primary_accountable(Some(company_id.into()));
                 res.modify_resource(new_resource);
             }
             Action::TransferCustody => {
-                let resource = resource.ok_or(Error::EventMissingResource)?;
+                let resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                 let company_id: CompanyID = self.inner().receiver().clone().try_into()?;
                 let mut new_resource = resource.clone();
                 new_resource.set_in_custody_of(company_id.into());
                 res.modify_resource(new_resource);
             }
             Action::Use => {
-                let resource = resource.ok_or(Error::EventMissingResource)?;
+                let resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                 let mut resource_mod = resource.clone();
                 if let Some(move_costs) = self.move_costs().as_ref() {
-                    let mut input_process = input_of.ok_or(Error::EventMissingInputProcess)?.clone();
+                    let mut input_process = state.input_of.clone().ok_or(Error::EventMissingInputProcess)?.clone();
                     if resource_mod.move_costs_to(&mut input_process, &move_costs)? {
                         res.modify_resource(resource_mod);
                         res.modify_process(input_process);
@@ -330,7 +355,12 @@ mod tests {
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();
-        let res = event.process(Some(process_from.clone()), Some(process_to.clone()), Some(resource.clone()), None, &now).unwrap();
+        let state = EventProcessState::builder()
+            .output_of(process_from.clone())
+            .input_of(process_to.clone())
+            .resource(resource.clone())
+            .build().unwrap();
+        let res = event.process(state, &now).unwrap();
         let mods = res.modifications();
         assert_eq!(mods.len(), 2);
         match &mods[0] {
@@ -377,7 +407,12 @@ mod tests {
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();
-        match event.process(Some(process_from.clone()), Some(process_to.clone()), Some(resource.clone()), None, &now) {
+        let state = EventProcessState::builder()
+            .output_of(process_from.clone())
+            .input_of(process_to.clone())
+            .resource(resource.clone())
+            .build().unwrap();
+        match event.process(state, &now) {
             Err(Error::NegativeCosts) => {}
             _ => panic!("should have overflowed move_costs"),
         }
