@@ -21,6 +21,9 @@ pub fn dec_measure(measure: &mut Measure, dec_by: &Measure) -> Result<bool> {
     if dec_quantity.is_zero() {
         return Ok(false);
     }
+    if dec_quantity.is_negative() {
+        Err(Error::NegativeMeasurement)?;
+    }
     let remaining = from_quantity.clone().sub(dec_quantity.clone())
         .map_err(|e| Error::NumericUnionOpError(e))?;
     if remaining.is_negative() {
@@ -44,6 +47,9 @@ pub fn inc_measure(measure: &mut Measure, inc_by: &Measure) -> Result<bool> {
     let inc_quantity = inc_by.has_numerical_value().clone();
     if inc_quantity.is_zero() {
         return Ok(false);
+    }
+    if inc_quantity.is_negative() {
+        Err(Error::NegativeMeasurement)?;
     }
     let added = from_quantity.clone().add(inc_quantity.clone())
         .map_err(|e| Error::NumericUnionOpError(e))?;
