@@ -1,5 +1,5 @@
 use crate::{
-    costs::Costs,
+    costs::{Costs, CostMover},
     models::{
         company::CompanyID,
         process_spec::ProcessSpecID,
@@ -22,6 +22,16 @@ basis_model! {
 impl Process {
     pub fn track_costs(&mut self, costs: Costs) {
         self.costs = self.costs.clone() + costs;
+    }
+}
+
+impl CostMover for Process {
+    fn costs(&self) -> &Costs {
+        self.costs()
+    }
+
+    fn set_costs(&mut self, costs: Costs) {
+        self.set_costs(costs);
     }
 }
 

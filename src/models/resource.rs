@@ -1,5 +1,5 @@
 use crate::{
-    costs::Costs,
+    costs::{Costs, CostMover},
     models::{
         agent::AgentID,
         process::ProcessID,
@@ -20,5 +20,15 @@ basis_model! {
     }
     ResourceID
     ResourceBuilder
+}
+
+impl CostMover for Resource {
+    fn costs(&self) -> &Costs {
+        self.costs()
+    }
+
+    fn set_costs(&mut self, costs: Costs) {
+        self.set_costs(costs);
+    }
 }
 
