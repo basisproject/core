@@ -1,4 +1,4 @@
-use vf_rs;
+use vf_rs::vf;
 
 basis_model! {
     pub struct Occupation {
