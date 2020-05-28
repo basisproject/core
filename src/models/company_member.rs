@@ -7,7 +7,7 @@ use crate::{
         process_spec::ProcessSpecID,
     },
 };
-use getset::{Getters, CopyGetters};
+use getset::Getters;
 use om2::{Measure, Unit, NumericUnion};
 use serde::{Serialize, Deserialize};
 use vf_rs::vf;
@@ -25,7 +25,7 @@ pub enum PayrollSchedule {
 /// account information.
 ///
 /// Can account for hourly wages or salary.
-#[derive(Clone, Debug, PartialEq, Getters, CopyGetters, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Getters, Serialize, Deserialize)]
 #[getset(get = "pub")]
 pub struct Compensation {
     /// A measure of value per time (ie, credits per hour, or credits per year)
@@ -35,7 +35,7 @@ pub struct Compensation {
     /// Our payroll schedule (biweekly, semimonthly, etc)
     schedule: PayrollSchedule,
     /// If the `period` is not hourly, we can give an estimate for the number of
-    /// hours worked per week, which gives us an abillity to estimate our labor
+    /// hours worked per week, which gives us an ability to estimate our labor
     /// hours (and not just wage payments)
     est_hours_per_week: Option<f64>,
 }
