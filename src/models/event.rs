@@ -72,10 +72,7 @@ pub enum TransferType {
 }
 
 basis_model! {
-    /// Events really tie the room together.
-    ///
-    /// They are the piece that represent the flow of resources and costs both
-    /// through and between economic entities.
+    /// The event model, which is the glue that moves costs between objects.
     pub struct Event {
         /// The event's core VF type
         inner: vf::EconomicEvent<AgreementID, AgentID, ProcessID, AgentID, AgreementID, (), ResourceSpecID, ResourceID, EventID>,
@@ -114,17 +111,17 @@ pub enum Saver {
 /// A set of data that the event processor needs to do its thing. Generally this
 /// acts as a container for objects that the event only has *references* to and
 /// wouldn't otherwise be able to access.
-#[derive(Debug, Default, Builder)]
+#[derive(Debug, Default, Clone, Builder)]
 #[builder(pattern = "owned", setter(into, strip_option), default)]
 pub struct EventProcessState {
-    /// The process this event is an output of
-    output_of: Option<Process>,
     /// The process this event is an input of
     input_of: Option<Process>,
-    /// The resource this event operates on (Consume/Produce/etc)
-    resource: Option<Resource>,
+    /// The process this event is an output of
+    output_of: Option<Process>,
     /// The provider (if a member) performing an action (generally `Work`)
     provider: Option<CompanyMember>,
+    /// The resource this event operates on (Consume/Produce/etc)
+    resource: Option<Resource>,
 }
 
 impl EventProcessState {
@@ -202,13 +199,13 @@ impl Event {
     /// should happen when the event is created.
     pub fn process(&self, state: EventProcessState, now: &DateTime<Utc>) -> Result<EventProcessResult> {
         // some low-hanging fruit error checking. hackers HATE him!!1
-        if self.inner().output_of().as_ref() != state.output_of.as_ref().map(|x| x.id()) {
+        if state.output_of.is_some() && self.inner().output_of().as_ref() != state.output_of.as_ref().map(|x| x.id()) {
             Err(Error::EventMismatchedOutputProcessID)?;
         }
-        if self.inner().input_of().as_ref() != state.input_of.as_ref().map(|x| x.id()) {
+        if state.input_of.is_some() && self.inner().input_of().as_ref() != state.input_of.as_ref().map(|x| x.id()) {
             Err(Error::EventMismatchedInputProcessID)?;
         }
-        if self.inner().resource_inventoried_as().as_ref() != state.resource.as_ref().map(|x| x.id()) {
+        if state.resource.is_some() && self.inner().resource_inventoried_as().as_ref() != state.resource.as_ref().map(|x| x.id()) {
             Err(Error::EventMismatchedResourceID)?;
         }
         if let Some(provider) = state.provider.as_ref() {
@@ -333,8 +330,8 @@ impl Event {
                 res.modify_resource(resource);
             }
             Action::Use => {
-                let mut resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                 if let Some(move_costs) = self.move_costs().as_ref() {
+                    let mut resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                     let mut input_process = state.input_of.clone().ok_or(Error::EventMissingInputProcess)?;
                     if resource.move_costs_to(&mut input_process, &move_costs)? {
                         res.modify_resource(resource);
@@ -382,6 +379,121 @@ impl Event {
         }
         Ok(res)
     }
+
+    /// Return a list of fields that the `Event` object needs to have to
+    /// successfully process itself.
+    pub fn required_event_fields(&self) -> Vec<&'static str> {
+        let mut fields = vec![];
+        match self.inner().action() {
+            Action::Accept => {}
+            Action::Cite => {}
+            Action::Consume => {
+                fields.push("resource_quantity");
+            }
+            Action::DeliverService => {
+                fields.push("move_costs");
+            }
+            Action::Dropoff => {}
+            Action::Lower => {}
+            Action::Modify => {
+                fields.push("move_costs");
+            }
+            Action::Move => {}
+            Action::Pickup => {}
+            Action::Produce => {
+                fields.push("resource_quantity");
+            }
+            Action::Raise => {}
+            Action::Transfer => {
+                fields.push("transfer_type");
+                match self.transfer_type {
+                    Some(TransferType::InternalCostTransfer) => {
+                        fields.push("move_costs");
+                    }
+                    _ => {}
+                }
+            }
+            Action::TransferAllRights => {}
+            Action::TransferCustody => {}
+            Action::Use => {}
+            Action::Work => {
+                fields.push("labor_type");
+                match self.labor_type {
+                    Some(LaborType::Wage) | Some(LaborType::WageAndHours) => {
+                        fields.push("move_costs");
+                    }
+                    _ => {}
+                }
+            }
+        }
+        fields.sort();
+        fields
+    }
+
+    /// Return a list of fields that the `EventProcessState` object needs to
+    /// have to successfully process this event.
+    pub fn required_state_fields(&self) -> Vec<&'static str> {
+        let mut fields = vec![];
+        match self.inner().action() {
+            Action::Accept => {}
+            Action::Cite => {}
+            Action::Consume => {
+                fields.push("resource");
+                if self.move_costs().is_some() {
+                    fields.push("input_of");
+                }
+            }
+            Action::DeliverService => {
+                fields.push("output_of");
+                fields.push("input_of");
+            }
+            Action::Dropoff => {}
+            Action::Lower => {}
+            Action::Modify => {
+                fields.push("output_of");
+                fields.push("resource");
+            }
+            Action::Move => {}
+            Action::Pickup => {}
+            Action::Produce => {
+                fields.push("resource");
+                if self.move_costs().is_some() {
+                    fields.push("output_of");
+                }
+            }
+            Action::Raise => {}
+            Action::Transfer => {
+                match self.transfer_type {
+                    Some(TransferType::InternalCostTransfer) => {
+                        fields.push("input_of");
+                        fields.push("output_of");
+                    }
+                    Some(TransferType::ResourceTransfer) => {
+                        fields.push("resource");
+                    }
+                    _ => {}
+                }
+            }
+            Action::TransferAllRights => {
+                fields.push("resource");
+            }
+            Action::TransferCustody => {
+                fields.push("resource");
+            }
+            Action::Use => {
+                fields.push("resource");
+                if self.move_costs().is_some() {
+                    fields.push("input_of");
+                }
+            }
+            Action::Work => {
+                fields.push("input_of");
+                fields.push("provider");
+            }
+        }
+        fields.sort();
+        fields
+    }
 }
 
 #[cfg(test)]
@@ -402,7 +514,109 @@ mod tests {
     use rust_decimal::prelude::*;
     use vf_rs::vf;
 
-    fn test_init(company_id: &CompanyID, now: &DateTime<Utc>) -> (Process, Process, Resource, CompanyMember) {
+    fn state_with_fields(state: &EventProcessState, fields: Vec<&'static str>) -> EventProcessState {
+        let mut builder = EventProcessState::builder();
+        for field in fields {
+            match field {
+                "output_of" => {
+                    if state.output_of.is_some() {
+                        builder = builder.output_of(state.output_of.clone().unwrap());
+                    }
+                }
+                "input_of" => {
+                    if state.input_of.is_some() {
+                        builder = builder.input_of(state.input_of.clone().unwrap());
+                    }
+                }
+                "resource" => {
+                    if state.resource.is_some() {
+                        builder = builder.resource(state.resource.clone().unwrap());
+                    }
+                }
+                "provider" => {
+                    if state.provider.is_some() {
+                        builder = builder.provider(state.provider.clone().unwrap());
+                    }
+                }
+                _ => panic!("unknown field {}", field)
+            }
+        }
+        builder.build().unwrap()
+    }
+
+    /// Given a set of values, find all combinations of those values as present
+    /// or absent in a vec.
+    fn generate_combinations<T: Clone>(vals: &Vec<T>) -> Vec<Vec<T>> {
+        // we use binary counting here to accomplish the combination finding.
+        // this might seem obtuse, but i have 4 hours of sleep and this seems
+        // like the quickest way to get it done.
+        let mut out = vec![];
+        let combos = 2u32.pow(vals.len() as u32);
+        for i in 0..combos {
+            let mut combo = vec![];
+            let mut bits = i;
+            for idx in 0..vals.len() {
+                if bits & 1 > 0 {
+                    combo.push(vals[idx].clone());
+                }
+                bits = bits >> 1;
+            }
+            out.push(combo);
+        }
+        out
+    }
+
+    /// Takes a valid event/state and tries a bunch of different possible
+    /// combinations of state and event fields being None, trying to find
+    /// permutations that break expectations.
+    ///
+    /// In other words, we test actual results against the methods
+    /// `required_event_fields` and `required_state_fields`.
+    fn fuzz_state(event: Event, state: EventProcessState, now: &DateTime<Utc>) {
+        let all_field_combos = generate_combinations(&vec!["input_of", "output_of", "provider", "resource"]);
+        let all_event_combos = generate_combinations(&vec!["move_costs", "transfer_type", "labor_type", "resource_quantity"]);
+        for evfields in &all_event_combos {
+            let mut event2 = event.clone();
+            event2.set_move_costs(None);
+            event2.set_transfer_type(None);
+            event2.set_labor_type(None);
+            event2.inner_mut().set_resource_quantity(None);
+            for evfield in evfields {
+                match *evfield {
+                    "move_costs" => { event2.set_move_costs(event.move_costs().clone()); }
+                    "transfer_type" => { event2.set_transfer_type(event.transfer_type().clone()); }
+                    "labor_type" => { event2.set_labor_type(event.labor_type().clone()); }
+                    "resource_quantity" => { event2.inner_mut().set_resource_quantity(event.inner().resource_quantity().clone()); }
+                    _ => {}
+                }
+            }
+            let must_event_fields = event2.required_event_fields();
+            let must_state_fields = event2.required_state_fields();
+            for fieldset in &all_field_combos {
+                let should_pass =
+                    must_event_fields.iter().fold(true, |acc, x| acc && evfields.contains(x)) &&
+                    must_state_fields.iter().fold(true, |acc, x| acc && fieldset.contains(x));
+                let state = state_with_fields(&state, fieldset.clone());
+                match event2.process(state, now) {
+                    Ok(_) => {
+                        if !should_pass {
+                            panic!("event state fuzzer: passed but should have failed: {:?}", fieldset);
+                        }
+                    }
+                    Err(e) => {
+                        if should_pass {
+                            panic!("event state fuzzer: failed but should have passed: {:?} {}", fieldset, e);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Creates an EventProcessState object with some easy defaults. Saves
+    /// having to copy and paste this stuff over and over.
+    fn make_state(company_id: &CompanyID, provider_is_company: bool, now: &DateTime<Utc>) -> EventProcessState {
+        let mut builder = EventProcessState::builder();
         let process_from = Process::builder()
             .id("1111")
             .inner(vf::Process::builder().name("Make widgets").build().unwrap())
@@ -426,82 +640,222 @@ mod tests {
                     .build().unwrap()
             )
             .in_custody_of(company_id.clone())
-            .costs(Costs::default())
+            .costs(Costs::new_with_labor("machinist", 34.91))
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();
-        let member = CompanyMember::builder()
-            .id("5555")
+        if !provider_is_company {
+            let member = CompanyMember::builder()
+                .id("5555")
+                .inner(
+                    vf::AgentRelationship::builder()
+                        .subject(UserID::from("jerry"))
+                        .object(CompanyID::from("jerry's widgets ultd"))
+                        .relationship("CEO")
+                        .build().unwrap()
+                )
+                .active(true)
+                .roles(vec![Role::MemberAdmin])
+                .compensation(Compensation::new_hourly(0.0, "12345"))
+                .process_spec_id("1234444")
+                .created(now.clone())
+                .updated(now.clone())
+                .build().unwrap();
+            builder = builder.provider(member);
+        }
+        builder
+            .output_of(process_from)
+            .input_of(process_to)
+            .resource(resource)
+            .build().unwrap()
+    }
+
+    /// Create a test event. Change it how you want after the fact.
+    fn make_event(action: vf::Action, company_id: &CompanyID, state: &EventProcessState, now: &DateTime<Utc>) -> Event {
+        Event::builder()
+            .id(EventID::create())
             .inner(
-                vf::AgentRelationship::builder()
-                    .subject(UserID::from("jerry"))
-                    .object(CompanyID::from("jerry's widgets ultd"))
-                    .relationship("CEO")
+                vf::EconomicEvent::builder()
+                    .action(action)
+                    .has_beginning(now.clone())
+                    .input_of(state.input_of.as_ref().unwrap().id().clone())
+                    .output_of(state.output_of.as_ref().unwrap().id().clone())
+                    .provider(company_id.clone())
+                    .receiver(company_id.clone())
+                    .resource_inventoried_as(state.resource.as_ref().unwrap().id().clone())
+                    .resource_quantity(Measure::new(NumericUnion::Decimal(Decimal::new(6, 0)), Unit::One))
                     .build().unwrap()
             )
-            .active(true)
-            .roles(vec![Role::MemberAdmin])
-            .compensation(Compensation::new_hourly(0.0, "12345"))
-            .process_spec_id("1234444")
+            .move_costs(Costs::new_with_labor("machinist", 30.0))
+            .labor_type(None)
+            .transfer_type(None)
             .created(now.clone())
             .updated(now.clone())
-            .build().unwrap();
-        (process_from, process_to, resource, member)
+            .build().unwrap()
     }
+
+    /// Check that a given process has the give costs, but also that its pre-
+    /// event-process is the exact same as the new version (besides the process
+    /// costs).
+    fn check_process_mods(fields_allowed_to_change: Vec<&'static str>, process_new: &Process, process_previous: &Process) {
+        let mod_process = |mut process: Process| {
+            for field in &fields_allowed_to_change {
+                match *field {
+                    "costs" => { process.set_costs(Costs::new()); }
+                    _ => {}
+                }
+            }
+            process
+        };
+        let process = mod_process(process_new.clone());
+        let process_prev = mod_process(process_previous.clone());
+        let proc_ser = serde_json::to_string_pretty(&process).unwrap();
+        let proc2_ser = serde_json::to_string_pretty(&process_prev).unwrap();
+        // only process.costs should be changed
+        assert_eq!(proc_ser, proc2_ser);
+    }
+
+    /// Check that a resource, compared against its previous version, has only
+    /// changed its costs, custody, owner, and quantity. All other mods should
+    /// be marked as test failures (or this expectation should be changed and an
+    /// exception added in this function).
+    fn check_resource_mods(fields_allowed_to_change: Vec<&'static str>, resource_new: &Resource, resource_previous: &Resource) {
+        let mod_resource = |mut resource: Resource| {
+            for field in &fields_allowed_to_change {
+                match *field {
+                    "costs" => { resource.set_costs(Costs::new()); }
+                    "in_custody_of" => { resource.set_in_custody_of(CompanyID::new("<testlol>").into()); }
+                    "accounting_quantity" => { resource.inner_mut().set_accounting_quantity(None); }
+                    "primary_accountable" => { resource.inner_mut().set_primary_accountable(None); }
+                    _ => {}
+                }
+            }
+            resource
+        };
+        let resource = mod_resource(resource_new.clone());
+        let resource_prev = mod_resource(resource_previous.clone());
+        let res_ser = serde_json::to_string_pretty(&resource).unwrap();
+        let res2_ser = serde_json::to_string_pretty(&resource_prev).unwrap();
+        // only resource.costs/custody/quantity/accountable should be changed
+        assert_eq!(res_ser, res2_ser);
+    }
+
+    // -------------------------------------------------------------------------
 
     #[test]
     fn consume() {
+        let now = util::time::now();
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, true, &now);
+
+        let event = make_event(vf::Action::Consume, &company_id, &state, &now);
+        fuzz_state(event.clone(), state.clone(), &now);
+
+        let res = event.process(state.clone(), &now).unwrap();
+        let mods = res.modifications();
+        assert_eq!(mods.len(), 2);
+        match &mods[0] {
+            Saver::ModifyProcess(process) => {
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 30.0));
+                check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
+            }
+            _ => panic!("unexpected result"),
+        }
+        match &mods[1] {
+            Saver::ModifyResource(resource) => {
+                assert_eq!(resource.inner().accounting_quantity().clone().unwrap(), Measure::new(NumericUnion::Integer(4), Unit::One));
+                assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", 34.91 - 30.0));
+                check_resource_mods(vec!["costs", "accounting_quantity"], resource, state.resource.as_ref().unwrap());
+            }
+            _ => panic!("unexpected result"),
+        }
+
+        let mut event = make_event(vf::Action::Consume, &company_id, &state, &now);
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(Decimal::new(5, 0)), Unit::One)));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", 100.000001)));
+        match event.process(state, &now) {
+            Err(Error::NegativeCosts) => {}
+            _ => panic!("should have overflowed move_costs"),
+        }
     }
 
     #[test]
     fn deliver_service() {
+        let now = util::time::now();
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, true, &now);
+
+        let event = make_event(vf::Action::DeliverService, &company_id, &state, &now);
+        fuzz_state(event.clone(), state.clone(), &now);
+
+        let res = event.process(state.clone(), &now).unwrap();
+        let mods = res.modifications();
+        assert_eq!(mods.len(), 2);
+        match &mods[0] {
+            Saver::ModifyProcess(process) => {
+                let costs = Costs::new_with_labor("machinist", 100.0) - Costs::new_with_labor("machinist", 30.0);
+                assert_eq!(process.costs(), &costs);
+                check_process_mods(vec!["costs"], process, state.output_of.as_ref().unwrap())
+            }
+            _ => panic!("unexpected result"),
+        }
+        match &mods[1] {
+            Saver::ModifyProcess(process) => {
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 30.0));
+                check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
+            }
+            _ => panic!("unexpected result"),
+        }
+    }
+
+    #[test]
+    fn modify() {
+        let now = util::time::now();
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, true, &now);
+
+        let event = make_event(vf::Action::Modify, &company_id, &state, &now);
+        fuzz_state(event.clone(), state.clone(), &now);
+
+        let res = event.process(state.clone(), &now).unwrap();
+        let mods = res.modifications();
+        assert_eq!(mods.len(), 2);
+        match &mods[0] {
+            Saver::ModifyProcess(process) => {
+                let costs = Costs::new_with_labor("machinist", 100.0) - Costs::new_with_labor("machinist", 30.0);
+                assert_eq!(process.costs(), &costs);
+                check_process_mods(vec!["costs"], process, state.output_of.as_ref().unwrap())
+            }
+            _ => panic!("unexpected result"),
+        }
+        match &mods[1] {
+            Saver::ModifyResource(resource) => {
+                assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", 64.91));
+                check_resource_mods(vec!["costs", "accounting_quantity"], resource, state.resource.as_ref().unwrap());
+            }
+            _ => panic!("unexpected result"),
+        }
     }
 
     #[test]
     fn produce() {
         let now = util::time::now();
-        let company_id: CompanyID = "6969".into();
-        let (process_from, process_to, resource, _) = test_init(&company_id, &now);
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, true, &now);
 
-        let event = Event::builder()
-            .id(EventID::create())
-            .inner(
-                vf::EconomicEvent::builder()
-                    .action(vf::Action::Produce)
-                    .has_beginning(util::time::now())
-                    .input_of(process_to.id().clone())
-                    .output_of(process_from.id().clone())
-                    .provider(company_id.clone())
-                    .receiver(company_id.clone())
-                    .resource_inventoried_as(resource.id().clone())
-                    .resource_quantity(Measure::new(NumericUnion::Decimal(Decimal::new(5, 0)), Unit::One))
-                    .build().unwrap()
-            )
-            .move_costs(Costs::new_with_labor("machinist", 42.0))
-            .labor_type(None)
-            .transfer_type(None)
-            .created(now.clone())
-            .updated(now.clone())
-            .build().unwrap();
-        let state = EventProcessState::builder()
-            .output_of(process_from.clone())
-            .input_of(process_to.clone())
-            .resource(resource.clone())
-            .build().unwrap();
-        let res = event.process(state, &now).unwrap();
+        let mut event = make_event(vf::Action::Produce, &company_id, &state, &now);
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(Decimal::new(5, 0)), Unit::One)));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", 42.0)));
+        fuzz_state(event.clone(), state.clone(), &now);
+
+        let res = event.process(state.clone(), &now).unwrap();
         let mods = res.modifications();
         assert_eq!(mods.len(), 2);
         match &mods[0] {
             Saver::ModifyProcess(process) => {
-                let mut process = process.clone();
-                assert_eq!(process.costs().clone(), Costs::new_with_labor("machinist", 100.0) - Costs::new_with_labor("machinist", 42.0));
-                process.set_costs(Costs::new());
-                let mut process_from2 = process_from.clone();
-                process_from2.set_costs(Costs::new());
-                let proc_ser = serde_json::to_string_pretty(&process).unwrap();
-                let proc2_ser = serde_json::to_string_pretty(&process_from2).unwrap();
-                // only process.costs should be changed
-                assert_eq!(proc_ser, proc2_ser);
+                let costs = Costs::new_with_labor("machinist", 100.0) - Costs::new_with_labor("machinist", 42.0);
+                assert_eq!(process.costs(), &costs);
+                check_process_mods(vec!["costs"], process, state.output_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }
@@ -510,37 +864,15 @@ mod tests {
                 assert_eq!(resource.inner().accounting_quantity().clone().unwrap(), Measure::new(NumericUnion::Integer(15), Unit::One));
                 assert_eq!(resource.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
                 assert_eq!(resource.in_custody_of(), &company_id.clone().into());
-                assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", 42.0));
-                println!("{:?}", resource);
+                assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", 34.91 + 42.0));
+                check_resource_mods(vec!["costs", "in_custody_of", "accounting_quantity", "primary_accountable"], resource, state.resource.as_ref().unwrap());
             }
             _ => panic!("unexpected result"),
         }
 
-        let event = Event::builder()
-            .id(EventID::create())
-            .inner(
-                vf::EconomicEvent::builder()
-                    .action(vf::Action::Produce)
-                    .has_beginning(util::time::now())
-                    .input_of(process_to.id().clone())
-                    .output_of(process_from.id().clone())
-                    .provider(company_id.clone())
-                    .receiver(company_id.clone())
-                    .resource_inventoried_as(resource.id().clone())
-                    .resource_quantity(Measure::new(NumericUnion::Decimal(Decimal::new(5, 0)), Unit::One))
-                    .build().unwrap()
-            )
-            .move_costs(Costs::new_with_labor("machinist", 100.000001))
-            .labor_type(None)
-            .transfer_type(None)
-            .created(now.clone())
-            .updated(now.clone())
-            .build().unwrap();
-        let state = EventProcessState::builder()
-            .output_of(process_from.clone())
-            .input_of(process_to.clone())
-            .resource(resource.clone())
-            .build().unwrap();
+        let mut event = make_event(vf::Action::Produce, &company_id, &state, &now);
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(Decimal::new(5, 0)), Unit::One)));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", 100.000001)));
         match event.process(state, &now) {
             Err(Error::NegativeCosts) => {}
             _ => panic!("should have overflowed move_costs"),
