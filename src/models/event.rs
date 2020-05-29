@@ -29,6 +29,7 @@ use crate::{
 };
 use derive_builder::Builder;
 use om2::{Measure, NumericUnion, Unit};
+use rust_decimal::prelude::*;
 use serde::{Serialize, Deserialize};
 use std::convert::TryInto;
 use vf_rs::vf::{self, Action};
@@ -344,14 +345,14 @@ impl Event {
                 let member = state.provider.clone().ok_or(Error::EventMissingProvider)?;
                 let labor_type = self.labor_type.clone().ok_or(Error::EventMissingLaborType)?;
                 let occupation_id = member.inner().relationship().clone();
-                let get_hours = || -> Result<f64> {
+                let get_hours = || -> Result<Decimal> {
                     match self.inner().effort_quantity() {
                         Some(Measure { has_unit: Unit::Hour, has_numerical_value: hours }) => {
-                            let num_hours = NumericUnion::Double(0.0).add(hours.clone())
+                            let num_hours = NumericUnion::Decimal(Decimal::zero()).add(hours.clone())
                                 .map_err(|e| Error::NumericUnionOpError(e))?;
                             match num_hours {
-                                NumericUnion::Double(val) => Ok(val),
-                                _ => Err(Error::NumericUnionOpError(format!("error converting to f64: {:?}", num_hours)))?,
+                                NumericUnion::Decimal(val) => Ok(val),
+                                _ => Err(Error::NumericUnionOpError(format!("error converting to Decimal: {:?}", num_hours)))?,
                             }
                         }
                         _ => Err(Error::EventLaborMustBeHours)?,
@@ -511,7 +512,7 @@ mod tests {
         util,
     };
     use om2::{Measure, NumericUnion, Unit};
-    use rust_decimal::prelude::*;
+    use rust_decimal_macros::*;
     use vf_rs::vf;
 
     fn state_with_fields(state: &EventProcessState, fields: Vec<&'static str>) -> EventProcessState {
@@ -620,7 +621,7 @@ mod tests {
         let process_from = Process::builder()
             .id("1111")
             .inner(vf::Process::builder().name("Make widgets").build().unwrap())
-            .costs(Costs::new_with_labor("machinist", 100.0))
+            .costs(Costs::new_with_labor("machinist", dec!(100.0)))
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();
@@ -640,7 +641,7 @@ mod tests {
                     .build().unwrap()
             )
             .in_custody_of(company_id.clone())
-            .costs(Costs::new_with_labor("machinist", 34.91))
+            .costs(Costs::new_with_labor("machinist", dec!(34.91)))
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();
@@ -656,7 +657,7 @@ mod tests {
                 )
                 .active(true)
                 .roles(vec![Role::MemberAdmin])
-                .compensation(Compensation::new_hourly(0.0, "12345"))
+                .compensation(Compensation::new_hourly(dec!(0.0), "12345"))
                 .process_spec_id("1234444")
                 .created(now.clone())
                 .updated(now.clone())
@@ -683,10 +684,10 @@ mod tests {
                     .provider(company_id.clone())
                     .receiver(company_id.clone())
                     .resource_inventoried_as(state.resource.as_ref().unwrap().id().clone())
-                    .resource_quantity(Measure::new(NumericUnion::Decimal(Decimal::new(6, 0)), Unit::One))
+                    .resource_quantity(Measure::new(NumericUnion::Decimal(dec!(6)), Unit::One))
                     .build().unwrap()
             )
-            .move_costs(Costs::new_with_labor("machinist", 30.0))
+            .move_costs(Costs::new_with_labor("machinist", dec!(30.0)))
             .labor_type(None)
             .transfer_type(None)
             .created(now.clone())
@@ -756,7 +757,7 @@ mod tests {
         assert_eq!(mods.len(), 2);
         match &mods[0] {
             Saver::ModifyProcess(process) => {
-                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 30.0));
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", dec!(30.0)));
                 check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
@@ -764,15 +765,15 @@ mod tests {
         match &mods[1] {
             Saver::ModifyResource(resource) => {
                 assert_eq!(resource.inner().accounting_quantity().clone().unwrap(), Measure::new(NumericUnion::Integer(4), Unit::One));
-                assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", 34.91 - 30.0));
+                assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", dec!(4.91)));
                 check_resource_mods(vec!["costs", "accounting_quantity"], resource, state.resource.as_ref().unwrap());
             }
             _ => panic!("unexpected result"),
         }
 
         let mut event = make_event(vf::Action::Consume, &company_id, &state, &now);
-        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(Decimal::new(5, 0)), Unit::One)));
-        event.set_move_costs(Some(Costs::new_with_labor("machinist", 100.000001)));
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(5)), Unit::One)));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
         match event.process(state, &now) {
             Err(Error::NegativeCosts) => {}
             _ => panic!("should have overflowed move_costs"),
@@ -793,15 +794,14 @@ mod tests {
         assert_eq!(mods.len(), 2);
         match &mods[0] {
             Saver::ModifyProcess(process) => {
-                let costs = Costs::new_with_labor("machinist", 100.0) - Costs::new_with_labor("machinist", 30.0);
-                assert_eq!(process.costs(), &costs);
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", dec!(70)));
                 check_process_mods(vec!["costs"], process, state.output_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }
         match &mods[1] {
             Saver::ModifyProcess(process) => {
-                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 30.0));
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", dec!(30)));
                 check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
@@ -822,15 +822,14 @@ mod tests {
         assert_eq!(mods.len(), 2);
         match &mods[0] {
             Saver::ModifyProcess(process) => {
-                let costs = Costs::new_with_labor("machinist", 100.0) - Costs::new_with_labor("machinist", 30.0);
-                assert_eq!(process.costs(), &costs);
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", dec!(70)));
                 check_process_mods(vec!["costs"], process, state.output_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }
         match &mods[1] {
             Saver::ModifyResource(resource) => {
-                assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", 64.91));
+                assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", dec!(64.91)));
                 check_resource_mods(vec!["costs", "accounting_quantity"], resource, state.resource.as_ref().unwrap());
             }
             _ => panic!("unexpected result"),
@@ -844,8 +843,8 @@ mod tests {
         let state = make_state(&company_id, true, &now);
 
         let mut event = make_event(vf::Action::Produce, &company_id, &state, &now);
-        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(Decimal::new(5, 0)), Unit::One)));
-        event.set_move_costs(Some(Costs::new_with_labor("machinist", 42.0)));
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(5)), Unit::One)));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(42.0))));
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
@@ -853,8 +852,7 @@ mod tests {
         assert_eq!(mods.len(), 2);
         match &mods[0] {
             Saver::ModifyProcess(process) => {
-                let costs = Costs::new_with_labor("machinist", 100.0) - Costs::new_with_labor("machinist", 42.0);
-                assert_eq!(process.costs(), &costs);
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", dec!(58)));
                 check_process_mods(vec!["costs"], process, state.output_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
@@ -864,15 +862,15 @@ mod tests {
                 assert_eq!(resource.inner().accounting_quantity().clone().unwrap(), Measure::new(NumericUnion::Integer(15), Unit::One));
                 assert_eq!(resource.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
                 assert_eq!(resource.in_custody_of(), &company_id.clone().into());
-                assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", 34.91 + 42.0));
+                assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", dec!(76.91)));
                 check_resource_mods(vec!["costs", "in_custody_of", "accounting_quantity", "primary_accountable"], resource, state.resource.as_ref().unwrap());
             }
             _ => panic!("unexpected result"),
         }
 
         let mut event = make_event(vf::Action::Produce, &company_id, &state, &now);
-        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(Decimal::new(5, 0)), Unit::One)));
-        event.set_move_costs(Some(Costs::new_with_labor("machinist", 100.000001)));
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(5)), Unit::One)));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
         match event.process(state, &now) {
             Err(Error::NegativeCosts) => {}
             _ => panic!("should have overflowed move_costs"),

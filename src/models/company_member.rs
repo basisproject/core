@@ -9,6 +9,7 @@ use crate::{
 };
 use getset::Getters;
 use om2::{Measure, Unit, NumericUnion};
+use rust_decimal::prelude::*;
 use serde::{Serialize, Deserialize};
 use vf_rs::vf;
 
@@ -37,13 +38,13 @@ pub struct Compensation {
     /// If the `period` is not hourly, we can give an estimate for the number of
     /// hours worked per week, which gives us an ability to estimate our labor
     /// hours (and not just wage payments)
-    est_hours_per_week: Option<f64>,
+    est_hours_per_week: Option<Decimal>,
 }
 
 impl Compensation {
     /// Create a standard hourly wage, paid biweekly
     pub fn new_hourly<T, A>(wage: T, pay_into: A) -> Self
-        where T: Into<f64>,
+        where T: Into<Decimal>,
               A: Into<AccountID>,
     {
         Self::new_hourly_with_schedule(wage, pay_into, PayrollSchedule::BiWeekly)
@@ -51,11 +52,11 @@ impl Compensation {
 
     /// Create an hourly wage
     pub fn new_hourly_with_schedule<T, A>(wage: T, pay_into: A, schedule: PayrollSchedule) -> Self
-        where T: Into<f64>,
+        where T: Into<Decimal>,
               A: Into<AccountID>,
     {
         Self {
-            wage: Measure::new(NumericUnion::Double(wage.into()), Unit::Hour),
+            wage: Measure::new(NumericUnion::Decimal(wage.into()), Unit::Hour),
             pay_into: pay_into.into(),
             schedule: schedule,
             est_hours_per_week: None,
@@ -63,20 +64,20 @@ impl Compensation {
     }
 
     /// Create a standard yearly salary, paid semimonthly
-    pub fn new_salary<T, A>(wage: T, pay_into: A, est_hours_per_week: f64) -> Self
-        where T: Into<f64>,
+    pub fn new_salary<T, A>(wage: T, pay_into: A, est_hours_per_week: Decimal) -> Self
+        where T: Into<Decimal>,
               A: Into<AccountID>,
     {
         Self::new_salary_with_schedule(wage, pay_into, PayrollSchedule::SemiMonthly, est_hours_per_week)
     }
 
     /// Create a salary
-    pub fn new_salary_with_schedule<T, A>(wage: T, pay_into: A, schedule: PayrollSchedule, est_hours_per_week: f64) -> Self
-        where T: Into<f64>,
+    pub fn new_salary_with_schedule<T, A>(wage: T, pay_into: A, schedule: PayrollSchedule, est_hours_per_week: Decimal) -> Self
+        where T: Into<Decimal>,
               A: Into<AccountID>,
     {
         Self {
-            wage: Measure::new(NumericUnion::Double(wage.into()), Unit::Year),
+            wage: Measure::new(NumericUnion::Decimal(wage.into()), Unit::Year),
             pay_into: pay_into.into(),
             schedule: schedule,
             est_hours_per_week: Some(est_hours_per_week),
@@ -130,6 +131,7 @@ mod test {
         },
         util,
     };
+    use rust_decimal_macros::*;
     use super::*;
     use vf_rs::vf;
 
@@ -145,7 +147,7 @@ mod test {
             )
             .active(true)
             .roles(vec![Role::MemberAdmin])
-            .compensation(Compensation::new_hourly(0.0, "12345"))
+            .compensation(Compensation::new_hourly(dec!(0.0), "12345"))
             .process_spec_id("1234444")
             .created(util::time::now())
             .updated(util::time::now())

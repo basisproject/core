@@ -86,13 +86,6 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
     let field_hashkey = fields.iter().map(|f| f.hash_key.clone()).collect::<Vec<_>>();
     let field_hashval = fields.iter().map(|f| f.hash_val.clone()).collect::<Vec<_>>();
     let fn_div_panic = fields.iter().map(|f| format!("Costs::div() -- divide by zero for {} {{:?}}", f.name)).collect::<Vec<_>>();
-    let fn_muldiv_rhs = fields.iter().map(|f| -> syn::Expr {
-        if f.hash_val == format_ident!("Decimal") {
-            syn::parse_str("Decimal::from_f64(rhs).unwrap()").unwrap()
-        } else {
-            syn::parse_str("rhs").unwrap()
-        }
-    }).collect::<Vec<_>>();
 
     let cost_impl = quote! {
         impl #name {
@@ -222,13 +215,13 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl Mul<f64> for Costs {
+        impl Mul<rust_decimal::Decimal> for Costs {
             type Output = Self;
 
-            fn mul(mut self, rhs: f64) -> Self {
+            fn mul(mut self, rhs: Decimal) -> Self {
                 #(
                     for (_, val) in self.#field_name_mut().iter_mut() {
-                        *val *= #fn_muldiv_rhs;
+                        *val *= rhs;
                     }
                 )*
                 self
@@ -263,16 +256,16 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl Div<f64> for Costs {
+        impl Div<Decimal> for Costs {
            type Output = Self;
 
-           fn div(mut self, rhs: f64) -> Self::Output {
-               if rhs == f64::zero() {
+           fn div(mut self, rhs: Decimal) -> Self::Output {
+               if rhs == Decimal::zero() {
                    panic!("Costs::div() -- divide by zero");
                }
                #(
                    for (_, v) in self.#field_name_mut().iter_mut() {
-                       *v /= #fn_muldiv_rhs;
+                       *v /= rhs;
                    }
                )*
                self
