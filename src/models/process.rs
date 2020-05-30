@@ -10,12 +10,12 @@ use vf_rs::vf;
 
 basis_model! {
     pub struct Process {
+        id: <<ProcessID>>,
         /// The inner VF process
         inner: vf::Process<ProcessSpecID, Url, CompanyID, (), ()>,
         /// Our costs tally for this process
         costs: Costs,
     }
-    ProcessID
     ProcessBuilder
 }
 

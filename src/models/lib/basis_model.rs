@@ -6,9 +6,9 @@ macro_rules! basis_model {
     (
         $(#[$struct_meta:meta])*
         pub struct $name:ident {
+            id: <<$id:ident>>,
             $($fields:tt)*
         }
-        $id:ident
         $builder:ident
 
     ) => {
@@ -57,20 +57,20 @@ macro_rules! basis_model {
 
         impl crate::models::lib::basis_model::ModelID for $id {}
 
-        $(#[$struct_meta])*
-        #[derive(Clone, Debug, PartialEq, getset::Getters, getset::MutGetters, getset::Setters, derive_builder::Builder, serde::Serialize, serde::Deserialize)]
-        #[builder(pattern = "owned", setter(into))]
-        #[getset(get = "pub", get_mut = "pub", set = "pub")]
-        pub struct $name {
-            id: $id,
-            $($fields)*
-            #[builder(default)]
-            active: bool,
-            created: chrono::DateTime<chrono::Utc>,
-            updated: chrono::DateTime<chrono::Utc>,
-            #[builder(setter(strip_option), default)]
-            #[serde(skip_serializing_if = "Option::is_none")]
-            deleted: Option<chrono::DateTime<chrono::Utc>>,
+        basis_model_inner! {
+            $(#[$struct_meta])*
+            #[derive(Clone, Debug, PartialEq, getset::Getters, getset::MutGetters, getset::Setters, derive_builder::Builder, serde::Serialize, serde::Deserialize)]
+            #[builder(pattern = "owned", setter(into))]
+            #[getset(get = "pub", get_mut = "pub", set = "pub")]
+            pub struct $name {
+                id: $id,
+                $($fields)*
+                #[builder(default)]
+                active: bool,
+                created: chrono::DateTime<chrono::Utc>,
+                updated: chrono::DateTime<chrono::Utc>,
+                deleted: Option<chrono::DateTime<chrono::Utc>>,
+            }
         }
 
         impl $name {
@@ -87,5 +87,115 @@ macro_rules! basis_model {
             }
         }
     }
+}
+
+/// Applies meta to various fields depending on their type
+macro_rules! basis_model_inner {
+    // grab Vec fields and apply special meta
+    (
+        @parse_fields ($($parsed_fields:tt)*)
+        $(#[$struct_meta:meta])*
+        pub struct $name:ident {
+            $(#[$field_meta:meta])*
+            $field_name:ident: Vec<$field_type:ty>,
+
+            $($fields:tt)*
+        }
+    ) => {
+        basis_model_inner! {
+            @parse_fields (
+                $($parsed_fields)*
+
+                $(#[$field_meta])*
+                #[builder(default)]
+                #[serde(default = "Default::default", skip_serializing_if = "Vec::is_empty")]
+                $field_name: Vec<$field_type>,
+            )
+            $(#[$struct_meta])*
+            pub struct $name {
+                $($fields)*
+            }
+        }
+    };
+
+    // grab Option fields and apply special meta
+    (
+        @parse_fields ($($parsed_fields:tt)*)
+        $(#[$struct_meta:meta])*
+        pub struct $name:ident {
+            $(#[$field_meta:meta])*
+            $field_name:ident: Option<$field_type:ty>,
+
+            $($fields:tt)*
+        }
+    ) => {
+        basis_model_inner! {
+            @parse_fields (
+                $($parsed_fields)*
+
+                $(#[$field_meta])*
+                #[builder(default)]
+                #[serde(default = "Default::default", skip_serializing_if = "Option::is_none")]
+                $field_name: Option<$field_type>,
+            )
+            $(#[$struct_meta])*
+            pub struct $name {
+                $($fields)*
+            }
+        }
+    };
+
+    // parse "normal" fields
+    (
+        @parse_fields ($($parsed_fields:tt)*)
+        $(#[$struct_meta:meta])*
+        pub struct $name:ident {
+            $(#[$field_meta:meta])*
+            $field_name:ident: $field_type:ty,
+
+            $($fields:tt)*
+        }
+    ) => {
+        basis_model_inner! {
+            @parse_fields (
+                $($parsed_fields)*
+
+                $(#[$field_meta])*
+                $field_name: $field_type,
+            )
+            $(#[$struct_meta])*
+            pub struct $name {
+                $($fields)*
+            }
+        }
+    };
+
+    // all done
+    (
+        @parse_fields ($($parsed_fields:tt)*)
+        $(#[$struct_meta:meta])*
+        pub struct $name:ident {}
+    ) => {
+        $(#[$struct_meta])*
+        pub struct $name {
+            $($parsed_fields)*
+        }
+    };
+
+    // entry
+    (
+        $(#[$struct_meta:meta])*
+        pub struct $name:ident {
+            $($fields:tt)*
+        }
+    ) => {
+        basis_model_inner! {
+            @parse_fields ()
+            $(#[$struct_meta])*
+            pub struct $name {
+                $($fields)*
+            }
+        }
+    };
 }
 

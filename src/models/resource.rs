@@ -1,7 +1,7 @@
 use crate::{
     costs::{Costs, CostMover},
     models::{
-        agent::AgentID,
+        lib::agent::AgentID,
         process::ProcessID,
         resource_spec::ResourceSpecID,
     },
@@ -11,6 +11,7 @@ use vf_rs::vf;
 
 basis_model! {
     pub struct Resource {
+        id: <<ResourceID>>,
         /// The VF object for this product instance
         inner: vf::EconomicResource<Url, ResourceSpecID, ResourceID, AgentID, ProcessID>,
         /// The company that has custody of the resource
@@ -18,7 +19,6 @@ basis_model! {
         /// The costs imbued in this resource
         costs: Costs,
     }
-    ResourceID
     ResourceBuilder
 }
 

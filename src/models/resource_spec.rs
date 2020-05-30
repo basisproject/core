@@ -28,6 +28,7 @@ impl Dimensions {
 
 basis_model! {
     pub struct ResourceSpec {
+        id: <<ResourceSpecID>>,
         inner: vf::ResourceSpecification<Url>,
         /// products are namespaced by company_id. we have no interest in trying
         /// to classify some chair as a Chair that anyone can build, but rather
@@ -37,7 +38,6 @@ basis_model! {
         /// not the place for it.
         company_id: CompanyID,
     }
-    ResourceSpecID
     ResourceSpecBuilder
 }
 

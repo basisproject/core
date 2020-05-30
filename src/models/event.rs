@@ -17,10 +17,10 @@ use crate::{
     costs::{Costs, CostMover},
     error::{Error, Result},
     models::{
-        agent::AgentID,
         agreement::AgreementID,
         company::CompanyID,
         company_member::CompanyMember,
+        lib::agent::AgentID,
         process::{Process, ProcessID},
         resource::{Resource, ResourceID},
         resource_spec::ResourceSpecID,
@@ -75,6 +75,7 @@ pub enum TransferType {
 basis_model! {
     /// The event model, which is the glue that moves costs between objects.
     pub struct Event {
+        id: <<EventID>>,
         /// The event's core VF type
         inner: vf::EconomicEvent<AgreementID, AgentID, ProcessID, AgentID, AgreementID, (), ResourceSpecID, ResourceID, EventID>,
         /// If this event is an output of a process, move some fixed amount of
@@ -95,7 +96,6 @@ basis_model! {
         /// allowed or not.
         transfer_type: Option<TransferType>,
     }
-    EventID
     EventBuilder
 }
 

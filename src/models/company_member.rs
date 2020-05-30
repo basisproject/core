@@ -1,8 +1,8 @@
 use crate::{
     models::{
         account::AccountID,
-        agent::AgentID,
         company::{Permission, Role},
+        lib::agent::AgentID,
         occupation::OccupationID,
         process_spec::ProcessSpecID,
     },
@@ -89,11 +89,11 @@ basis_model! {
     /// A member of a company. Links a user to a company, and has other attached
     /// information like compensation, permission roles, etc.
     pub struct CompanyMember {
+        id: <<CompanyMemberID>>,
         /// Our inner VF relationship (stores both the UserID and CompanyID
         /// under the `AgentID` generic type)
         inner: vf::AgentRelationship<(), AgentID, OccupationID>,
         /// The roles this member has at their company
-        #[builder(default)]
         roles: Vec<Role>,
         /// Describes how the member is compensated for their labor
         compensation: Compensation,
@@ -103,7 +103,6 @@ basis_model! {
         /// of a Process here because Process is generally ephemeral.
         process_spec_id: ProcessSpecID,
     }
-    CompanyMemberID
     CompanyMemberBuilder
 }
 

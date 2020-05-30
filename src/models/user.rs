@@ -2,12 +2,11 @@ use crate::access::{Permission, Role};
 
 basis_model! {
     pub struct User {
-        #[builder(default)]
+        id: <<UserID>>,
         roles: Vec<Role>,
         email: String,
         name: String,
     }
-    UserID
     UserBuilder
 }
 

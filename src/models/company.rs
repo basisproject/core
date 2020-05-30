@@ -193,6 +193,7 @@ basis_model! {
     /// syndicates (exist by the will of the workers of that comany), or private
     /// (exist completely outside the system).
     pub struct Company {
+        id: <<CompanyID>>,
         /// The Agent object for this company, stores its name, image, location,
         /// etc.
         inner: vf::Agent,
@@ -201,7 +202,6 @@ basis_model! {
         /// Primary email address
         email: String,
     }
-    CompanyID
     CompanyBuilder
 }
 
