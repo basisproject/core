@@ -3,23 +3,16 @@ use crate::{
     access::Permission,
     error::{Error, Result},
     models::{
-        region::{Region, RegionID},
+        region::{self, Region, RegionID},
         user::User,
     }
 };
 
-// TODO:
-// TODO:
-// trying to figure out how to make transactions the exposed api for "getting
-// things done" while at the same time allowing transactions to pass back models
-// while ALSO forcing the models to NOT have set_*/get_mut helper functions.
-// TODO:
-// TODO:
 pub fn create<T: Into<String>>(user: &User, id: RegionID, name: T, now: &DateTime<Utc>) -> Result<Region> {
     if !user.can(&Permission::RegionCreate) {
         Err(Error::PermissionDenied)?;
     }
-    let res = Region::builder()
+    let res = region::builder()
         .id(id)
         .name(name.into())
         .created(now.clone())
@@ -34,6 +27,9 @@ mod tests {
     use super::*;
     use crate::{
         access::Role,
+        models::{
+            user,
+        },
         util,
     };
 
@@ -41,7 +37,7 @@ mod tests {
     fn can_create() {
         let id = RegionID::create();
         let now = util::time::now();
-        let user = User::builder()
+        let user = user::builder()
             .id("52221")
             .roles(vec![Role::SuperAdmin])
             .email("surely@hotmail.com")   // don't call me shirley

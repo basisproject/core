@@ -5,7 +5,7 @@ pub trait ModelID: Into<String> + From<String> + Clone + PartialEq + Eq + std::h
 macro_rules! basis_model {
     (
         $(#[$struct_meta:meta])*
-        pub struct $name:ident {
+        pub struct $model:ident {
             id: <<$id:ident>>,
             $($fields:tt)*
         }
@@ -61,8 +61,8 @@ macro_rules! basis_model {
             $(#[$struct_meta])*
             #[derive(Clone, Debug, PartialEq, getset::Getters, getset::MutGetters, getset::Setters, derive_builder::Builder, serde::Serialize, serde::Deserialize)]
             #[builder(pattern = "owned", setter(into))]
-            #[getset(get = "pub", get_mut = "pub", set = "pub")]
-            pub struct $name {
+            #[getset(get = "pub", get_mut, set)]
+            pub struct $model {
                 id: $id,
                 $($fields)*
                 #[builder(default)]
@@ -73,8 +73,8 @@ macro_rules! basis_model {
             }
         }
 
-        impl $name {
-            pub fn builder() -> $builder {
+        impl $model {
+            fn builder() -> $builder {
                 $builder::default()
             }
 
@@ -86,7 +86,101 @@ macro_rules! basis_model {
                 self.deleted.is_some()
             }
         }
+
+        pub fn builder() -> $builder {
+            $model::builder()
+        }
+
+        /// Defining public setters as functions means we can later export JUST
+        /// the model (with no setter functions) since the setters won't be an
+        /// impl on the models. While this makes the inner code a bit more obtuse
+        /// (because we have to do `model::set::created(&mut mymodel, created)`
+        /// instead of `mymodel.set_created(created)`, it allows us to protect our
+        /// inner API and clearly define our rules for engaging with the system.
+        pub mod set {
+            use super::*;
+
+            #[allow(dead_code)]
+            pub fn created(model: &mut $model, created: chrono::DateTime<chrono::Utc>) {
+                model.set_created(created);
+            }
+
+            #[allow(dead_code)]
+            pub fn updated(model: &mut $model, updated: chrono::DateTime<chrono::Utc>) {
+                model.set_updated(updated);
+            }
+
+            #[allow(dead_code)]
+            pub fn deleted(model: &mut $model, deleted: Option<chrono::DateTime<chrono::Utc>>) {
+                model.set_deleted(deleted);
+            }
+
+            basis_setters! {
+                $model,
+                $($fields)*
+            }
+        }
+
+        /// Defining public mutgetters as functions means we can later export
+        /// JUST the model (with no setter functions) since the setters won't be
+        /// an impl on the models. While this makes the inner code a bit more
+        /// obtuse (because we have to do `model::mut::inner(&mut mymodel).set_val(69)`
+        /// instead of `mymodel.inner_mut().set_val(69)`, it allows us to protect
+        /// our inner API and clearly define our rules for engaging with the
+        /// system.
+        pub mod getmut {
+            use super::*;
+
+            basis_mutgetters! {
+                $model,
+                $($fields)*
+            }
+        }
     }
+}
+
+macro_rules! basis_setters {
+    (
+        $model:ident,
+        $(
+            $(#[$field_meta:meta])*
+            $field_name:ident: $field_type:ty,
+        )*
+    ) => {
+        $(
+            #[allow(dead_code)]
+            pub fn $field_name(model: &mut $model, val: $field_type) {
+                // NOTE: i'd love to use the model's setters here, but until
+                // rust macros can concat idents, i'm not dealing with a fucking
+                // proc_macro just to define setters. let's get this moving
+                // forward without bikeshedding about proper use of setters for
+                // 12 years.
+                model.$field_name = val;
+            }
+        )*
+    };
+}
+
+macro_rules! basis_mutgetters {
+    (
+        $model:ident,
+        $(
+            $(#[$field_meta:meta])*
+            $field_name:ident: $field_type:ty,
+        )*
+    ) => {
+        $(
+            #[allow(dead_code)]
+            pub fn $field_name(model: &mut $model) -> &mut $field_type {
+                // NOTE: i'd love to use the model's mut getters here, but until
+                // rust macros can concat idents, i'm not dealing with a fucking
+                // proc_macro just to define setters. let's get this moving
+                // forward without bikeshedding about proper use of setters for
+                // 12 years.
+                &mut model.$field_name
+            }
+        )*
+    };
 }
 
 /// Applies meta to various fields depending on their type

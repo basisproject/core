@@ -17,6 +17,7 @@ use crate::{
     costs::{Costs, CostMover},
     error::{Error, Result},
     models::{
+        self,
         agreement::AgreementID,
         company::CompanyID,
         company_member::CompanyMember,
@@ -169,20 +170,20 @@ impl EventProcessResult {
 
     /// Push a resource to create into the result set
     pub fn create_resource(&mut self, mut resource: Resource) {
-        resource.set_created(self.process_time.clone());
-        resource.set_updated(self.process_time.clone());
+        models::resource::set::created(&mut resource, self.process_time.clone());
+        models::resource::set::updated(&mut resource, self.process_time.clone());
         self.modifications.push(Saver::CreateResource(resource));
     }
 
     /// Push a process to modify into the result set
     pub fn modify_process(&mut self, mut process: Process) {
-        process.set_updated(self.process_time.clone());
+        models::process::set::updated(&mut process, self.process_time.clone());
         self.modifications.push(Saver::ModifyProcess(process));
     }
 
     /// Push a resource to modify into the result set
     pub fn modify_resource(&mut self, mut resource: Resource) {
-        resource.set_updated(self.process_time.clone());
+        models::resource::set::updated(&mut resource, self.process_time.clone());
         self.modifications.push(Saver::ModifyResource(resource));
     }
 }
@@ -230,7 +231,7 @@ impl Event {
 
                 let mut should_save_resource = false;
                 if measure::dec_measure(&mut resource_measure, &event_measure)? {
-                    resource.inner_mut().set_accounting_quantity(Some(resource_measure));
+                    models::resource::getmut::inner(&mut resource).set_accounting_quantity(Some(resource_measure));
                     should_save_resource = true;
                 }
                 if let Some(move_costs) = self.move_costs().as_ref() {
@@ -283,9 +284,9 @@ impl Event {
                     None => event_measure,
                 };
                 let company_id = self.inner().provider().clone();
-                resource.inner_mut().set_accounting_quantity(Some(new_resource_measure));
-                resource.inner_mut().set_primary_accountable(Some(company_id.clone().into()));
-                resource.set_in_custody_of(company_id.into());
+                models::resource::getmut::inner(&mut resource).set_accounting_quantity(Some(new_resource_measure));
+                models::resource::getmut::inner(&mut resource).set_primary_accountable(Some(company_id.clone().into()));
+                models::resource::set::in_custody_of(&mut resource, company_id.into());
                 if let Some(move_costs) = self.move_costs().as_ref() {
                     let mut output_process = state.output_of.clone().ok_or(Error::EventMissingOutputProcess)?;
                     if output_process.move_costs_to(&mut resource, move_costs)? {
@@ -312,8 +313,8 @@ impl Event {
                     TransferType::ResourceTransfer => {
                         let mut resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                         let company_id: CompanyID = self.inner().receiver().clone().try_into()?;
-                        resource.inner_mut().set_primary_accountable(Some(company_id.clone().into()));
-                        resource.set_in_custody_of(company_id.into());
+                        models::resource::getmut::inner(&mut resource).set_primary_accountable(Some(company_id.clone().into()));
+                        models::resource::set::in_custody_of(&mut resource, company_id.into());
                         res.modify_resource(resource);
                     }
                 }
@@ -321,13 +322,13 @@ impl Event {
             Action::TransferAllRights => {
                 let mut resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                 let company_id: CompanyID = self.inner().receiver().clone().try_into()?;
-                resource.inner_mut().set_primary_accountable(Some(company_id.into()));
+                models::resource::getmut::inner(&mut resource).set_primary_accountable(Some(company_id.into()));
                 res.modify_resource(resource);
             }
             Action::TransferCustody => {
                 let mut resource = state.resource.clone().ok_or(Error::EventMissingResource)?;
                 let company_id: CompanyID = self.inner().receiver().clone().try_into()?;
-                resource.set_in_custody_of(company_id.into());
+                models::resource::set::in_custody_of(&mut resource, company_id.into());
                 res.modify_resource(resource);
             }
             Action::Use => {
@@ -503,6 +504,7 @@ mod tests {
     use crate::{
         costs::Costs,
         models::{
+            self,
             company::{CompanyID, Role},
             company_member::{Compensation, CompanyMember},
             process::Process,
@@ -618,21 +620,21 @@ mod tests {
     /// having to copy and paste this stuff over and over.
     fn make_state(company_id: &CompanyID, provider_is_company: bool, now: &DateTime<Utc>) -> EventProcessState {
         let mut builder = EventProcessState::builder();
-        let process_from = Process::builder()
+        let process_from = models::process::builder()
             .id("1111")
             .inner(vf::Process::builder().name("Make widgets").build().unwrap())
             .costs(Costs::new_with_labor("machinist", dec!(100.0)))
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();
-        let process_to = Process::builder()
+        let process_to = models::process::builder()
             .id("1112")
             .inner(vf::Process::builder().name("Check widgets").build().unwrap())
             .costs(Costs::default())
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();
-        let resource = Resource::builder()
+        let resource = models::resource::builder()
             .id("4444")
             .inner(
                 vf::EconomicResource::builder()
@@ -646,7 +648,7 @@ mod tests {
             .updated(now.clone())
             .build().unwrap();
         if !provider_is_company {
-            let member = CompanyMember::builder()
+            let member = models::company_member::builder()
                 .id("5555")
                 .inner(
                     vf::AgentRelationship::builder()
@@ -725,9 +727,9 @@ mod tests {
             for field in &fields_allowed_to_change {
                 match *field {
                     "costs" => { resource.set_costs(Costs::new()); }
-                    "in_custody_of" => { resource.set_in_custody_of(CompanyID::new("<testlol>").into()); }
-                    "accounting_quantity" => { resource.inner_mut().set_accounting_quantity(None); }
-                    "primary_accountable" => { resource.inner_mut().set_primary_accountable(None); }
+                    "in_custody_of" => { models::resource::set::in_custody_of(&mut resource, CompanyID::new("<testlol>").into()); }
+                    "accounting_quantity" => { models::resource::getmut::inner(&mut resource).set_accounting_quantity(None); }
+                    "primary_accountable" => { models::resource::getmut::inner(&mut resource).set_primary_accountable(None); }
                     _ => {}
                 }
             }
