@@ -91,7 +91,10 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
         impl #name {
             #(
                 #[doc = #fn_new_with_comment]
-                pub fn #fn_new_with<T: Into<#field_hashkey>>(id: T, #field_name: #field_hashval) -> Self {
+                pub fn #fn_new_with<T, V>(id: T, #field_name: V) -> Self
+                    where T: Into<#field_hashkey>,
+                          V: Into<#field_hashval> + Copy,
+                {
                     let mut costs = Self::new();
                     costs.#fn_track(id, #field_name);
                     costs
@@ -99,12 +102,15 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             )*
             #(
                 #[doc = #fn_track_comment]
-                pub fn #fn_track<T: Into<#field_hashkey>>(&mut self, id: T, val: #field_hashval) {
-                    if val < #field_hashval::zero() {
+                pub fn #fn_track<T, V>(&mut self, id: T, val: V)
+                    where T: Into<#field_hashkey>,
+                          V: Into<#field_hashval> + Copy,
+                {
+                    if val.into() < #field_hashval::zero() {
                         panic!(#fn_track_panic);
                     }
                     let entry = self.#field_name_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
-                    *entry += val;
+                    *entry += val.into();
                 }
             )*
             #(
@@ -218,7 +224,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
         impl Mul<rust_decimal::Decimal> for Costs {
             type Output = Self;
 
-            fn mul(mut self, rhs: Decimal) -> Self {
+            fn mul(mut self, rhs: rust_decimal::Decimal) -> Self {
                 #(
                     for (_, val) in self.#field_name_mut().iter_mut() {
                         *val *= rhs;
