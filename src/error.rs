@@ -42,8 +42,12 @@ pub enum Error {
     NegativeCosts,
     #[error("operation creates negative measurement")]
     NegativeMeasurement,
-    #[error("error operating on NumericUnion")]
+    #[error("error operating on NumericUnion: {0}")]
     NumericUnionOpError(String),
+    #[error("permission denied")]
+    PermissionDenied,
+    #[error("error building object {0}")]
+    BuilderFailed(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

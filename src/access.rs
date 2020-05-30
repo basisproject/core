@@ -12,6 +12,10 @@ pub enum Permission {
     /// arbitrary dates on transactions, mainly for testing.
     TimeTravel,
 
+    RegionCreate,
+    RegionUpdate,
+    RegionDelete,
+
     UserCreate,
     UserUpdate,
     UserAdminUpdate,
