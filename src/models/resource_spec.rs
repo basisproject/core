@@ -3,13 +3,13 @@ use crate::{
         company::CompanyID,
     },
 };
-use getset::{Getters, Setters};
+use getset::Getters;
 use serde::{Serialize, Deserialize};
 use url::Url;
 use vf_rs::vf;
 
-#[derive(Clone, Debug, Default, PartialEq, Getters, Setters, Serialize, Deserialize)]
-#[getset(get = "pub", set = "pub")]
+#[derive(Clone, Debug, Default, PartialEq, Getters, Serialize, Deserialize)]
+#[getset(get = "pub")]
 pub struct Dimensions {
     width: f64,
     height: f64,

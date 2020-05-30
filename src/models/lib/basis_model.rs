@@ -17,10 +17,12 @@ macro_rules! basis_model {
         pub struct $id(String);
 
         impl $id {
+            /// Create a new id from a val
             pub fn new<T: Into<String>>(id: T) -> Self {
                 Self(id.into())
             }
 
+            /// Create a new random id
             pub fn create() -> Self {
                 Self(uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut uuid::Uuid::encode_buffer()).to_string())
             }
@@ -74,19 +76,23 @@ macro_rules! basis_model {
         }
 
         impl $model {
+            #[allow(dead_code)]
             fn builder() -> $builder {
                 $builder::default()
             }
 
+            #[allow(dead_code)]
             pub fn is_active(&self) -> bool {
                 self.active && !self.is_deleted()
             }
 
+            #[allow(dead_code)]
             pub fn is_deleted(&self) -> bool {
                 self.deleted.is_some()
             }
         }
 
+        #[allow(dead_code)]
         pub fn builder() -> $builder {
             $model::builder()
         }

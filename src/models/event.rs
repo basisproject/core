@@ -506,7 +506,7 @@ mod tests {
         models::{
             self,
             company::{CompanyID, Role},
-            company_member::{Compensation, CompanyMember},
+            company_member::{Compensation},
             process::Process,
             resource::Resource,
             user::UserID,
