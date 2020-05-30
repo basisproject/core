@@ -482,8 +482,8 @@ impl Event {
                 fields.push("resource");
             }
             Action::Use => {
-                fields.push("resource");
                 if self.move_costs().is_some() {
+                    fields.push("resource");
                     fields.push("input_of");
                 }
             }
@@ -594,19 +594,19 @@ mod tests {
             let must_event_fields = event2.required_event_fields();
             let must_state_fields = event2.required_state_fields();
             for fieldset in &all_field_combos {
-                let should_pass =
-                    must_event_fields.iter().fold(true, |acc, x| acc && evfields.contains(x)) &&
-                    must_state_fields.iter().fold(true, |acc, x| acc && fieldset.contains(x));
+                let has_event_fields = must_event_fields.iter().fold(true, |acc, x| acc && evfields.contains(x));
+                let has_state_fields = must_state_fields.iter().fold(true, |acc, x| acc && fieldset.contains(x));
+                let should_pass =has_event_fields && has_state_fields;
                 let state = state_with_fields(&state, fieldset.clone());
                 match event2.process(state, now) {
                     Ok(_) => {
                         if !should_pass {
-                            panic!("event state fuzzer: passed but should have failed: {:?}", fieldset);
+                            panic!("event state fuzzer: passed but should have failed: {:?} {:?}", evfields, fieldset);
                         }
                     }
                     Err(e) => {
                         if should_pass {
-                            panic!("event state fuzzer: failed but should have passed: {:?} {}", fieldset, e);
+                            panic!("event state fuzzer: failed but should have passed: {:?} {:?} {}", evfields, fieldset, e);
                         }
                     }
                 }
@@ -710,8 +710,8 @@ mod tests {
         };
         let process = mod_process(process_new.clone());
         let process_prev = mod_process(process_previous.clone());
-        let proc_ser = serde_json::to_string_pretty(&process).unwrap();
-        let proc2_ser = serde_json::to_string_pretty(&process_prev).unwrap();
+        let proc_ser = serde_json::to_string(&process).unwrap();
+        let proc2_ser = serde_json::to_string(&process_prev).unwrap();
         // only process.costs should be changed
         assert_eq!(proc_ser, proc2_ser);
     }
@@ -735,8 +735,8 @@ mod tests {
         };
         let resource = mod_resource(resource_new.clone());
         let resource_prev = mod_resource(resource_previous.clone());
-        let res_ser = serde_json::to_string_pretty(&resource).unwrap();
-        let res2_ser = serde_json::to_string_pretty(&resource_prev).unwrap();
+        let res_ser = serde_json::to_string(&resource).unwrap();
+        let res2_ser = serde_json::to_string(&resource_prev).unwrap();
         // only resource.costs/custody/quantity/accountable should be changed
         assert_eq!(res_ser, res2_ser);
     }
@@ -794,17 +794,25 @@ mod tests {
         assert_eq!(mods.len(), 2);
         match &mods[0] {
             Saver::ModifyProcess(process) => {
-                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", dec!(70)));
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 70));
                 check_process_mods(vec!["costs"], process, state.output_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }
         match &mods[1] {
             Saver::ModifyProcess(process) => {
-                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", dec!(30)));
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 30));
                 check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
+        }
+
+        let mut event = make_event(vf::Action::DeliverService, &company_id, &state, &now);
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(5)), Unit::One)));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
+        match event.process(state, &now) {
+            Err(Error::NegativeCosts) => {}
+            _ => panic!("should have overflowed move_costs"),
         }
     }
 
@@ -822,7 +830,7 @@ mod tests {
         assert_eq!(mods.len(), 2);
         match &mods[0] {
             Saver::ModifyProcess(process) => {
-                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", dec!(70)));
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 70));
                 check_process_mods(vec!["costs"], process, state.output_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
@@ -833,6 +841,14 @@ mod tests {
                 check_resource_mods(vec!["costs", "accounting_quantity"], resource, state.resource.as_ref().unwrap());
             }
             _ => panic!("unexpected result"),
+        }
+
+        let mut event = make_event(vf::Action::Modify, &company_id, &state, &now);
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(5)), Unit::One)));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
+        match event.process(state, &now) {
+            Err(Error::NegativeCosts) => {}
+            _ => panic!("should have overflowed move_costs"),
         }
     }
 
@@ -852,7 +868,7 @@ mod tests {
         assert_eq!(mods.len(), 2);
         match &mods[0] {
             Saver::ModifyProcess(process) => {
-                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", dec!(58)));
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 58));
                 check_process_mods(vec!["costs"], process, state.output_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
@@ -878,23 +894,218 @@ mod tests {
     }
 
     #[test]
-    fn transfer() {
+    fn transfer_internal() {
+        let now = util::time::now();
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, true, &now);
+
+        let mut event = make_event(vf::Action::Transfer, &company_id, &state, &now);
+        event.set_transfer_type(Some(TransferType::InternalCostTransfer));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", 59)));
+        fuzz_state(event.clone(), state.clone(), &now);
+
+        let res = event.process(state.clone(), &now).unwrap();
+        let mods = res.modifications();
+        assert_eq!(mods.len(), 2);
+        match &mods[0] {
+            Saver::ModifyProcess(process) => {
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 41));
+                check_process_mods(vec!["costs"], process, state.output_of.as_ref().unwrap())
+            }
+            _ => panic!("unexpected result"),
+        }
+        match &mods[1] {
+            Saver::ModifyProcess(process) => {
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 59));
+                check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
+            }
+            _ => panic!("unexpected result"),
+        }
+
+        let mut event = make_event(vf::Action::Produce, &company_id, &state, &now);
+        event.set_transfer_type(Some(TransferType::InternalCostTransfer));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
+        match event.process(state, &now) {
+            Err(Error::NegativeCosts) => {}
+            _ => panic!("should have overflowed move_costs"),
+        }
+    }
+
+    #[test]
+    fn transfer_resource() {
+        let now = util::time::now();
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, true, &now);
+
+        let mut event = make_event(vf::Action::Transfer, &company_id, &state, &now);
+        event.set_transfer_type(Some(TransferType::ResourceTransfer));
+        fuzz_state(event.clone(), state.clone(), &now);
+
+        let res = event.process(state.clone(), &now).unwrap();
+        let mods = res.modifications();
+        assert_eq!(mods.len(), 1);
+        match &mods[0] {
+            Saver::ModifyResource(resource) => {
+                assert_eq!(resource.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
+                assert_eq!(resource.in_custody_of(), &company_id.clone().into());
+                check_resource_mods(vec!["in_custody_of", "primary_accountable"], resource, state.resource.as_ref().unwrap());
+            }
+            _ => panic!("unexpected result"),
+        }
     }
 
     #[test]
     fn transfer_all_rights() {
+        let now = util::time::now();
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, true, &now);
+
+        let event = make_event(vf::Action::TransferAllRights, &company_id, &state, &now);
+        fuzz_state(event.clone(), state.clone(), &now);
+
+        let res = event.process(state.clone(), &now).unwrap();
+        let mods = res.modifications();
+        assert_eq!(mods.len(), 1);
+        match &mods[0] {
+            Saver::ModifyResource(resource) => {
+                assert_eq!(resource.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
+                check_resource_mods(vec!["primary_accountable"], resource, state.resource.as_ref().unwrap());
+            }
+            _ => panic!("unexpected result"),
+        }
     }
 
     #[test]
     fn transfer_custody() {
+        let now = util::time::now();
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, true, &now);
+
+        let event = make_event(vf::Action::TransferCustody, &company_id, &state, &now);
+        fuzz_state(event.clone(), state.clone(), &now);
+
+        let res = event.process(state.clone(), &now).unwrap();
+        let mods = res.modifications();
+        assert_eq!(mods.len(), 1);
+        match &mods[0] {
+            Saver::ModifyResource(resource) => {
+                assert_eq!(resource.in_custody_of().clone(), company_id.clone().into());
+                check_resource_mods(vec!["in_custody_of"], resource, state.resource.as_ref().unwrap());
+            }
+            _ => panic!("unexpected result"),
+        }
     }
 
     #[test]
     fn r#use() {
+        let now = util::time::now();
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, true, &now);
+
+        let event = make_event(vf::Action::Use, &company_id, &state, &now);
+        fuzz_state(event.clone(), state.clone(), &now);
+
+        let res = event.process(state.clone(), &now).unwrap();
+        let mods = res.modifications();
+        assert_eq!(mods.len(), 2);
+        match &mods[0] {
+            Saver::ModifyResource(resource) => {
+                assert_eq!(resource.in_custody_of().clone(), company_id.clone().into());
+                assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", dec!(4.91)));
+                check_resource_mods(vec!["costs", "in_custody_of"], resource, state.resource.as_ref().unwrap());
+            }
+            _ => panic!("unexpected result"),
+        }
+        match &mods[1] {
+            Saver::ModifyProcess(process) => {
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 30));
+                check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
+            }
+            _ => panic!("unexpected result"),
+        }
+
+        let mut event = make_event(vf::Action::Use, &company_id, &state, &now);
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
+        match event.process(state, &now) {
+            Err(Error::NegativeCosts) => {}
+            _ => panic!("should have overflowed move_costs"),
+        }
     }
 
     #[test]
-    fn work() {
+    fn work_wage() {
+        let now = util::time::now();
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, false, &now);
+
+        let mut event = make_event(vf::Action::Work, &company_id, &state, &now);
+        event.set_labor_type(Some(LaborType::Wage));
+        event.inner_mut().set_provider(state.provider.as_ref().unwrap().id().clone().into());
+        fuzz_state(event.clone(), state.clone(), &now);
+
+        let res = event.process(state.clone(), &now).unwrap();
+        let mods = res.modifications();
+        assert_eq!(mods.len(), 1);
+        match &mods[0] {
+            Saver::ModifyProcess(process) => {
+                assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 30));
+                check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
+            }
+            _ => panic!("unexpected result"),
+        }
+    }
+
+    #[test]
+    fn work_hours() {
+        let now = util::time::now();
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, false, &now);
+
+        let mut event = make_event(vf::Action::Work, &company_id, &state, &now);
+        event.set_labor_type(Some(LaborType::Hours));
+        event.set_move_costs(None);
+        event.inner_mut().set_provider(state.provider.as_ref().unwrap().id().clone().into());
+        event.inner_mut().set_effort_quantity(Some(Measure::new(NumericUnion::Integer(5), Unit::Hour)));
+        fuzz_state(event.clone(), state.clone(), &now);
+
+        let res = event.process(state.clone(), &now).unwrap();
+        let mods = res.modifications();
+        assert_eq!(mods.len(), 1);
+        match &mods[0] {
+            Saver::ModifyProcess(process) => {
+                assert_eq!(process.costs(), &Costs::new_with_labor_hours("CEO", 5));
+                check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
+            }
+            _ => panic!("unexpected result"),
+        }
+    }
+
+    #[test]
+    fn work_wage_and_hours() {
+        let now = util::time::now();
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, false, &now);
+
+        let mut event = make_event(vf::Action::Work, &company_id, &state, &now);
+        event.set_labor_type(Some(LaborType::WageAndHours));
+        event.set_move_costs(Some(Costs::new_with_labor("CEO", 69)));
+        event.inner_mut().set_provider(state.provider.as_ref().unwrap().id().clone().into());
+        event.inner_mut().set_effort_quantity(Some(Measure::new(NumericUnion::Integer(12), Unit::Hour)));
+        fuzz_state(event.clone(), state.clone(), &now);
+
+        let res = event.process(state.clone(), &now).unwrap();
+        let mods = res.modifications();
+        assert_eq!(mods.len(), 1);
+        match &mods[0] {
+            Saver::ModifyProcess(process) => {
+                let mut costs = Costs::new();
+                costs.track_labor("CEO", 69);
+                costs.track_labor_hours("CEO", 12);
+                assert_eq!(process.costs(), &costs);
+                check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
+            }
+            _ => panic!("unexpected result"),
+        }
     }
 }
 
