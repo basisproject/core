@@ -1,4 +1,3 @@
-use getset::Getters;
 use serde::{Serialize, Deserialize};
 
 #[macro_use]
@@ -22,8 +21,7 @@ pub enum Op {
 }
 
 /// Documents a modification to a model.
-#[derive(Debug, Clone, PartialEq, Getters, Serialize, Deserialize)]
-#[getset(get = "pub")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Modification {
     /// The type of modification
     op: Op,
