@@ -48,6 +48,8 @@ pub enum Error {
     PermissionDenied,
     #[error("error building object {0}")]
     BuilderFailed(String),
+    #[error("error converting Model to its inner form")]
+    ModelConvertError,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

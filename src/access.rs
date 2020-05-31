@@ -169,6 +169,15 @@ impl Role {
     }
 }
 
+#[macro_export]
+macro_rules! access_check {
+    ($model:ident, $perm:expr) => {
+        if !$model.can(&$perm) {
+            Err(Error::PermissionDenied)?;
+        }
+    };
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;

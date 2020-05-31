@@ -8,7 +8,7 @@ use crate::{
     },
 };
 use serde::{Serialize, Deserialize};
-use std::convert::TryInto;
+use std::convert::TryFrom;
 
 /// VF (correctly) assumes different types of actors in the economic network
 /// that have "agency" so here we define the objects that have agency within the
@@ -26,62 +26,62 @@ pub enum AgentID {
     UserID(UserID),
 }
 
-impl Into<AgentID> for CompanyID {
-    fn into(self) -> AgentID {
-        AgentID::CompanyID(self)
+impl From<CompanyID> for AgentID {
+    fn from(val: CompanyID) -> Self {
+        AgentID::CompanyID(val)
     }
 }
-impl Into<AgentID> for CompanyMemberID {
-    fn into(self) -> AgentID {
-        AgentID::MemberID(self)
+impl From<CompanyMemberID> for AgentID {
+    fn from(val: CompanyMemberID) -> Self {
+        AgentID::MemberID(val)
     }
 }
-impl Into<AgentID> for RegionID {
-    fn into(self) -> AgentID {
-        AgentID::RegionID(self)
+impl From<RegionID> for AgentID {
+    fn from(val: RegionID) -> Self {
+        AgentID::RegionID(val)
     }
 }
-impl Into<AgentID> for UserID {
-    fn into(self) -> AgentID {
-        AgentID::UserID(self)
+impl From<UserID> for AgentID {
+    fn from(val: UserID) -> Self {
+        AgentID::UserID(val)
     }
 }
 
-impl TryInto<CompanyID> for AgentID {
+impl TryFrom<AgentID> for CompanyID {
     type Error = Error;
 
-    fn try_into(self) -> Result<CompanyID> {
-        Ok(match self {
+    fn try_from(val: AgentID) -> Result<Self> {
+        Ok(match val {
             AgentID::CompanyID(id) => id,
             _ => Err(Error::WrongAgentIDType)?,
         })
     }
 }
-impl TryInto<CompanyMemberID> for AgentID {
+impl TryFrom<AgentID> for CompanyMemberID {
     type Error = Error;
 
-    fn try_into(self) -> Result<CompanyMemberID> {
-        Ok(match self {
+    fn try_from(val: AgentID) -> Result<Self> {
+        Ok(match val {
             AgentID::MemberID(id) => id,
             _ => Err(Error::WrongAgentIDType)?,
         })
     }
 }
-impl TryInto<RegionID> for AgentID {
+impl TryFrom<AgentID> for RegionID {
     type Error = Error;
 
-    fn try_into(self) -> Result<RegionID> {
-        Ok(match self {
+    fn try_from(val: AgentID) -> Result<Self> {
+        Ok(match val {
             AgentID::RegionID(id) => id,
             _ => Err(Error::WrongAgentIDType)?,
         })
     }
 }
-impl TryInto<UserID> for AgentID {
+impl TryFrom<AgentID> for UserID {
     type Error = Error;
 
-    fn try_into(self) -> Result<UserID> {
-        Ok(match self {
+    fn try_from(val: AgentID) -> Result<Self> {
+        Ok(match val {
             AgentID::UserID(id) => id,
             _ => Err(Error::WrongAgentIDType)?,
         })

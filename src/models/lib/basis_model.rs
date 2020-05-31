@@ -38,9 +38,9 @@ macro_rules! basis_model {
             }
         }
 
-        impl std::convert::Into<String> for $id {
-            fn into(self) -> String {
-                let $id(val) = self;
+        impl std::convert::From<$id> for String {
+            fn from(id: $id) -> Self {
+                let $id(val) = id;
                 val
             }
         }
@@ -92,9 +92,20 @@ macro_rules! basis_model {
             }
         }
 
-        impl std::convert::Into<crate::models::Model> for $model {
-            fn into(self) -> crate::models::Model {
-                crate::models::Model::$model(self)
+        impl std::convert::From<$model> for crate::models::Model {
+            fn from(val: $model) -> Self {
+                crate::models::Model::$model(val)
+            }
+        }
+
+        impl std::convert::TryFrom<crate::models::Model> for $model {
+            type Error = crate::error::Error;
+
+            fn try_from(val: crate::models::Model) -> std::result::Result<Self, Self::Error> {
+                match val {
+                    crate::models::Model::$model(val) => Ok(val),
+                    _ => Err(Self::Error::ModelConvertError),
+                }
             }
         }
 

@@ -59,6 +59,7 @@ macro_rules! load_models {
 
 pub mod error;
 mod util;
+#[macro_use]
 mod access;
 mod models;
 pub mod costs;
