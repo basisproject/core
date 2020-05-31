@@ -18,6 +18,10 @@ use crate::{
     error::{Error, Result},
     models::{
         self,
+        Op,
+        Modification,
+        Modifications,
+
         agreement::AgreementID,
         company::CompanyID,
         company_member::CompanyMember,
@@ -100,16 +104,6 @@ basis_model! {
     EventBuilder
 }
 
-/// A container type for objects we want to save while processing an event. For
-/// our purposes, saving means either updating or creating.
-#[derive(Debug)]
-pub enum Saver {
-    CreateEvent(Event),
-    CreateResource(Resource),
-    ModifyProcess(Process),
-    ModifyResource(Resource),
-}
-
 /// A set of data that the event processor needs to do its thing. Generally this
 /// acts as a container for objects that the event only has *references* to and
 /// wouldn't otherwise be able to access.
@@ -142,7 +136,7 @@ pub struct EventProcessResult {
     /// The time we're processing the event
     process_time: DateTime<Utc>,
     /// The items we're saving/updating as a result of processing this event
-    modifications: Vec<Saver>,
+    modifications: Modifications,
 }
 
 impl EventProcessResult {
@@ -151,13 +145,13 @@ impl EventProcessResult {
         Self {
             event_id: event_id.clone(),
             process_time: process_time.clone(),
-            modifications: Default::default(),
+            modifications: Modifications::new(),
         }
     }
 
     /// Consume the result and return the modification list
-    pub fn modifications(self) -> Vec<Saver> {
-        self.modifications
+    pub fn modifications(self) -> Vec<Modification> {
+        self.modifications.into_modifications()
     }
 
     /// Push an event to create into the result set
@@ -165,26 +159,26 @@ impl EventProcessResult {
         event.inner_mut().set_triggered_by(Some(self.event_id.clone()));
         event.set_created(self.process_time.clone());
         event.set_updated(self.process_time.clone());
-        self.modifications.push(Saver::CreateEvent(event));
+        self.modifications.push(Op::Create, event);
     }
 
     /// Push a resource to create into the result set
     pub fn create_resource(&mut self, mut resource: Resource) {
         models::resource::set::created(&mut resource, self.process_time.clone());
         models::resource::set::updated(&mut resource, self.process_time.clone());
-        self.modifications.push(Saver::CreateResource(resource));
+        self.modifications.push(Op::Create, resource);
     }
 
     /// Push a process to modify into the result set
     pub fn modify_process(&mut self, mut process: Process) {
         models::process::set::updated(&mut process, self.process_time.clone());
-        self.modifications.push(Saver::ModifyProcess(process));
+        self.modifications.push(Op::Update, process);
     }
 
     /// Push a resource to modify into the result set
     pub fn modify_resource(&mut self, mut resource: Resource) {
         models::resource::set::updated(&mut resource, self.process_time.clone());
-        self.modifications.push(Saver::ModifyResource(resource));
+        self.modifications.push(Op::Update, resource);
     }
 }
 
@@ -505,6 +499,8 @@ mod tests {
         costs::Costs,
         models::{
             self,
+            Model,
+
             company::{CompanyID, Role},
             company_member::{Compensation},
             process::Process,
@@ -757,18 +753,18 @@ mod tests {
         let res = event.process(state.clone(), &now).unwrap();
         let mods = res.modifications();
         assert_eq!(mods.len(), 2);
-        match &mods[0] {
-            Saver::ModifyProcess(process) => {
+        match mods[0].clone().into_pair() {
+            (Op::Update, Model::Process(process)) => {
                 assert_eq!(process.costs(), &Costs::new_with_labor("machinist", dec!(30.0)));
-                check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
+                check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }
-        match &mods[1] {
-            Saver::ModifyResource(resource) => {
+        match mods[1].clone().into_pair() {
+            (Op::Update, Model::Resource(resource)) => {
                 assert_eq!(resource.inner().accounting_quantity().clone().unwrap(), Measure::new(NumericUnion::Integer(4), Unit::One));
                 assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", dec!(4.91)));
-                check_resource_mods(vec!["costs", "accounting_quantity"], resource, state.resource.as_ref().unwrap());
+                check_resource_mods(vec!["costs", "accounting_quantity"], &resource, state.resource.as_ref().unwrap());
             }
             _ => panic!("unexpected result"),
         }
@@ -794,17 +790,17 @@ mod tests {
         let res = event.process(state.clone(), &now).unwrap();
         let mods = res.modifications();
         assert_eq!(mods.len(), 2);
-        match &mods[0] {
-            Saver::ModifyProcess(process) => {
+        match mods[0].clone().into_pair() {
+            (Op::Update, Model::Process(process)) => {
                 assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 70));
-                check_process_mods(vec!["costs"], process, state.output_of.as_ref().unwrap())
+                check_process_mods(vec!["costs"], &process, state.output_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }
-        match &mods[1] {
-            Saver::ModifyProcess(process) => {
+        match mods[1].clone().into_pair() {
+            (Op::Update, Model::Process(process)) => {
                 assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 30));
-                check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
+                check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }
@@ -830,17 +826,17 @@ mod tests {
         let res = event.process(state.clone(), &now).unwrap();
         let mods = res.modifications();
         assert_eq!(mods.len(), 2);
-        match &mods[0] {
-            Saver::ModifyProcess(process) => {
+        match mods[0].clone().into_pair() {
+            (Op::Update, Model::Process(process)) => {
                 assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 70));
-                check_process_mods(vec!["costs"], process, state.output_of.as_ref().unwrap())
+                check_process_mods(vec!["costs"], &process, state.output_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }
-        match &mods[1] {
-            Saver::ModifyResource(resource) => {
+        match mods[1].clone().into_pair() {
+            (Op::Update, Model::Resource(resource)) => {
                 assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", dec!(64.91)));
-                check_resource_mods(vec!["costs", "accounting_quantity"], resource, state.resource.as_ref().unwrap());
+                check_resource_mods(vec!["costs", "accounting_quantity"], &resource, state.resource.as_ref().unwrap());
             }
             _ => panic!("unexpected result"),
         }
@@ -868,20 +864,20 @@ mod tests {
         let res = event.process(state.clone(), &now).unwrap();
         let mods = res.modifications();
         assert_eq!(mods.len(), 2);
-        match &mods[0] {
-            Saver::ModifyProcess(process) => {
+        match mods[0].clone().into_pair() {
+            (Op::Update, Model::Process(process)) => {
                 assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 58));
-                check_process_mods(vec!["costs"], process, state.output_of.as_ref().unwrap())
+                check_process_mods(vec!["costs"], &process, state.output_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }
-        match &mods[1] {
-            Saver::ModifyResource(resource) => {
+        match mods[1].clone().into_pair() {
+            (Op::Update, Model::Resource(resource)) => {
                 assert_eq!(resource.inner().accounting_quantity().clone().unwrap(), Measure::new(NumericUnion::Integer(15), Unit::One));
                 assert_eq!(resource.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
                 assert_eq!(resource.in_custody_of(), &company_id.clone().into());
                 assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", dec!(76.91)));
-                check_resource_mods(vec!["costs", "in_custody_of", "accounting_quantity", "primary_accountable"], resource, state.resource.as_ref().unwrap());
+                check_resource_mods(vec!["costs", "in_custody_of", "accounting_quantity", "primary_accountable"], &resource, state.resource.as_ref().unwrap());
             }
             _ => panic!("unexpected result"),
         }
@@ -909,17 +905,17 @@ mod tests {
         let res = event.process(state.clone(), &now).unwrap();
         let mods = res.modifications();
         assert_eq!(mods.len(), 2);
-        match &mods[0] {
-            Saver::ModifyProcess(process) => {
+        match mods[0].clone().into_pair() {
+            (Op::Update, Model::Process(process)) => {
                 assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 41));
-                check_process_mods(vec!["costs"], process, state.output_of.as_ref().unwrap())
+                check_process_mods(vec!["costs"], &process, state.output_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }
-        match &mods[1] {
-            Saver::ModifyProcess(process) => {
+        match mods[1].clone().into_pair() {
+            (Op::Update, Model::Process(process)) => {
                 assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 59));
-                check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
+                check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }
@@ -946,11 +942,11 @@ mod tests {
         let res = event.process(state.clone(), &now).unwrap();
         let mods = res.modifications();
         assert_eq!(mods.len(), 1);
-        match &mods[0] {
-            Saver::ModifyResource(resource) => {
+        match mods[0].clone().into_pair() {
+            (Op::Update, Model::Resource(resource)) => {
                 assert_eq!(resource.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
                 assert_eq!(resource.in_custody_of(), &company_id.clone().into());
-                check_resource_mods(vec!["in_custody_of", "primary_accountable"], resource, state.resource.as_ref().unwrap());
+                check_resource_mods(vec!["in_custody_of", "primary_accountable"], &resource, state.resource.as_ref().unwrap());
             }
             _ => panic!("unexpected result"),
         }
@@ -968,10 +964,10 @@ mod tests {
         let res = event.process(state.clone(), &now).unwrap();
         let mods = res.modifications();
         assert_eq!(mods.len(), 1);
-        match &mods[0] {
-            Saver::ModifyResource(resource) => {
+        match mods[0].clone().into_pair() {
+            (Op::Update, Model::Resource(resource)) => {
                 assert_eq!(resource.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
-                check_resource_mods(vec!["primary_accountable"], resource, state.resource.as_ref().unwrap());
+                check_resource_mods(vec!["primary_accountable"], &resource, state.resource.as_ref().unwrap());
             }
             _ => panic!("unexpected result"),
         }
@@ -989,10 +985,10 @@ mod tests {
         let res = event.process(state.clone(), &now).unwrap();
         let mods = res.modifications();
         assert_eq!(mods.len(), 1);
-        match &mods[0] {
-            Saver::ModifyResource(resource) => {
+        match mods[0].clone().into_pair() {
+            (Op::Update, Model::Resource(resource)) => {
                 assert_eq!(resource.in_custody_of().clone(), company_id.clone().into());
-                check_resource_mods(vec!["in_custody_of"], resource, state.resource.as_ref().unwrap());
+                check_resource_mods(vec!["in_custody_of"], &resource, state.resource.as_ref().unwrap());
             }
             _ => panic!("unexpected result"),
         }
@@ -1010,18 +1006,18 @@ mod tests {
         let res = event.process(state.clone(), &now).unwrap();
         let mods = res.modifications();
         assert_eq!(mods.len(), 2);
-        match &mods[0] {
-            Saver::ModifyResource(resource) => {
+        match mods[0].clone().into_pair() {
+            (Op::Update, Model::Resource(resource)) => {
                 assert_eq!(resource.in_custody_of().clone(), company_id.clone().into());
                 assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", dec!(4.91)));
-                check_resource_mods(vec!["costs", "in_custody_of"], resource, state.resource.as_ref().unwrap());
+                check_resource_mods(vec!["costs", "in_custody_of"], &resource, state.resource.as_ref().unwrap());
             }
             _ => panic!("unexpected result"),
         }
-        match &mods[1] {
-            Saver::ModifyProcess(process) => {
+        match mods[1].clone().into_pair() {
+            (Op::Update, Model::Process(process)) => {
                 assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 30));
-                check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
+                check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }
@@ -1048,10 +1044,10 @@ mod tests {
         let res = event.process(state.clone(), &now).unwrap();
         let mods = res.modifications();
         assert_eq!(mods.len(), 1);
-        match &mods[0] {
-            Saver::ModifyProcess(process) => {
+        match mods[0].clone().into_pair() {
+            (Op::Update, Model::Process(process)) => {
                 assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 30));
-                check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
+                check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }
@@ -1073,10 +1069,10 @@ mod tests {
         let res = event.process(state.clone(), &now).unwrap();
         let mods = res.modifications();
         assert_eq!(mods.len(), 1);
-        match &mods[0] {
-            Saver::ModifyProcess(process) => {
+        match mods[0].clone().into_pair() {
+            (Op::Update, Model::Process(process)) => {
                 assert_eq!(process.costs(), &Costs::new_with_labor_hours("CEO", 5));
-                check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
+                check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }
@@ -1098,13 +1094,13 @@ mod tests {
         let res = event.process(state.clone(), &now).unwrap();
         let mods = res.modifications();
         assert_eq!(mods.len(), 1);
-        match &mods[0] {
-            Saver::ModifyProcess(process) => {
+        match mods[0].clone().into_pair() {
+            (Op::Update, Model::Process(process)) => {
                 let mut costs = Costs::new();
                 costs.track_labor("CEO", 69);
                 costs.track_labor_hours("CEO", 12);
                 assert_eq!(process.costs(), &costs);
-                check_process_mods(vec!["costs"], process, state.input_of.as_ref().unwrap())
+                check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap())
             }
             _ => panic!("unexpected result"),
         }

@@ -3,23 +3,26 @@ use crate::{
     access::Permission,
     error::{Error, Result},
     models::{
-        region::{self, Region, RegionID},
+        Op,
+        Modifications,
+        region::{self, RegionID},
         user::User,
     }
 };
 
-pub fn create<T: Into<String>>(user: &User, id: RegionID, name: T, now: &DateTime<Utc>) -> Result<Region> {
+/// Create a region model
+pub fn create<T: Into<String>>(user: &User, id: RegionID, name: T, now: &DateTime<Utc>) -> Result<Modifications> {
     if !user.can(&Permission::RegionCreate) {
         Err(Error::PermissionDenied)?;
     }
-    let res = region::builder()
+    let model = region::builder()
         .id(id)
         .name(name.into())
         .created(now.clone())
         .updated(now.clone())
         .build()
         .map_err(|e| Error::BuilderFailed(e))?;
-    Ok(res)
+    Ok(Modifications::new_single(Op::Create, model))
 }
 
 #[cfg(test)]
@@ -28,6 +31,7 @@ mod tests {
     use crate::{
         access::Role,
         models::{
+            Model,
             user,
         },
         util,
@@ -46,9 +50,15 @@ mod tests {
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();
-        let region = create(&user, id.clone(), "xina", &now).unwrap();
-        assert_eq!(region.id(), &id);
-        assert_eq!(region.name(), "xina");
+        let mods = create(&user, id.clone(), "xina", &now).unwrap().into_modifications();
+        assert_eq!(mods.len(), 1);
+        match mods[0].clone().into_pair() {
+            (Op::Create, Model::Region(region)) => {
+                assert_eq!(region.id(), &id);
+                assert_eq!(region.name(), "xina");
+            }
+            _ => panic!("unexpected result"),
+        }
     }
 }
 

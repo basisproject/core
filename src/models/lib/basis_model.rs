@@ -92,6 +92,12 @@ macro_rules! basis_model {
             }
         }
 
+        impl std::convert::Into<crate::models::Model> for $model {
+            fn into(self) -> crate::models::Model {
+                crate::models::Model::$model(self)
+            }
+        }
+
         #[allow(dead_code)]
         pub fn builder() -> $builder {
             $model::builder()
