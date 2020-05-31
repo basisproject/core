@@ -18,6 +18,7 @@ pub enum Permission {
 
     UserCreate,
     UserUpdate,
+    UserSetRoles,
     UserAdminUpdate,
     UserSetPubkey,
     UserDelete,
@@ -85,6 +86,7 @@ impl Role {
                 vec![
                     Permission::UserCreate,
                     Permission::UserUpdate,
+                    Permission::UserSetRoles,
                     Permission::UserAdminUpdate,
                     Permission::UserSetPubkey,
                     Permission::UserDelete,

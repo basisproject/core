@@ -124,6 +124,11 @@ macro_rules! basis_model {
             use super::*;
 
             #[allow(dead_code)]
+            pub fn active(model: &mut $model, active: bool) {
+                model.set_active(active);
+            }
+
+            #[allow(dead_code)]
             pub fn created(model: &mut $model, created: chrono::DateTime<chrono::Utc>) {
                 model.set_created(created);
             }

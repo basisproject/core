@@ -13,7 +13,7 @@
 //! storage mechanism.
 
 pub mod region;
-//pub mod user;
+pub mod user;
 //pub mod occupation;
 //pub mod currency;
 //pub mod company;
