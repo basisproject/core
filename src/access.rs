@@ -40,20 +40,13 @@ pub enum Permission {
     ResourceSpecAdminUpdate,
     ResourceSpecAdminDelete,
 
-    CostTagCreate,
-    CostTagUpdate,
-    CostTagDelete,
+    OccupationCreate,
+    OccupationUpdate,
+    OccupationDelete,
 
-    ResourceTagCreate,
-    ResourceTagDelete,
-
-    OrderCreate,
-    OrderUpdate,
-    OrderAdminUpdate,
-
-    WalletCreate,
-    WalletUpdate,
-    WalletDelete,
+    AccountCreate,
+    AccountUpdate,
+    AccountDelete,
 }
 
 /// Define the system-wide roles users can have.
@@ -64,8 +57,6 @@ pub enum Role {
     IdentityAdmin,
     CompanyAdmin,
     ResourceSpecAdmin,
-    TagAdmin,
-    OrderAdmin,
     Bank,
     User,
 }
@@ -103,17 +94,6 @@ impl Role {
                     Permission::ResourceSpecAdminDelete,
                 ]
             }
-            Role::TagAdmin => {
-                vec![
-                    Permission::ResourceTagCreate,
-                    Permission::ResourceTagDelete,
-                ]
-            }
-            Role::OrderAdmin => {
-                vec![
-                    Permission::OrderAdminUpdate,
-                ]
-            }
             Role::Bank => {
                 vec![
                     Permission::CompanySetType,
@@ -133,14 +113,9 @@ impl Role {
                     Permission::ResourceSpecCreate,
                     Permission::ResourceSpecUpdate,
                     Permission::ResourceSpecDelete,
-                    Permission::CostTagCreate,
-                    Permission::CostTagUpdate,
-                    Permission::CostTagDelete,
-                    Permission::OrderCreate,
-                    Permission::OrderUpdate,
-                    Permission::WalletCreate,
-                    Permission::WalletUpdate,
-                    Permission::WalletDelete,
+                    Permission::AccountCreate,
+                    Permission::AccountUpdate,
+                    Permission::AccountDelete,
                 ]
             }
         }
@@ -195,8 +170,6 @@ pub mod tests {
         assert!(super_admin.can(&Permission::CompanyAdminUpdate));
         assert!(super_admin.can(&Permission::CompanyAdminDelete));
         assert!(super_admin.can(&Permission::CompanySetType));
-        assert!(super_admin.can(&Permission::ResourceTagCreate));
-        assert!(super_admin.can(&Permission::ResourceTagDelete));
 
         let traveller = Role::TimeTraveler;
         assert!(traveller.can(&Permission::TimeTravel));
@@ -208,8 +181,6 @@ pub mod tests {
         assert!(!traveller.can(&Permission::CompanyAdminUpdate));
         assert!(!traveller.can(&Permission::CompanyAdminDelete));
         assert!(!traveller.can(&Permission::CompanySetType));
-        assert!(!traveller.can(&Permission::ResourceTagCreate));
-        assert!(!traveller.can(&Permission::ResourceTagDelete));
 
         let comp_admin = Role::CompanyAdmin;
         assert!(!comp_admin.can(&Permission::TimeTravel));
@@ -223,7 +194,6 @@ pub mod tests {
         assert!(!comp_admin.can(&Permission::CompanySetType));
 
         // TODO: ResourceSpecAdmin
-        // TODO: OrderAdmin
     }
 }
 

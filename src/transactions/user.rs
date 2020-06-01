@@ -67,26 +67,15 @@ mod tests {
         models::{
             user::{self, User},
         },
+        transactions::tests::make_user,
         util,
     };
-
-    fn make_user(user_id: &UserID, now: &DateTime<Utc>) -> User {
-        user::builder()
-            .id(user_id.clone())
-            .roles(vec![Role::SuperAdmin])
-            .email("surely@hotmail.com")   // don't call me shirley
-            .name("buzzin' frog")
-            .active(true)
-            .created(now.clone())
-            .updated(now.clone())
-            .build().unwrap()
-    }
 
     #[test]
     fn can_create() {
         let id = UserID::create();
         let now = util::time::now();
-        let user = make_user(&id, &now);
+        let user = make_user(&id, &now, Some(vec![Role::IdentityAdmin]));
         let mods = create(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_modifications();
         assert_eq!(mods.len(), 1);
 
@@ -98,8 +87,7 @@ mod tests {
 
         let id = UserID::create();
         let now = util::time::now();
-        let mut user = make_user(&id, &now);
-        user::set::roles(&mut user, vec![Role::User]);
+        let user = make_user(&id, &now, Some(vec![Role::User]));
 
         let res = create(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now);
         assert_eq!(res, Err(Error::PermissionDenied));
@@ -109,7 +97,7 @@ mod tests {
     fn can_update() {
         let id = UserID::create();
         let now = util::time::now();
-        let user = make_user(&id, &now);
+        let user = make_user(&id, &now, Some(vec![Role::IdentityAdmin]));
         let mods = create(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_modifications();
 
         let subject = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
@@ -137,8 +125,7 @@ mod tests {
     fn can_set_roles() {
         let id = UserID::create();
         let now = util::time::now();
-        let mut user = make_user(&id, &now);
-        user::set::roles(&mut user, vec![Role::IdentityAdmin]);
+        let mut user = make_user(&id, &now, Some(vec![Role::IdentityAdmin]));
         user::set::active(&mut user, false);
 
         // inactive users should not be able to run mods
@@ -167,7 +154,7 @@ mod tests {
     fn can_delete() {
         let id = UserID::create();
         let now = util::time::now();
-        let user = make_user(&id, &now);
+        let user = make_user(&id, &now, Some(vec![Role::IdentityAdmin]));
         let mods = delete(&user.clone(), user, &now).unwrap().into_modifications();
         assert_eq!(mods.len(), 1);
 

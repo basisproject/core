@@ -39,30 +39,18 @@ mod tests {
         models::{
             Op,
 
-            region::{Region},
-            user,
+            region::Region,
+            user::{self, UserID},
         },
+        transactions::tests::make_user,
         util,
     };
-    use std::convert::TryFrom;
-
-    fn make_user(now: &DateTime<Utc>) -> User {
-        user::builder()
-            .id("52221")
-            .roles(vec![Role::SuperAdmin])
-            .email("surely@hotmail.com")   // don't call me shirley
-            .name("buzzin' frog")
-            .active(true)
-            .created(now.clone())
-            .updated(now.clone())
-            .build().unwrap()
-    }
 
     #[test]
     fn can_create() {
         let id = RegionID::create();
         let now = util::time::now();
-        let user = make_user(&now);
+        let user = make_user(&UserID::create(), &now, Some(vec![Role::SuperAdmin]));
         let mods = create(&user, id.clone(), "xina", true, &now).unwrap().into_modifications();
         assert_eq!(mods.len(), 1);
 
@@ -72,8 +60,7 @@ mod tests {
 
         let id = RegionID::create();
         let now = util::time::now();
-        let mut user = make_user(&now);
-        user::set::roles(&mut user, vec![Role::User]);
+        let user = make_user(&UserID::create(), &now, Some(vec![Role::User]));
 
         let res = create(&user, id.clone(), "xina", true, &now);
         assert_eq!(res, Err(Error::PermissionDenied));
@@ -83,7 +70,7 @@ mod tests {
     fn can_delete() {
         let id = RegionID::create();
         let now = util::time::now();
-        let mut user = make_user(&now);
+        let mut user = make_user(&UserID::create(), &now, Some(vec![Role::SuperAdmin]));
         let mods = create(&user, id.clone(), "fine", true, &now).unwrap().into_modifications();
         let region = mods[0].clone().expect_op::<Region>(Op::Create).unwrap();
         let mods = delete(&user, region, &now).unwrap().into_modifications();
@@ -93,7 +80,7 @@ mod tests {
         assert_eq!(model.id(), &id);
 
         let mods = create(&user, id.clone(), "fine", true, &now).unwrap().into_modifications();
-        let region = Region::try_from(mods[0].clone().into_pair().1).unwrap();
+        let region = mods[0].clone().expect_op::<Region>(Op::Create).unwrap();
         user::set::active(&mut user, false);
         let res = delete(&user, region, &now);
         assert_eq!(res, Err(Error::PermissionDenied));
