@@ -1,9 +1,10 @@
+//! The main error enum for the project lives here. The goal is to be somewhat
+//! verbose with our errors.
+
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum Error {
-    #[error("invalid role")]
-    InvalidRole,
     #[error("AgentID is the wrong type")]
     WrongAgentIDType,
     #[error("event `output_of` process does not match ID")]
