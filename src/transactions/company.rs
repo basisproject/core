@@ -5,7 +5,7 @@ use crate::{
     models::{
         Op,
         Modifications,
-        company::{self, Company, CompanyID, CompanyType, Permission as CompanyPermission, Role as CompanyRole},
+        company::{self, Company, CompanyID, CompanyType, Permission as CompanyPermission},
         company_member::{self, CompanyMember, CompanyMemberID},
         occupation::OccupationID,
         user::User,
@@ -40,7 +40,7 @@ pub fn create_private<T: Into<String>>(caller: &User, id: CompanyID, company_nam
                 .build()
                 .map_err(|e| Error::BuilderFailed(e))?
         )
-        .roles(vec![CompanyRole::Owner])
+        .permissions(vec![CompanyPermission::All])
         .active(true)
         .created(now.clone())
         .updated(now.clone())

@@ -1,7 +1,7 @@
 use crate::{
     models::{
         account::AccountID,
-        company::{Permission, Role},
+        company::Permission,
         lib::agent::AgentID,
         occupation::OccupationID,
         process_spec::ProcessSpecID,
@@ -93,8 +93,8 @@ basis_model! {
         /// Our inner VF relationship (stores both the UserID and CompanyID
         /// under the `AgentID` generic type)
         inner: vf::AgentRelationship<(), AgentID, OccupationID>,
-        /// The roles this member has at their company
-        roles: Vec<Role>,
+        /// The permissions this member has at their company (additive)
+        permissions: Vec<Permission>,
         /// Describes how the member is compensated for their labor. Must be
         /// defined for the member to perform labor.
         compensation: Option<Compensation>,
@@ -114,12 +114,7 @@ impl CompanyMember {
         if !self.is_active() {
             return false;
         }
-        for role in &self.roles {
-            if role.can(&permission) {
-                return true;
-            }
-        }
-        false
+        self.permissions().contains(permission)
     }
 }
 
@@ -147,7 +142,7 @@ mod test {
                     .build().unwrap()
             )
             .active(true)
-            .roles(vec![Role::MemberAdmin])
+            .permissions(vec![Permission::MemberCreate, Permission::MemberSetPermissions, Permission::MemberDelete])
             .compensation(Some(Compensation::new_hourly(dec!(0.0), "12345")))
             .process_spec_id(Some("1234444".into()))
             .created(util::time::now())

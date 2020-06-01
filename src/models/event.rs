@@ -500,7 +500,7 @@ mod tests {
         models::{
             self,
 
-            company::{CompanyID, Role},
+            company::{CompanyID, Permission},
             company_member::{Compensation},
             process::Process,
             resource::Resource,
@@ -653,7 +653,7 @@ mod tests {
                         .build().unwrap()
                 )
                 .active(true)
-                .roles(vec![Role::MemberAdmin])
+                .permissions(vec![Permission::MemberCreate, Permission::MemberSetPermissions, Permission::MemberDelete])
                 .compensation(Some(Compensation::new_hourly(dec!(0.0), "12345")))
                 .process_spec_id(Some("1234444".into()))
                 .created(now.clone())
