@@ -654,8 +654,8 @@ mod tests {
                 )
                 .active(true)
                 .roles(vec![Role::MemberAdmin])
-                .compensation(Compensation::new_hourly(dec!(0.0), "12345"))
-                .process_spec_id("1234444")
+                .compensation(Some(Compensation::new_hourly(dec!(0.0), "12345")))
+                .process_spec_id(Some("1234444".into()))
                 .created(now.clone())
                 .updated(now.clone())
                 .build().unwrap();

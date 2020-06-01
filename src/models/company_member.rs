@@ -95,13 +95,15 @@ basis_model! {
         inner: vf::AgentRelationship<(), AgentID, OccupationID>,
         /// The roles this member has at their company
         roles: Vec<Role>,
-        /// Describes how the member is compensated for their labor
-        compensation: Compensation,
+        /// Describes how the member is compensated for their labor. Must be
+        /// defined for the member to perform labor.
+        compensation: Option<Compensation>,
         /// A process spec that the member attributes their labor to by default.
         /// This allows some amount of automation when determining what inner
         /// process to count their labor towards. We use a ProcessSpec instead
-        /// of a Process here because Process is generally ephemeral.
-        process_spec_id: ProcessSpecID,
+        /// of a Process here because Process is generally ephemeral. Must be
+        /// defined for the member to perform labor.
+        process_spec_id: Option<ProcessSpecID>,
     }
     CompanyMemberBuilder
 }
@@ -146,8 +148,8 @@ mod test {
             )
             .active(true)
             .roles(vec![Role::MemberAdmin])
-            .compensation(Compensation::new_hourly(dec!(0.0), "12345"))
-            .process_spec_id("1234444")
+            .compensation(Some(Compensation::new_hourly(dec!(0.0), "12345")))
+            .process_spec_id(Some("1234444".into()))
             .created(util::time::now())
             .updated(util::time::now())
             .build().unwrap()

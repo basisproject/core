@@ -12,7 +12,7 @@ use crate::{
 
 /// Create a region
 pub fn create<T: Into<String>>(caller: &User, id: RegionID, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::RegionCreate);
+    access_check!(caller, Permission::RegionCreate)?;
     let model = region::builder()
         .id(id)
         .name(name.into())
@@ -26,7 +26,7 @@ pub fn create<T: Into<String>>(caller: &User, id: RegionID, name: T, active: boo
 
 /// Delete a region
 pub fn delete(caller: &User, mut subject: Region, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::RegionDelete);
+    access_check!(caller, Permission::RegionDelete)?;
     region::set::deleted(&mut subject, Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
@@ -63,7 +63,7 @@ mod tests {
         let user = make_user(&UserID::create(), &now, Some(vec![Role::User]));
 
         let res = create(&user, id.clone(), "xina", true, &now);
-        assert_eq!(res, Err(Error::PermissionDenied));
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
     #[test]
@@ -83,7 +83,7 @@ mod tests {
         let region = mods[0].clone().expect_op::<Region>(Op::Create).unwrap();
         user::set::active(&mut user, false);
         let res = delete(&user, region, &now);
-        assert_eq!(res, Err(Error::PermissionDenied));
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 }
 

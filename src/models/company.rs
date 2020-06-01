@@ -1,5 +1,7 @@
 use crate::{
-    models::region::RegionID,
+    models::{
+        region::RegionID,
+    },
 };
 use serde::{Serialize, Deserialize};
 use vf_rs::vf;
@@ -45,25 +47,17 @@ pub enum Permission {
     MemberDelete,
 
     LaborSetClock,
-    LaborTagCost,
     LaborSetWage,
 
     ResourceSpecCreate,
     ResourceSpecUpdate,
     ResourceSpecDelete,
-    ResourceSpecTagCost,
 
     OrderCreate,
     OrderUpdateProcessStatus,
-    OrderUpdateCostTags,
     OrderUpdateShipping,
     OrderUpdateShippingDates,
     OrderCancel,
-    OrderTagCost,
-
-    CostTagCreate,
-    CostTagUpdate,
-    CostTagDelete,
 }
 
 /// A Role contains a set of Permissions and can be assigned to a CompanyMember
@@ -75,11 +69,6 @@ pub enum Role {
     MemberAdmin,
     LaborAdmin,
     ResourceSpecAdmin,
-    CostTagAdmin,
-    CostTaggerAdmin,
-    CostTaggerLabor,
-    CostTaggerResourceSpec,
-    CostTaggerOrder,
     Purchaser,
     Supplier,
 }
@@ -116,39 +105,9 @@ impl Role {
                     Permission::ResourceSpecDelete,
                 ]
             }
-            Role::CostTagAdmin => {
-                vec![
-                    Permission::CostTagCreate,
-                    Permission::CostTagUpdate,
-                    Permission::CostTagDelete,
-                ]
-            }
-            Role::CostTaggerAdmin => {
-                vec![
-                    Permission::LaborTagCost,
-                    Permission::ResourceSpecTagCost,
-                    Permission::OrderTagCost,
-                ]
-            }
-            Role::CostTaggerLabor => {
-                vec![
-                    Permission::LaborTagCost,
-                ]
-            }
-            Role::CostTaggerResourceSpec => {
-                vec![
-                    Permission::ResourceSpecTagCost,
-                ]
-            }
-            Role::CostTaggerOrder => {
-                vec![
-                    Permission::OrderTagCost,
-                ]
-            }
             Role::Purchaser => {
                 vec![
                     Permission::OrderCreate,
-                    Permission::OrderUpdateCostTags,
                     Permission::OrderCancel,
                 ]
             }
@@ -223,7 +182,6 @@ pub mod tests {
         assert!(owner.can(&Permission::ResourceSpecDelete));
         assert!(owner.can(&Permission::OrderCreate));
         assert!(owner.can(&Permission::OrderUpdateProcessStatus));
-        assert!(owner.can(&Permission::OrderUpdateCostTags));
         assert!(owner.can(&Permission::OrderCancel));
 
         let admin = Role::Admin;
@@ -237,7 +195,6 @@ pub mod tests {
         assert!(admin.can(&Permission::ResourceSpecDelete));
         assert!(admin.can(&Permission::OrderCreate));
         assert!(admin.can(&Permission::OrderUpdateProcessStatus));
-        assert!(admin.can(&Permission::OrderUpdateCostTags));
         assert!(admin.can(&Permission::OrderCancel));
 
         let member_admin = Role::MemberAdmin;
@@ -251,7 +208,6 @@ pub mod tests {
         assert!(!member_admin.can(&Permission::ResourceSpecDelete));
         assert!(!member_admin.can(&Permission::OrderCreate));
         assert!(!member_admin.can(&Permission::OrderUpdateProcessStatus));
-        assert!(!member_admin.can(&Permission::OrderUpdateCostTags));
         assert!(!member_admin.can(&Permission::OrderCancel));
     }
 }

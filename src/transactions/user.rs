@@ -11,7 +11,7 @@ use crate::{
 
 /// Create a user
 pub fn create<T: Into<String>>(caller: &User, id: UserID, roles: Vec<Role>, email: T, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::UserCreate);
+    access_check!(caller, Permission::UserCreate)?;
     let model = user::builder()
         .id(id)
         .roles(roles)
@@ -27,9 +27,16 @@ pub fn create<T: Into<String>>(caller: &User, id: UserID, roles: Vec<Role>, emai
 
 /// Update a user object
 pub fn update(caller: &User, mut subject: User, email: Option<String>, name: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::UserUpdate);
+    access_check!(caller, Permission::UserAdminUpdate)
+        .or_else(|_| access_check!(caller, Permission::UserUpdate))
+        .and_then(|_| {
+            if caller.id() == subject.id() {
+                Ok(())
+            } else {
+                Err(Error::InsufficientPrivileges)
+            }
+        })?;
     if caller.id() != subject.id() {
-        access_check!(caller, Permission::UserAdminUpdate);
     }
     if let Some(email) = email {
         user::set::email(&mut subject, email.into())
@@ -46,7 +53,7 @@ pub fn update(caller: &User, mut subject: User, email: Option<String>, name: Opt
 
 /// Update a user's roles
 pub fn set_roles(caller: &User, mut subject: User, roles: Vec<Role>, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::UserSetRoles);
+    access_check!(caller, Permission::UserSetRoles)?;
     user::set::roles(&mut subject, roles);
     user::set::updated(&mut subject, now.clone());
     Ok(Modifications::new_single(Op::Update, subject))
@@ -54,7 +61,7 @@ pub fn set_roles(caller: &User, mut subject: User, roles: Vec<Role>, now: &DateT
 
 /// Delete a user
 pub fn delete(caller: &User, mut subject: User, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::UserDelete);
+    access_check!(caller, Permission::UserDelete)?;
     user::set::deleted(&mut subject, Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
@@ -90,7 +97,7 @@ mod tests {
         let user = make_user(&id, &now, Some(vec![Role::User]));
 
         let res = create(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now);
-        assert_eq!(res, Err(Error::PermissionDenied));
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
     #[test]
@@ -118,7 +125,7 @@ mod tests {
         assert_eq!(subject3.active(), &false);
 
         let res = update(&subject3.clone(), subject3, None, None, Some(false), &now);
-        assert_eq!(res, Err(Error::PermissionDenied));
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
     #[test]
@@ -130,7 +137,7 @@ mod tests {
 
         // inactive users should not be able to run mods
         let res = set_roles(&user, user.clone(), vec![Role::IdentityAdmin], &now);
-        assert_eq!(res, Err(Error::PermissionDenied));
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         // set back to active and continue lol
         user::set::active(&mut user, true);
@@ -145,7 +152,7 @@ mod tests {
         // try to set their roles back to identity admin it shuould fail lol
         // sucker.
         match set_roles(&user, user.clone(), vec![Role::IdentityAdmin], &now) {
-            Err(Error::PermissionDenied) => {}
+            Err(Error::InsufficientPrivileges) => {}
             _ => panic!("should have failed"),
         }
     }
@@ -162,7 +169,7 @@ mod tests {
         assert_eq!(deleted.deleted(), &Some(now.clone()));
 
         let res = delete(&deleted.clone(), deleted, &now);
-        assert_eq!(res, Err(Error::PermissionDenied));
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 }
 

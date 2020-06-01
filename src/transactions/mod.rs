@@ -16,7 +16,7 @@ pub mod region;
 pub mod user;
 pub mod occupation;
 //pub mod currency;
-//pub mod company;
+pub mod company;
 //pub mod agent;
 //pub mod process_spec;
 //pub mod process;

@@ -13,7 +13,7 @@ use vf_rs::vf;
 
 /// Create a new occupation
 pub fn create<T: Into<String>>(caller: &User, id: OccupationID, label: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::OccupationCreate);
+    access_check!(caller, Permission::OccupationCreate)?;
     let model = occupation::builder()
         .id(id)
         .inner(
@@ -32,7 +32,7 @@ pub fn create<T: Into<String>>(caller: &User, id: OccupationID, label: T, active
 
 /// Update an existing `Occupation`
 pub fn update(caller: &User, mut subject: Occupation, label: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::OccupationUpdate);
+    access_check!(caller, Permission::OccupationUpdate)?;
     if let Some(label) = label {
         occupation::getmut::inner(&mut subject).set_role_label(label);
     }
@@ -45,7 +45,7 @@ pub fn update(caller: &User, mut subject: Occupation, label: Option<String>, act
 
 /// Delete an `Occupation`
 pub fn delete(caller: &User, mut subject: Occupation, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::OccupationDelete);
+    access_check!(caller, Permission::OccupationDelete)?;
     occupation::set::deleted(&mut subject, Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
@@ -82,7 +82,7 @@ mod tests {
         let user = make_user(&UserID::create(), &now, Some(vec![Role::User]));
 
         let res = create(&user, id.clone(), "dog psychic", true, &now);
-        assert_eq!(res, Err(Error::PermissionDenied));
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
     #[test]
@@ -107,7 +107,7 @@ mod tests {
 
         let user = make_user(&UserID::create(), &now, None);
         let res = update(&user, subject.clone(), Some("the best president the best president the best president president unpresidented FALSE ACQUISITIONS".into()), None, &now2);
-        assert_eq!(res, Err(Error::PermissionDenied));
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
     #[test]
@@ -125,7 +125,7 @@ mod tests {
 
         let user = make_user(&UserID::create(), &now, None);
         let res = delete(&user, subject2, &now);
-        assert_eq!(res, Err(Error::PermissionDenied));
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 }
 

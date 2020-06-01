@@ -44,8 +44,8 @@ pub enum Error {
     NegativeMeasurement,
     #[error("error operating on NumericUnion: {0}")]
     NumericUnionOpError(String),
-    #[error("permission denied")]
-    PermissionDenied,
+    #[error("insufficient privileges")]
+    InsufficientPrivileges,
     #[error("error building object {0}")]
     BuilderFailed(String),
     #[error("error converting Model to its inner form")]

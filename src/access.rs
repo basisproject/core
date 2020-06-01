@@ -22,9 +22,7 @@ pub enum Permission {
     UserAdminUpdate,
     UserDelete,
 
-    CompanyCreateSyndicate,
     CompanyCreatePrivate,
-    CompanySetApproved,
     CompanyAdminUpdate,
     CompanyAdminDelete,
     CompanySetType,
@@ -83,7 +81,6 @@ impl Role {
             },
             Role::CompanyAdmin => {
                 vec![
-                    Permission::CompanySetApproved,
                     Permission::CompanyAdminUpdate,
                     Permission::CompanyAdminDelete,
                 ]
@@ -97,14 +94,12 @@ impl Role {
             Role::Bank => {
                 vec![
                     Permission::CompanySetType,
-                    Permission::CompanySetApproved,
                 ]
             },
             Role::User => {
                 vec![
                     Permission::UserUpdate,
                     Permission::UserDelete,
-                    Permission::CompanyCreateSyndicate,
                     Permission::CompanyCreatePrivate,
                     Permission::CompanyUpdateMembers,
                     Permission::CompanyClockIn,
@@ -144,11 +139,15 @@ impl Role {
     }
 }
 
+/// This macro is so I don't have to create an Access trait with a `can` fn that
+/// User and CompanyMember implement. Just being lazy.
 #[macro_export]
 macro_rules! access_check {
     ($model:ident, $perm:expr) => {
-        if !$model.can(&$perm) {
-            Err(Error::PermissionDenied)?;
+        if $model.can(&$perm) {
+            Ok(())
+        } else {
+            Err(Error::InsufficientPrivileges)
         }
     };
 }
