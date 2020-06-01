@@ -50,6 +50,10 @@ pub enum Error {
     BuilderFailed(String),
     #[error("error converting Model to its inner form")]
     ModelConvertError,
+    #[error("Op does not match expectation")]
+    OpMismatch,
+    #[error("modification missing at given index")]
+    ModificationIndex,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

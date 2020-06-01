@@ -1,4 +1,8 @@
+use crate::{
+    error::{Error, Result},
+};
 use serde::{Serialize, Deserialize};
+use std::convert::TryFrom;
 
 #[macro_use]
 mod lib;
@@ -38,6 +42,18 @@ impl Modification {
     /// Turn this modification into a pair
     pub fn into_pair(self) -> (Op, Model) {
         (self.op, self.model)
+    }
+
+    /// Consume this modification, and verify that the `Op` matches the one
+    /// passed in, then return the *unwraped* model (ie, not `Model::User(user)`
+    /// but `user as User`).
+    pub fn expect_op<T: TryFrom<Model>>(self, verify_op: Op) -> Result<T> {
+        let (op, model) = self.into_pair();
+        if op != verify_op {
+            Err(Error::OpMismatch)?;
+        }
+        // NOTE: I do not know why I have to map this error. Seems dumb.
+        Ok(T::try_from(model).map_err(|_| Error::ModelConvertError)?)
     }
 }
 

@@ -25,10 +25,10 @@ pub fn create<T: Into<String>>(caller: &User, id: RegionID, name: T, active: boo
 }
 
 /// Delete a region
-pub fn delete(caller: &User, mut region: Region, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(caller: &User, mut subject: Region, now: &DateTime<Utc>) -> Result<Modifications> {
     access_check!(caller, Permission::RegionDelete);
-    region::set::deleted(&mut region, Some(now.clone()));
-    Ok(Modifications::new_single(Op::Delete, region))
+    region::set::deleted(&mut subject, Some(now.clone()));
+    Ok(Modifications::new_single(Op::Delete, subject))
 }
 
 #[cfg(test)]
@@ -37,8 +37,9 @@ mod tests {
     use crate::{
         access::Role,
         models::{
-            Model,
+            Op,
 
+            region::{Region},
             user,
         },
         util,
@@ -64,23 +65,18 @@ mod tests {
         let user = make_user(&now);
         let mods = create(&user, id.clone(), "xina", true, &now).unwrap().into_modifications();
         assert_eq!(mods.len(), 1);
-        match mods[0].clone().into_pair() {
-            (Op::Create, Model::Region(model)) => {
-                assert_eq!(model.id(), &id);
-                assert_eq!(model.name(), "xina");
-            }
-            _ => panic!("unexpected result"),
-        }
+
+        let model = mods[0].clone().expect_op::<Region>(Op::Create).unwrap();
+        assert_eq!(model.id(), &id);
+        assert_eq!(model.name(), "xina");
 
         let id = RegionID::create();
         let now = util::time::now();
         let mut user = make_user(&now);
         user::set::roles(&mut user, vec![Role::User]);
-        let mods = create(&user, id.clone(), "xina", true, &now);
-        match mods {
-            Err(Error::PermissionDenied) => {}
-            _ => panic!("should have failed"),
-        }
+
+        let res = create(&user, id.clone(), "xina", true, &now);
+        assert_eq!(res, Err(Error::PermissionDenied));
     }
 
     #[test]
@@ -89,24 +85,18 @@ mod tests {
         let now = util::time::now();
         let mut user = make_user(&now);
         let mods = create(&user, id.clone(), "fine", true, &now).unwrap().into_modifications();
-        let region = Region::try_from(mods[0].clone().into_pair().1).unwrap();
+        let region = mods[0].clone().expect_op::<Region>(Op::Create).unwrap();
         let mods = delete(&user, region, &now).unwrap().into_modifications();
         assert_eq!(mods.len(), 1);
-        match mods[0].clone().into_pair() {
-            (Op::Delete, Model::Region(model)) => {
-                assert_eq!(model.id(), &id);
-            }
-            _ => panic!("unexpected result"),
-        }
+
+        let model = mods[0].clone().expect_op::<Region>(Op::Delete).unwrap();
+        assert_eq!(model.id(), &id);
 
         let mods = create(&user, id.clone(), "fine", true, &now).unwrap().into_modifications();
         let region = Region::try_from(mods[0].clone().into_pair().1).unwrap();
         user::set::active(&mut user, false);
-        let mods = delete(&user, region, &now);
-        match mods {
-            Err(Error::PermissionDenied) => {}
-            _ => panic!("should have failed"),
-        }
+        let res = delete(&user, region, &now);
+        assert_eq!(res, Err(Error::PermissionDenied));
     }
 }
 

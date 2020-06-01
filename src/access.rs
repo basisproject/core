@@ -20,7 +20,6 @@ pub enum Permission {
     UserUpdate,
     UserSetRoles,
     UserAdminUpdate,
-    UserSetPubkey,
     UserDelete,
 
     CompanyCreateSyndicate,
@@ -88,7 +87,6 @@ impl Role {
                     Permission::UserUpdate,
                     Permission::UserSetRoles,
                     Permission::UserAdminUpdate,
-                    Permission::UserSetPubkey,
                     Permission::UserDelete,
                 ]
             },
@@ -192,7 +190,6 @@ pub mod tests {
         assert!(super_admin.can(&Permission::UserCreate));
         assert!(super_admin.can(&Permission::UserUpdate));
         assert!(super_admin.can(&Permission::UserAdminUpdate));
-        assert!(super_admin.can(&Permission::UserSetPubkey));
         assert!(super_admin.can(&Permission::UserDelete));
         assert!(super_admin.can(&Permission::CompanyCreatePrivate));
         assert!(super_admin.can(&Permission::CompanyAdminUpdate));
@@ -206,7 +203,6 @@ pub mod tests {
         assert!(!traveller.can(&Permission::UserCreate));
         assert!(!traveller.can(&Permission::UserUpdate));
         assert!(!traveller.can(&Permission::UserAdminUpdate));
-        assert!(!traveller.can(&Permission::UserSetPubkey));
         assert!(!traveller.can(&Permission::UserDelete));
         assert!(!traveller.can(&Permission::CompanyCreatePrivate));
         assert!(!traveller.can(&Permission::CompanyAdminUpdate));
@@ -220,7 +216,6 @@ pub mod tests {
         assert!(!comp_admin.can(&Permission::UserCreate));
         assert!(!comp_admin.can(&Permission::UserUpdate));
         assert!(!comp_admin.can(&Permission::UserAdminUpdate));
-        assert!(!comp_admin.can(&Permission::UserSetPubkey));
         assert!(!comp_admin.can(&Permission::UserDelete));
         assert!(!comp_admin.can(&Permission::CompanyCreatePrivate));
         assert!(comp_admin.can(&Permission::CompanyAdminUpdate));

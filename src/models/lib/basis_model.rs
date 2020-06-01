@@ -104,7 +104,7 @@ macro_rules! basis_model {
             fn try_from(val: crate::models::Model) -> std::result::Result<Self, Self::Error> {
                 match val {
                     crate::models::Model::$model(val) => Ok(val),
-                    _ => Err(Self::Error::ModelConvertError),
+                    _ => Err(crate::error::Error::ModelConvertError),
                 }
             }
         }
