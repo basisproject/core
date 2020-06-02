@@ -15,7 +15,7 @@ impl User {
         if !self.is_active() {
             return false;
         }
-        for role in &self.roles {
+        for role in self.roles() {
             if role.can(permission) {
                 return true;
             }

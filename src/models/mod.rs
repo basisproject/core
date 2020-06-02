@@ -1,3 +1,20 @@
+//! Models are the "atom" datatypes for Basis. They represent the objects in the
+//! system and their relationships to each other (via IDs). Each model has a
+//! struct (ie `User`) and an ID object (ie `UserID`). The id object allows
+//! models to link to each other without having to embed the graph into the
+//! model data itself.
+//!
+//! Models are read-only and can only be created or updated using
+//! [transactions](../transactions).
+//!
+//! In some cases models contain business logic (like [Event](event/index.html))
+//! that define various interactions. For the most part though, models define
+//! data structure and relationships.
+//!
+//! This module also contains some utilities for enumerating changes to models
+//! (like [Modifications](struct.Modifications.html)) and the classes that
+//! support them.
+
 use crate::{
     error::{Error, Result},
 };

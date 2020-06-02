@@ -21,7 +21,7 @@ basis_model! {
 
 impl Process {
     pub fn track_costs(&mut self, costs: Costs) {
-        self.costs = self.costs.clone() + costs;
+        self.set_costs(self.costs().clone() + costs);
     }
 }
 

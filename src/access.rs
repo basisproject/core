@@ -1,3 +1,13 @@
+//! The access module defines the various top-level permissions within the
+//! system and the roles that contain those permissions.
+//!
+//! Roles can have multiple Permission objects. Permissions are additive,
+//! meaning everyone starts with *no* permissions (returning
+//! [Error::InsufficientPrivileges](../error/enum.Error.html#variant.InsufficientPrivileges))
+//! and permissions are added (allowed) from there.
+//!
+//! Generally, the access system just applies to [Users](../models/user/).
+
 use serde::{Serialize, Deserialize};
 
 /// Define the system-wide permissions.
@@ -60,6 +70,7 @@ pub enum Role {
 }
 
 impl Role {
+    /// For a given role, return the permissions that role has access to.
     pub fn permissions(&self) -> Vec<Permission> {
         match *self {
             Role::SuperAdmin => {
@@ -116,6 +127,7 @@ impl Role {
         }
     }
 
+    /// Determine if a role has a specific permission.
     pub fn can(&self, perm: &Permission) -> bool {
         for p in &self.permissions() {
             match p {
@@ -141,7 +153,6 @@ impl Role {
 
 /// This macro is so I don't have to create an Access trait with a `can` fn that
 /// User and CompanyMember implement. Just being lazy.
-#[macro_export]
 macro_rules! access_check {
     ($model:ident, $perm:expr) => {
         if $model.can(&$perm) {

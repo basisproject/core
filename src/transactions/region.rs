@@ -5,7 +5,7 @@ use crate::{
     models::{
         Op,
         Modifications,
-        region::{self, RegionID, Region},
+        region::{RegionID, Region},
         user::User,
     },
 };
@@ -13,7 +13,7 @@ use crate::{
 /// Create a region
 pub fn create<T: Into<String>>(caller: &User, id: RegionID, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     access_check!(caller, Permission::RegionCreate)?;
-    let model = region::builder()
+    let model = Region::builder()
         .id(id)
         .name(name.into())
         .active(active)
@@ -27,7 +27,7 @@ pub fn create<T: Into<String>>(caller: &User, id: RegionID, name: T, active: boo
 /// Delete a region
 pub fn delete(caller: &User, mut subject: Region, now: &DateTime<Utc>) -> Result<Modifications> {
     access_check!(caller, Permission::RegionDelete)?;
-    region::set::deleted(&mut subject, Some(now.clone()));
+    subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
 
@@ -40,7 +40,7 @@ mod tests {
             Op,
 
             region::Region,
-            user::{self, UserID},
+            user::UserID,
         },
         transactions::tests::make_user,
         util,
@@ -81,7 +81,7 @@ mod tests {
 
         let mods = create(&user, id.clone(), "fine", true, &now).unwrap().into_modifications();
         let region = mods[0].clone().expect_op::<Region>(Op::Create).unwrap();
-        user::set::active(&mut user, false);
+        user.set_active(false);
         let res = delete(&user, region, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }

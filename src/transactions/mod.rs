@@ -34,12 +34,12 @@ mod tests {
     use crate::{
         access::Role,
         models::{
-            user::{self, User, UserID},
+            user::{User, UserID},
         },
     };
 
     pub fn make_user(user_id: &UserID, now: &DateTime<Utc>, roles: Option<Vec<Role>>) -> User {
-        user::builder()
+        User::builder()
             .id(user_id.clone())
             .roles(roles.unwrap_or(vec![Role::User]))
             .email("surely@hotmail.com")   // don't call me shirley

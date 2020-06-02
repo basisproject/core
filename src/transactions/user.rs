@@ -5,14 +5,14 @@ use crate::{
     models::{
         Op,
         Modifications,
-        user::{self, User, UserID},
+        user::{User, UserID},
     },
 };
 
 /// Create a user
 pub fn create<T: Into<String>>(caller: &User, id: UserID, roles: Vec<Role>, email: T, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     access_check!(caller, Permission::UserCreate)?;
-    let model = user::builder()
+    let model = User::builder()
         .id(id)
         .roles(roles)
         .email(email)
@@ -36,33 +36,31 @@ pub fn update(caller: &User, mut subject: User, email: Option<String>, name: Opt
                 Err(Error::InsufficientPrivileges)
             }
         })?;
-    if caller.id() != subject.id() {
-    }
     if let Some(email) = email {
-        user::set::email(&mut subject, email.into())
+        subject.set_email(email);
     }
     if let Some(name) = name {
-        user::set::name(&mut subject, name.into())
+        subject.set_name(name);
     }
     if let Some(active) = active {
-        user::set::active(&mut subject, active.into())
+        subject.set_active(active);
     }
-    user::set::updated(&mut subject, now.clone());
+    subject.set_updated(now.clone());
     Ok(Modifications::new_single(Op::Update, subject))
 }
 
 /// Update a user's roles
 pub fn set_roles(caller: &User, mut subject: User, roles: Vec<Role>, now: &DateTime<Utc>) -> Result<Modifications> {
     access_check!(caller, Permission::UserSetRoles)?;
-    user::set::roles(&mut subject, roles);
-    user::set::updated(&mut subject, now.clone());
+    subject.set_roles(roles);
+    subject.set_updated(now.clone());
     Ok(Modifications::new_single(Op::Update, subject))
 }
 
 /// Delete a user
 pub fn delete(caller: &User, mut subject: User, now: &DateTime<Utc>) -> Result<Modifications> {
     access_check!(caller, Permission::UserDelete)?;
-    user::set::deleted(&mut subject, Some(now.clone()));
+    subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
 
@@ -72,7 +70,7 @@ mod tests {
     use crate::{
         access::Role,
         models::{
-            user::{self, User},
+            user::User,
         },
         transactions::tests::make_user,
         util,
@@ -133,14 +131,14 @@ mod tests {
         let id = UserID::create();
         let now = util::time::now();
         let mut user = make_user(&id, &now, Some(vec![Role::IdentityAdmin]));
-        user::set::active(&mut user, false);
+        user.set_active(false);
 
         // inactive users should not be able to run mods
         let res = set_roles(&user, user.clone(), vec![Role::IdentityAdmin], &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         // set back to active and continue lol
-        user::set::active(&mut user, true);
+        user.set_active(true);
         let mods = set_roles(&user, user.clone(), vec![Role::User], &now).unwrap().into_modifications();
         assert_eq!(mods.len(), 1);
 

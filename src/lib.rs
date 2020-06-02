@@ -1,69 +1,44 @@
-/// A macro that standardizes including, exporting, and creating wrapper type(s)
-/// for our heroic models.
-macro_rules! load_models {
-    (
-        @pub use
-        $( ($path:ident, $model:ident, $($extratypes:ident),*), )*
-    ) => {
-        pub use models::{
-            $( $path::{$model, $($extratypes),*}, )*
-        };
-    };
-
-    (
-        @pub mod
-        $( ($path:ident, $($_rest:tt)*), )*
-    ) => {
-        $(
-            pub mod $path;
-        )*
-    };
-
-    // create an enum that wraps our models in CUD
-    (
-        @pub enum $enumname:ident
-        $( ($path:ident, $model:ident, $($_extratypes:ident),*), )*
-    ) => {
-        #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-        pub enum $enumname {
-            $(
-                $model(crate::models::$path::$model),
-            )*
-        }
-    };
-
-    // entry point
-    ($($load_type:tt)*) => {
-        load_models! {
-            @$($load_type)*
-            // kind of trying to load based on dependency order here, but it's not perfect.
-            (region, Region, RegionID),
-            (user, User, UserID),
-            (occupation, Occupation, OccupationID),
-            (currency, Currency, CurrencyID),
-            (company, Company, CompanyID),
-            (process_spec, ProcessSpec, ProcessSpecID),
-            (process, Process, ProcessID),
-            (event, Event, EventID),
-            (company_member, CompanyMember, CompanyMemberID),
-            (agreement, Agreement, AgreementID),
-            (account, Account, AccountID),
-            (resource_spec, ResourceSpec, ResourceSpecID, Dimensions),
-            (resource, Resource, ResourceID),
-            (commitment, Commitment, CommitmentID),
-            //(resource_group, ResourceGroup, ResourceGroupID),
-            //(resource_group_link, ResourceGroupLink, ResourceGroupLinkID),
-        }
-    };
-}
+//! Welcome to the Basis Core. While we realize there are many choices when it
+//! comes to rust-based economic libraries that facilitate a socialist mode of
+//! production, we like to believe this one is the most complete and featureful.
+//!
+//! This library, as said above, provides a functional interface for interacting
+//! with a graph of economic nodes engaging in a socialist mode of production.
+//! What this means is that we start from the concepts that
+//!
+//! 1. People should be free to determine their own path in life (bottom-up
+//! organization)
+//! 1. Companies started within this network operate without profit
+//! 1. Economic planning is built-in but not required
+//!
+//! Effectively, this is a codebase designed to support [the free association
+//! of producers](https://en.wikipedia.org/wiki/Free_association_(Marxism_and_anarchism)),
+//! a system of production sought after by Marxists and Anarchists in which
+//! people are free to engage in production without the shackles of currency,
+//! profits, or top-down planning structures.
+//!
+//! While this ideal is a long ways away, it is nonetheless worth striving for.
+//! We also recognize that there will be inevitable transitional periods between
+//! our current capitalist system and, *ahem*, better arrangements, so this
+//! library also contains methods for interacting with capitalist markets in a
+//! way that does not require compromising the ideals of the member companies.
+//! For more information on the Basis project, see [the project website](https://basisproject.gitlab.io/public/).
+//!
+//! This library does not deal with storage or other external mediums in any way
+//! and is fully self-contained. All data being operated on needs to be passed
+//! in, and the results of the computations are returned and must be stored in a
+//! place of your choosing. This allows Basis to exist beyond one particular
+//! implementation of whatever storage medium du jour and exist beyond one
+//! particular database structure.
+//!
+//! To get started, you will want to look at the [transactions](transactions/).
+//! Transactions are the main interface for interacting with Basis.
 
 pub mod error;
 mod util;
 #[macro_use]
-mod access;
-mod models;
+pub mod access;
+pub mod models;
 pub mod costs;
 pub mod transactions;
-
-load_models!{ pub use }
 

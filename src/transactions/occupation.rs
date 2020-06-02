@@ -5,7 +5,7 @@ use crate::{
     models::{
         Op,
         Modifications,
-        occupation::{self, Occupation, OccupationID},
+        occupation::{Occupation, OccupationID},
         user::User,
     },
 };
@@ -14,7 +14,7 @@ use vf_rs::vf;
 /// Create a new occupation
 pub fn create<T: Into<String>>(caller: &User, id: OccupationID, label: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     access_check!(caller, Permission::OccupationCreate)?;
-    let model = occupation::builder()
+    let model = Occupation::builder()
         .id(id)
         .inner(
             vf::AgentRelationshipRole::builder()
@@ -34,19 +34,19 @@ pub fn create<T: Into<String>>(caller: &User, id: OccupationID, label: T, active
 pub fn update(caller: &User, mut subject: Occupation, label: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     access_check!(caller, Permission::OccupationUpdate)?;
     if let Some(label) = label {
-        occupation::getmut::inner(&mut subject).set_role_label(label);
+        subject.inner_mut().set_role_label(label);
     }
     if let Some(active) = active {
-        occupation::set::active(&mut subject, active);
+        subject.set_active(active);
     }
-    occupation::set::updated(&mut subject, now.clone());
+    subject.set_updated(now.clone());
     Ok(Modifications::new_single(Op::Update, subject))
 }
 
 /// Delete an `Occupation`
 pub fn delete(caller: &User, mut subject: Occupation, now: &DateTime<Utc>) -> Result<Modifications> {
     access_check!(caller, Permission::OccupationDelete)?;
-    occupation::set::deleted(&mut subject, Some(now.clone()));
+    subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
 

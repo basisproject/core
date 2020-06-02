@@ -5,8 +5,8 @@ use crate::{
     models::{
         Op,
         Modifications,
-        company::{self, Company, CompanyID, CompanyType, Permission as CompanyPermission},
-        company_member::{self, CompanyMember, CompanyMemberID},
+        company::{Company, CompanyID, CompanyType, Permission as CompanyPermission},
+        company_member::{CompanyMember, CompanyMemberID},
         occupation::OccupationID,
         user::User,
     },
@@ -16,7 +16,7 @@ use vf_rs::vf;
 /// Creates a new private company
 pub fn create_private<T: Into<String>>(caller: &User, id: CompanyID, company_name: T, company_email: T, founder_id: CompanyMemberID, founder_occupation_id: OccupationID, now: &DateTime<Utc>) -> Result<Modifications> {
     access_check!(caller, Permission::CompanyCreatePrivate)?;
-    let company = company::builder()
+    let company = Company::builder()
         .id(id.clone())
         .ty(CompanyType::Private)
         .inner(
@@ -30,7 +30,7 @@ pub fn create_private<T: Into<String>>(caller: &User, id: CompanyID, company_nam
         .updated(now.clone())
         .build()
         .map_err(|e| Error::BuilderFailed(e))?;
-    let founder = company_member::builder()
+    let founder = CompanyMember::builder()
         .id(founder_id)
         .inner(
             vf::AgentRelationship::builder()
@@ -57,15 +57,15 @@ pub fn update_private(caller: &User, member: &CompanyMember, mut subject: Compan
     access_check!(caller, Permission::CompanyAdminUpdate)
         .or_else(|_| access_check!(member, CompanyPermission::CompanyUpdate))?;
     if let Some(name) = name {
-        company::getmut::inner(&mut subject).set_name(name);
+        subject.inner_mut().set_name(name);
     }
     if let Some(email) = email {
-        company::set::email(&mut subject, email);
+        subject.set_email(email);
     }
     if let Some(active) = active {
-        company::set::active(&mut subject, active);
+        subject.set_active(active);
     }
-    company::set::updated(&mut subject, now.clone());
+    subject.set_updated(now.clone());
     Ok(Modifications::new())
 }
 
@@ -73,7 +73,7 @@ pub fn update_private(caller: &User, member: &CompanyMember, mut subject: Compan
 pub fn delete_private(caller: &User, member: &CompanyMember, mut subject: Company, now: &DateTime<Utc>) -> Result<Modifications> {
     access_check!(caller, Permission::CompanyAdminDelete)
         .or_else(|_| access_check!(member, CompanyPermission::CompanyDelete))?;
-    company::set::deleted(&mut subject, Some(now.clone()));
+    subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
 
