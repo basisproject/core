@@ -114,7 +114,8 @@ impl CompanyMember {
         if !self.is_active() {
             return false;
         }
-        self.permissions().contains(permission)
+        self.permissions().contains(&Permission::All) ||
+            self.permissions().contains(permission)
     }
 }
 
