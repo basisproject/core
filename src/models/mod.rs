@@ -14,6 +14,14 @@
 //! This module also contains some utilities for enumerating changes to models
 //! (like [Modifications](struct.Modifications.html)) and the classes that
 //! support them.
+//!
+//! Note that because this crate relies heavily on the [ValueFlows ontology](https://valueflo.ws/)
+//! that many of the models have an `inner` field which represents the
+//! corresponding ValueFlows type associated with the model. Composition is used
+//! as the default pattern here, which offers a fairly clean implementation but
+//! with the small sacrifice of having to sometimes to `model.inner().val()`
+//! instead of just `model.val()`. The tradeoff is that the VF types are cleanly
+//! separated from the Basis models.
 
 use crate::{
     error::{Error, Result},
