@@ -154,7 +154,7 @@ impl Role {
 /// This macro is so I don't have to create an Access trait with a `can` fn that
 /// User and CompanyMember implement. Just being lazy.
 macro_rules! access_check {
-    ($model:ident, $perm:expr) => {
+    ($model:expr, $perm:expr) => {
         if $model.can(&$perm) {
             Ok(())
         } else {
