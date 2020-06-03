@@ -17,7 +17,6 @@ pub mod user;
 pub mod occupation;
 //pub mod currency;
 pub mod company;
-//pub mod agent;
 //pub mod process_spec;
 //pub mod process;
 //pub mod event;
@@ -27,6 +26,7 @@ pub mod company;
 //pub mod resource_spec;
 //pub mod resource;
 //pub mod commitment;
+//pub mod intent;
 
 #[cfg(test)]
 mod tests {

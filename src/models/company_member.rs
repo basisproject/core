@@ -1,3 +1,13 @@
+//! A company member represents a link between a user in the system and a
+//! company, and carries other information with it such as position (occupation)
+//! in the company, access permissions, and compensation.
+//!
+//! Members can perform labor into a [Process] within the company, which earns
+//! them credits and adds costs to the company which much be assigned to
+//! outgoing products and services.
+//!
+//! [Process]: ../process/struct.Process.html
+
 use crate::{
     models::{
         account::AccountID,
@@ -109,7 +119,8 @@ basis_model! {
 }
 
 impl CompanyMember {
-    /// Determines if a member (based on their roles) can perform an action.
+    /// Determines if a member can perform an action (base on their permissions
+    /// list). Note that we don't use 
     pub fn can(&self, permission: &Permission) -> bool {
         if !self.is_active() {
             return false;

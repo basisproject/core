@@ -1,3 +1,6 @@
+//! Accounts are a place to hold credits earned through labor. Think of them
+//! like a bank account or crypto wallet.
+
 use crate::{
     models:: {
         user::UserID,

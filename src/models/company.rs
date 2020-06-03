@@ -1,3 +1,16 @@
+//! A company is a group of one or more people working towards a common economic
+//! goal. Companies are the place where costs are accumulated and dispersed into
+//! outgoing products and services.
+//!
+//! Companies have their own set of permissions that allow [Members] to perform
+//! actions on the company. Note that while the [access system][access] uses
+//! roles to contain various permissions, companies assign permissions directly.
+//! This ultimately gives more control to companies to determine their own roles
+//! (outside the perview of this library) as needed.
+//!
+//! [Members]: ../company_member/struct.CompanyMember.html
+//! [access]: ../../access/
+
 use crate::{
     models::{
         region::RegionID,
@@ -6,6 +19,8 @@ use crate::{
 use serde::{Serialize, Deserialize};
 use vf_rs::vf;
 
+/// Describes different company types. Different types behave differently within
+/// the system, and this is where we differentiate the behaviors.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum CompanyType {
     /// For planned companies that span multiple regions.

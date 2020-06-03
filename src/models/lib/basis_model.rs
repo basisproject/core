@@ -11,6 +11,7 @@ macro_rules! basis_model {
         $builder:ident
 
     ) => {
+        /// ID type for this model.
         #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
         #[serde(transparent)]
         pub struct $id(String);
@@ -21,7 +22,7 @@ macro_rules! basis_model {
                 Self(id.into())
             }
 
-            /// Create a new random id
+            /// Create a new random id (UUIDv4)
             pub fn create() -> Self {
                 Self(uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut uuid::Uuid::encode_buffer()).to_string())
             }
@@ -67,28 +68,40 @@ macro_rules! basis_model {
                 #[builder(pattern = "owned", setter(into))]
                 #[getset(get = "pub", get_mut = "pub(crate)", set = "pub(crate)")]
                 pub struct $model {
+                    /// The model's ID, used to link to it from other models
                     id: $id,
                     $($fields)*
+                    /// The `active` field allows a model to be deactivated,
+                    /// which keeps it in data while only allowing it to be used
+                    /// or altered in specific ways.
                     #[builder(default)]
                     active: bool,
+                    /// Notes when the model was created.
                     created: chrono::DateTime<chrono::Utc>,
+                    /// Notes when the model was last updated.
                     updated: chrono::DateTime<chrono::Utc>,
+                    /// Notes if the model has been deleted, which has the same
+                    /// effect of deactivation, but is permanent.
                     deleted: Option<chrono::DateTime<chrono::Utc>>,
                 }
             }
 
             impl $model {
+                /// Returns a builder for this model
                 #[allow(dead_code)]
                 pub(crate) fn builder() -> $builder {
                     $builder::default()
                 }
 
-                #[allow(dead_code)]
+                /// Determine if this model is active. This also reads the
+                /// `deleted` field and will return false if the model has been
+                /// deleted, so this method is the canonical place to check if
+                /// the model can be used.
                 pub fn is_active(&self) -> bool {
                     self.active && !self.is_deleted()
                 }
 
-                #[allow(dead_code)]
+                /// Checks if the model has been deleted.
                 pub fn is_deleted(&self) -> bool {
                     self.deleted.is_some()
                 }
@@ -106,7 +119,7 @@ macro_rules! basis_model {
                 fn try_from(val: crate::models::Model) -> std::result::Result<Self, Self::Error> {
                     match val {
                         crate::models::Model::$model(val) => Ok(val),
-                        _ => Err(crate::error::Error::ModelConvertError),
+                        _ => Err(crate::error::Error::WrongModelType),
                     }
                 }
             }
@@ -115,7 +128,7 @@ macro_rules! basis_model {
     }
 }
 
-/// Applies meta to various fields depending on their type
+/// Applies meta to various model fields depending on their type
 macro_rules! basis_model_inner {
     // grab Vec fields and apply special meta
     (

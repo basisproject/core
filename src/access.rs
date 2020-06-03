@@ -3,10 +3,13 @@
 //!
 //! Roles can have multiple Permission objects. Permissions are additive,
 //! meaning everyone starts with *no* permissions (returning
-//! [Error::InsufficientPrivileges](../error/enum.Error.html#variant.InsufficientPrivileges))
-//! and permissions are added (allowed) from there.
+//! [Error::InsufficientPrivileges][err_priv]) and permissions are added
+//! (allowed) from there.
 //!
-//! Generally, the access system just applies to [Users](../models/user/).
+//! Generally, the access system just applies to [Users].
+//!
+//! [err_priv]: ../error/enum.Error.html#variant.InsufficientPrivileges
+//! [Users]: ../models/user/struct.User.html
 
 use serde::{Serialize, Deserialize};
 

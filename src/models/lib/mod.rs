@@ -30,21 +30,22 @@ macro_rules! load_models {
     ($($load_type:tt)*) => {
         load_models! {
             @$($load_type)*
-            // kind of trying to load based on dependency order here, but it's not perfect.
-            (region, Region, RegionID),
-            (user, User, UserID),
-            (occupation, Occupation, OccupationID),
-            (currency, Currency, CurrencyID),
-            (company, Company, CompanyID),
-            (process_spec, ProcessSpec, ProcessSpecID),
-            (process, Process, ProcessID),
-            (event, Event, EventID),
-            (company_member, CompanyMember, CompanyMemberID),
-            (agreement, Agreement, AgreementID),
             (account, Account, AccountID),
-            (resource_spec, ResourceSpec, ResourceSpecID, Dimensions),
-            (resource, Resource, ResourceID),
+            (agreement, Agreement, AgreementID),
             (commitment, Commitment, CommitmentID),
+            (company, Company, CompanyID),
+            (company_member, CompanyMember, CompanyMemberID),
+            (currency, Currency, CurrencyID),
+            (event, Event, EventID),
+            (intent, Intent, IntentID),
+            (occupation, Occupation, OccupationID),
+            (process, Process, ProcessID),
+            (process_spec, ProcessSpec, ProcessSpecID),
+            (region, Region, RegionID),
+            (resource, Resource, ResourceID),
+            (resource_spec, ResourceSpec, ResourceSpecID, Dimensions),
+            (user, User, UserID),
+
             //(resource_group, ResourceGroup, ResourceGroupID),
             //(resource_group_link, ResourceGroupLink, ResourceGroupLinkID),
         }

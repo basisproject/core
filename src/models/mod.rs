@@ -5,23 +5,27 @@
 //! model data itself.
 //!
 //! Models are read-only and can only be created or updated using
-//! [transactions](../transactions).
+//! [transactions].
 //!
-//! In some cases models contain business logic (like [Event](event/index.html))
-//! that define various interactions. For the most part though, models define
-//! data structure and relationships.
+//! In some cases models contain business logic (like [Event]) that define
+//! various interactions. For the most part though, models define data structure
+//! and relationships.
 //!
 //! This module also contains some utilities for enumerating changes to models
-//! (like [Modifications](struct.Modifications.html)) and the classes that
-//! support them.
+//! (like [Modifications]) and the classes that support them.
 //!
-//! Note that because this crate relies heavily on the [ValueFlows ontology](https://valueflo.ws/)
+//! Note that because this crate relies heavily on the [ValueFlows ontology][vf]
 //! that many of the models have an `inner` field which represents the
 //! corresponding ValueFlows type associated with the model. Composition is used
 //! as the default pattern here, which offers a fairly clean implementation but
 //! with the small sacrifice of having to sometimes to `model.inner().val()`
 //! instead of just `model.val()`. The tradeoff is that the VF types are cleanly
 //! separated from the Basis models.
+//!
+//! [transactions]: ../transactions
+//! [Event]: event/struct.Event.html
+//! [Modifications]: struct.Modifications.html
+//! [vf]: https://valueflo.ws/
 
 use crate::{
     error::{Error, Result},
@@ -78,7 +82,7 @@ impl Modification {
             Err(Error::OpMismatch)?;
         }
         // NOTE: I do not know why I have to map this error. Seems dumb.
-        Ok(T::try_from(model).map_err(|_| Error::ModelConvertError)?)
+        Ok(T::try_from(model).map_err(|_| Error::WrongModelType)?)
     }
 }
 

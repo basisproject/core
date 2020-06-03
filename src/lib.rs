@@ -12,7 +12,7 @@
 //! 1. Economic planning is built-in but not required
 //!
 //! Effectively, this is a codebase designed to support [the free association
-//! of producers](https://en.wikipedia.org/wiki/Free_association_(Marxism_and_anarchism)),
+//! of producers][freeassoc],
 //! a system of production sought after by Marxists and Anarchists in which
 //! people are free to engage in production without the shackles of currency,
 //! profits, or top-down planning structures.
@@ -22,7 +22,7 @@
 //! our current capitalist system and, *ahem*, better arrangements, so this
 //! library also contains methods for interacting with capitalist markets in a
 //! way that does not require compromising the ideals of the member companies.
-//! For more information on the Basis project, see [the project website](https://basisproject.gitlab.io/public/).
+//! For more information on the Basis project, see [the project website][basis].
 //!
 //! This library does not deal with storage or other external mediums in any way
 //! and is fully self-contained. All data being operated on needs to be passed
@@ -31,8 +31,12 @@
 //! implementation of whatever storage medium du jour and exist beyond one
 //! particular database structure.
 //!
-//! To get started, you will want to look at the [transactions](transactions/).
-//! Transactions are the main interface for interacting with Basis.
+//! To get started, you will want to look at the [transactions]. Transactions
+//! are the main interface for interacting with Basis.
+//!
+//! [freeassoc]: https://en.wikipedia.org/wiki/Free_association_(Marxism_and_anarchism)
+//! [basis]: https://basisproject.gitlab.io/public/
+//! [transactions]: transactions/
 
 pub mod error;
 mod util;
