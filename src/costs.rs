@@ -165,7 +165,7 @@ impl Costs {
 }
 
 /// A standard interface around moving costs from one object to another.
-pub trait CostMover {
+pub(crate) trait CostMover {
     /// Get the costs associated with this object
     fn costs(&self) -> &Costs;
 

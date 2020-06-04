@@ -15,7 +15,7 @@ use vf_rs::vf;
 
 /// Creates a new private company
 pub fn create_private<T: Into<String>>(caller: &User, id: CompanyID, company_name: T, company_email: T, company_active: bool, founder_id: CompanyMemberID, founder_occupation_id: OccupationID, founder_active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::CompanyCreatePrivate)?;
+    caller.access_check(Permission::CompanyCreatePrivate)?;
     let company = Company::builder()
         .id(id.clone())
         .ty(CompanyType::Private)
@@ -55,8 +55,8 @@ pub fn create_private<T: Into<String>>(caller: &User, id: CompanyID, company_nam
 
 /// Update a private company
 pub fn update_private(caller: &User, member: Option<&CompanyMember>, mut subject: Company, name: Option<String>, email: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::CompanyAdminUpdate)
-        .or_else(|_| access_check!(member.ok_or(Error::InsufficientPrivileges)?, CompanyPermission::CompanyUpdate))?;
+    caller.access_check(Permission::CompanyAdminUpdate)
+        .or_else(|_| member.ok_or(Error::InsufficientPrivileges)?.access_check(subject.id(), CompanyPermission::CompanyUpdate))?;
     if let Some(name) = name {
         subject.inner_mut().set_name(name);
     }
@@ -72,8 +72,8 @@ pub fn update_private(caller: &User, member: Option<&CompanyMember>, mut subject
 
 /// Delete a private company
 pub fn delete_private(caller: &User, member: Option<&CompanyMember>, mut subject: Company, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::CompanyAdminDelete)
-        .or_else(|_| access_check!(member.ok_or(Error::InsufficientPrivileges)?, CompanyPermission::CompanyDelete))?;
+    caller.access_check(Permission::CompanyAdminDelete)
+        .or_else(|_| member.ok_or(Error::InsufficientPrivileges)?.access_check(subject.id(), CompanyPermission::CompanyDelete))?;
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }

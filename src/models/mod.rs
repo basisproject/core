@@ -74,7 +74,7 @@ impl Modification {
     }
 
     /// Consume this modification, and verify that the `Op` matches the one
-    /// passed in, then return the *unwraped* model (ie, not `Model::User(user)`
+    /// passed in, then return the *unwrapped* model (ie, not `Model::User(user)`
     /// but `user as User`).
     pub fn expect_op<T: TryFrom<Model>>(self, verify_op: Op) -> Result<T> {
         let (op, model) = self.into_pair();

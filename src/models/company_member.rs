@@ -9,9 +9,10 @@
 //! [Process]: ../process/struct.Process.html
 
 use crate::{
+    error::{Error, Result},
     models::{
         account::AccountID,
-        company::Permission,
+        company::{CompanyID, Permission},
         lib::agent::AgentID,
         occupation::OccupationID,
         process_spec::ProcessSpecID,
@@ -120,13 +121,22 @@ basis_model! {
 
 impl CompanyMember {
     /// Determines if a member can perform an action (base on their permissions
-    /// list). Note that we don't use 
+    /// list). Note that we don't use roles here, the idea is that companies
+    /// manage their own roles and permissions are assigned to users directly.
     pub fn can(&self, permission: &Permission) -> bool {
         if !self.is_active() {
             return false;
         }
         self.permissions().contains(&Permission::All) ||
             self.permissions().contains(permission)
+    }
+
+    /// Check if this member can perform an action on a company.
+    pub fn access_check(&self, company_id: &CompanyID, permission: Permission) -> Result<()> {
+        if self.inner().object() != &company_id.clone().into() || !self.can(&permission) {
+            Err(Error::InsufficientPrivileges)?;
+        }
+        Ok(())
     }
 }
 

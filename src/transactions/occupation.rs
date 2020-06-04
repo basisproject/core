@@ -13,7 +13,7 @@ use vf_rs::vf;
 
 /// Create a new occupation
 pub fn create<T: Into<String>>(caller: &User, id: OccupationID, label: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::OccupationCreate)?;
+    caller.access_check(Permission::OccupationCreate)?;
     let model = Occupation::builder()
         .id(id)
         .inner(
@@ -32,7 +32,7 @@ pub fn create<T: Into<String>>(caller: &User, id: OccupationID, label: T, active
 
 /// Update an existing `Occupation`
 pub fn update(caller: &User, mut subject: Occupation, label: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::OccupationUpdate)?;
+    caller.access_check(Permission::OccupationUpdate)?;
     if let Some(label) = label {
         subject.inner_mut().set_role_label(label);
     }
@@ -45,7 +45,7 @@ pub fn update(caller: &User, mut subject: Occupation, label: Option<String>, act
 
 /// Delete an `Occupation`
 pub fn delete(caller: &User, mut subject: Occupation, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::OccupationDelete)?;
+    caller.access_check(Permission::OccupationDelete)?;
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }

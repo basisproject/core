@@ -11,7 +11,7 @@ use crate::{
 
 /// Create a user
 pub fn create<T: Into<String>>(caller: &User, id: UserID, roles: Vec<Role>, email: T, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::UserCreate)?;
+    caller.access_check(Permission::UserCreate)?;
     let model = User::builder()
         .id(id)
         .roles(roles)
@@ -27,14 +27,16 @@ pub fn create<T: Into<String>>(caller: &User, id: UserID, roles: Vec<Role>, emai
 
 /// Update a user object
 pub fn update(caller: &User, mut subject: User, email: Option<String>, name: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::UserAdminUpdate)
-        .or_else(|_| access_check!(caller, Permission::UserUpdate))
-        .and_then(|_| {
-            if caller.id() == subject.id() {
-                Ok(())
-            } else {
-                Err(Error::InsufficientPrivileges)
-            }
+    caller.access_check(Permission::UserAdminUpdate)
+        .or_else(|_| {
+            caller.access_check(Permission::UserUpdate)
+                .and_then(|_| {
+                    if caller.id() == subject.id() {
+                        Ok(())
+                    } else {
+                        Err(Error::InsufficientPrivileges)
+                    }
+                })
         })?;
     if let Some(email) = email {
         subject.set_email(email);
@@ -51,7 +53,7 @@ pub fn update(caller: &User, mut subject: User, email: Option<String>, name: Opt
 
 /// Update a user's roles
 pub fn set_roles(caller: &User, mut subject: User, roles: Vec<Role>, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::UserSetRoles)?;
+    caller.access_check(Permission::UserSetRoles)?;
     subject.set_roles(roles);
     subject.set_updated(now.clone());
     Ok(Modifications::new_single(Op::Update, subject))
@@ -59,7 +61,7 @@ pub fn set_roles(caller: &User, mut subject: User, roles: Vec<Role>, now: &DateT
 
 /// Delete a user
 pub fn delete(caller: &User, mut subject: User, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::UserDelete)?;
+    caller.access_check(Permission::UserDelete)?;
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }

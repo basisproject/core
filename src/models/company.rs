@@ -26,21 +26,21 @@ pub enum CompanyType {
     /// For planned companies that span multiple regions.
     ///
     /// Example: an organization that manages a bridge or set of infrastructure
-    /// between two or more regions.
+    /// between two or more regions, or a planned joint pharmaceutical research
+    /// facility
     TransRegional(Vec<RegionID>),
     /// For planned companies that exist within a single region.
     ///
-    /// Example: A regional medical research facility
+    /// Example: A regional transit system
     Regional(RegionID),
-    /// For worker-owned companies that operate within a single region.
+    /// For worker-owned companies that operate within the Basis network. Note
+    /// that syndicates can span multiple regions (for instance, a company that
+    /// has workers from several neighboring regions, or a company with many
+    /// remote workers).
     ///
     /// Example: A local, worker-owned widget factory
-    ///
-    /// TODO!
-    /// TODO! a company should be able to span multiple regions
-    /// TODO!
-    Syndicate(RegionID),
-    /// For companies that exist outside of the Basis system.
+    Syndicate(Vec<RegionID>),
+    /// For (capitalist pig) companies that exist outside of the Basis system.
     ///
     /// Example: Amazon
     Private,

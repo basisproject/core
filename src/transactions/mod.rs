@@ -12,21 +12,21 @@
 //! could (in theory) be used without needing to couple any of the logic to the
 //! storage mechanism.
 
-pub mod region;
-pub mod user;
-pub mod occupation;
-//pub mod currency;
-pub mod company;
-//pub mod process_spec;
-//pub mod process;
-//pub mod event;
-//pub mod company_member;
-//pub mod agreement;
 //pub mod account;
-//pub mod resource_spec;
-//pub mod resource;
+//pub mod agreement;
 //pub mod commitment;
+pub mod company;
+//pub mod company_member;
+//pub mod currency;
+//pub mod event;
 //pub mod intent;
+pub mod occupation;
+//pub mod process;
+//pub mod process_spec;
+pub mod region;
+//pub mod resource;
+//pub mod resource_spec;
+pub mod user;
 
 #[cfg(test)]
 mod tests {

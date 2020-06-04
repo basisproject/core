@@ -12,7 +12,7 @@ use crate::{
 
 /// Create a region
 pub fn create<T: Into<String>>(caller: &User, id: RegionID, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::RegionCreate)?;
+    caller.access_check(Permission::RegionCreate)?;
     let model = Region::builder()
         .id(id)
         .name(name.into())
@@ -26,7 +26,7 @@ pub fn create<T: Into<String>>(caller: &User, id: RegionID, name: T, active: boo
 
 /// Delete a region
 pub fn delete(caller: &User, mut subject: Region, now: &DateTime<Utc>) -> Result<Modifications> {
-    access_check!(caller, Permission::RegionDelete)?;
+    caller.access_check(Permission::RegionDelete)?;
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
