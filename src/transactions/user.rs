@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use crate::{
-    access::{Permission, Role},
+    access::{self, Permission, Role},
     error::{Error, Result},
     models::{
         Op,
@@ -9,9 +9,8 @@ use crate::{
     },
 };
 
-/// Create a user
-pub fn create<T: Into<String>>(caller: &User, id: UserID, roles: Vec<Role>, email: T, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
-    caller.access_check(Permission::UserCreate)?;
+/// Create a user (private implementation, meant to be wrapped).
+fn create_inner<T: Into<String>>(id: UserID, roles: Vec<Role>, email: T, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     let model = User::builder()
         .id(id)
         .roles(roles)
@@ -23,6 +22,20 @@ pub fn create<T: Into<String>>(caller: &User, id: UserID, roles: Vec<Role>, emai
         .build()
         .map_err(|e| Error::BuilderFailed(e))?;
     Ok(Modifications::new_single(Op::Create, model))
+}
+
+/// Create a new user with a `Role::User` role. No permissions required.
+pub fn create<T: Into<String>>(id: UserID, email: T, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+    access::guest_check(Permission::UserCreate)?;
+    create_inner(id, vec![Role::User], email, name, active, now)
+}
+
+/// Create a new user with a specific set of permissions using a current user as
+/// the originator. Effective, an admin create. Requires the 
+/// `Permission::UserCreate` permission.
+pub fn create_permissioned<T: Into<String>>(caller: &User, id: UserID, roles: Vec<Role>, email: T, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+    caller.access_check(Permission::UserAdminCreate)?;
+    create_inner(id, roles, email, name, active, now)
 }
 
 /// Update a user object
@@ -82,8 +95,22 @@ mod tests {
     fn can_create() {
         let id = UserID::create();
         let now = util::time::now();
+        let mods = create(id.clone(), "zing@lyonbros.com", "leonard", true, &now).unwrap().into_modifications();
+        assert_eq!(mods.len(), 1);
+
+        let model = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
+        assert_eq!(model.id(), &id);
+        assert_eq!(model.email(), "zing@lyonbros.com");
+        assert_eq!(model.name(), "leonard");
+        assert_eq!(model.active(), &true);
+    }
+
+    #[test]
+    fn can_create_permissioned() {
+        let id = UserID::create();
+        let now = util::time::now();
         let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
-        let mods = create(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_modifications();
+        let mods = create_permissioned(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_modifications();
         assert_eq!(mods.len(), 1);
 
         let model = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
@@ -96,7 +123,7 @@ mod tests {
         let now = util::time::now();
         let user = make_user(&id, Some(vec![Role::User]), &now);
 
-        let res = create(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now);
+        let res = create_permissioned(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
@@ -105,7 +132,7 @@ mod tests {
         let id = UserID::create();
         let now = util::time::now();
         let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
-        let mods = create(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_modifications();
+        let mods = create_permissioned(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_modifications();
 
         let subject = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
         assert_eq!(subject.email(), "zing@lyonbros.com");

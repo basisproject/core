@@ -11,6 +11,9 @@
 //! [err_priv]: ../error/enum.Error.html#variant.InsufficientPrivileges
 //! [Users]: ../models/user/struct.User.html
 
+use crate::{
+    error::{Error, Result},
+};
 use serde::{Serialize, Deserialize};
 
 /// Define the system-wide permissions.
@@ -32,6 +35,7 @@ pub enum Permission {
     UserCreate,
     UserUpdate,
     UserSetRoles,
+    UserAdminCreate,
     UserAdminUpdate,
     UserDelete,
 
@@ -71,6 +75,7 @@ pub enum Role {
     ResourceSpecAdmin,
     Bank,
     User,
+    Guest,
 }
 
 impl Role {
@@ -87,9 +92,9 @@ impl Role {
             },
             Role::IdentityAdmin => {
                 vec![
-                    Permission::UserCreate,
                     Permission::UserUpdate,
                     Permission::UserSetRoles,
+                    Permission::UserAdminCreate,
                     Permission::UserAdminUpdate,
                     Permission::UserDelete,
                 ]
@@ -129,6 +134,11 @@ impl Role {
                     Permission::AccountDelete,
                 ]
             }
+            Role::Guest => {
+                vec![
+                    Permission::UserCreate,
+                ]
+            }
         }
     }
 
@@ -153,6 +163,15 @@ impl Role {
             }
         }
         false
+    }
+}
+
+/// Check if a guest can perform an action.
+pub fn guest_check(perm: Permission) -> Result<()> {
+    if (Role::Guest).can(&perm) {
+        Ok(())
+    } else {
+        Err(Error::InsufficientPrivileges)
     }
 }
 
