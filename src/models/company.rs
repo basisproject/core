@@ -12,8 +12,12 @@
 //! [access]: ../../access/
 
 use crate::{
+    costs::Costs,
     models::{
+        lib::agent::AgentID,
+        process::Process,
         region::RegionID,
+        resource::Resource,
     },
 };
 use serde::{Serialize, Deserialize};
@@ -39,7 +43,7 @@ pub enum CompanyType {
     /// remote workers).
     ///
     /// Example: A local, worker-owned widget factory
-    Syndicate(Vec<RegionID>),
+    Syndicate,
     /// For (capitalist pig) companies that exist outside of the Basis system.
     ///
     /// Example: Amazon
@@ -57,7 +61,9 @@ pub enum Permission {
     CompanyDelete,
 
     MemberCreate,
+    MemberUpdate,
     MemberSetPermissions,
+    MemberSetCompensation,
     MemberDelete,
 
     LaborSetClock,
@@ -92,5 +98,74 @@ basis_model! {
         email: String,
     }
     CompanyBuilder
+}
+
+impl Company {
+    /// Calculate the total costs for this company, given a set of processes and
+    /// resources that belong to the company.
+    pub fn total_costs(&self, processes: &Vec<Process>, resources: &Vec<Resource>) -> Costs {
+        let process_costs = processes.iter()
+            .filter(|x| x.company_id() == self.id())
+            .fold(Costs::new(), |acc, x| acc + x.costs().clone());
+        let resource_costs = resources.iter()
+            .filter(|x| {
+                match x.inner().primary_accountable() {
+                    Some(agent_id) => {
+                        match agent_id {
+                            AgentID::CompanyID(company_id) => self.id() == company_id,
+                            _ => false,
+                        }
+                    }
+                    None => false,
+                }
+            })
+            .fold(Costs::new(), |acc, x| acc + x.costs().clone());
+        process_costs + resource_costs
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        models::{
+            process::ProcessID,
+            resource::ResourceID,
+            testutils::{make_company, make_process, make_resource},
+        },
+        util,
+    };
+    use om2::{Measure, Unit};
+    use rust_decimal_macros::*;
+
+    #[test]
+    fn totals_costs() {
+        let company_id = CompanyID::create();
+        let company = make_company(&company_id, CompanyType::Syndicate, "jerry's delicious widgets", &util::time::now());
+
+        let now = util::time::now();
+        let process1 = make_process(&ProcessID::create(), &company_id, "make widgets", &Costs::new_with_labor("lumberjack", dec!(16.9)), &now);
+        let process2 = make_process(&ProcessID::create(), &company_id, "market widgets", &Costs::new_with_labor("marketer", dec!(123.4)), &now);
+        let resource1 = make_resource(&ResourceID::create(), &company_id, &Measure::new(dec!(10.0), Unit::One), &Costs::new_with_labor("lumberjack", dec!(23.1)), &now);
+        let resource2 = make_resource(&ResourceID::create(), &company_id, &Measure::new(dec!(10.0), Unit::One), &Costs::new_with_labor("trucker", dec!(12.5)), &now);
+
+        let costs = company.total_costs(&vec![process1, process2], &vec![resource1, resource2]);
+        let mut expected_costs = Costs::new();
+        expected_costs.track_labor("lumberjack", dec!(40));
+        expected_costs.track_labor("trucker", dec!(12.5));
+        expected_costs.track_labor("marketer", dec!(123.4));
+        assert_eq!(costs, expected_costs);
+
+        let process1 = make_process(&ProcessID::create(), &CompanyID::create(), "make widgets", &Costs::new_with_labor("lumberjack", dec!(16.9)), &now);
+        let process2 = make_process(&ProcessID::create(), &company_id, "market widgets", &Costs::new_with_labor("marketer", dec!(123.4)), &now);
+        let resource1 = make_resource(&ResourceID::create(), &CompanyID::create(), &Measure::new(dec!(10.0), Unit::One), &Costs::new_with_labor("lumberjack", dec!(23.1)), &now);
+        let resource2 = make_resource(&ResourceID::create(), &company_id, &Measure::new(dec!(10.0), Unit::One), &Costs::new_with_labor("trucker", dec!(12.5)), &now);
+
+        let costs = company.total_costs(&vec![process1, process2], &vec![resource1, resource2]);
+        let mut expected_costs = Costs::new();
+        expected_costs.track_labor("trucker", dec!(12.5));
+        expected_costs.track_labor("marketer", dec!(123.4));
+        assert_eq!(costs, expected_costs);
+    }
 }
 

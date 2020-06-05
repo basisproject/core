@@ -5,6 +5,7 @@ use crate::{
     costs::{Costs, CostMover},
     models::{
         company::CompanyID,
+        lib::agent::AgentID,
         process_spec::ProcessSpecID,
     },
 };
@@ -26,7 +27,9 @@ basis_model! {
     pub struct Process {
         id: <<ProcessID>>,
         /// The inner VF process
-        inner: vf::Process<ProcessSpecID, Url, CompanyID, (), ()>,
+        inner: vf::Process<ProcessSpecID, Url, AgentID, (), ()>,
+        /// The company this process belongs to
+        company_id: CompanyID,
         /// Our costs tally for this process
         costs: Costs,
     }

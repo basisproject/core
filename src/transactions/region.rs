@@ -41,8 +41,8 @@ mod tests {
 
             region::Region,
             user::UserID,
+            testutils::make_user,
         },
-        transactions::tests::make_user,
         util,
     };
 
@@ -50,7 +50,7 @@ mod tests {
     fn can_create() {
         let id = RegionID::create();
         let now = util::time::now();
-        let user = make_user(&UserID::create(), &now, Some(vec![Role::SuperAdmin]));
+        let user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
         let mods = create(&user, id.clone(), "xina", true, &now).unwrap().into_modifications();
         assert_eq!(mods.len(), 1);
 
@@ -60,7 +60,7 @@ mod tests {
 
         let id = RegionID::create();
         let now = util::time::now();
-        let user = make_user(&UserID::create(), &now, Some(vec![Role::User]));
+        let user = make_user(&UserID::create(), Some(vec![Role::User]), &now);
 
         let res = create(&user, id.clone(), "xina", true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
@@ -70,7 +70,7 @@ mod tests {
     fn can_delete() {
         let id = RegionID::create();
         let now = util::time::now();
-        let mut user = make_user(&UserID::create(), &now, Some(vec![Role::SuperAdmin]));
+        let mut user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
         let mods = create(&user, id.clone(), "fine", true, &now).unwrap().into_modifications();
         let region = mods[0].clone().expect_op::<Region>(Op::Create).unwrap();
         let mods = delete(&user, region, &now).unwrap().into_modifications();

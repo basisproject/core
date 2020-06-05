@@ -7,6 +7,11 @@
 //! turning iron into steel). In effect, the transformation acts to *consume*
 //! the input resource, whereas in most cases processes just move resources.
 
+use crate::{
+    models::{
+        company::CompanyID,
+    },
+};
 use vf_rs::vf;
 
 basis_model! {
@@ -15,6 +20,8 @@ basis_model! {
         id: <<ProcessSpecID>>,
         /// Our VF process object.
         inner: vf::ProcessSpecification,
+        /// The company this process spec belongs to
+        company_id: CompanyID,
         // TODO: implement some concept of a known transformation (ie, refining
         // crude oil)
         //resource_transform: Option<ResourceTransformProcessID>,

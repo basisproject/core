@@ -60,8 +60,8 @@ mod tests {
 
             occupation::Occupation,
             user::UserID,
+            testutils::make_user,
         },
-        transactions::tests::make_user,
         util,
     };
 
@@ -69,7 +69,7 @@ mod tests {
     fn can_create() {
         let id = OccupationID::create();
         let now = util::time::now();
-        let user = make_user(&UserID::create(), &now, Some(vec![Role::SuperAdmin]));
+        let user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
         let mods = create(&user, id.clone(), "machinist", true, &now).unwrap().into_modifications();
         assert_eq!(mods.len(), 1);
 
@@ -79,7 +79,7 @@ mod tests {
 
         let id = OccupationID::create();
         let now = util::time::now();
-        let user = make_user(&UserID::create(), &now, Some(vec![Role::User]));
+        let user = make_user(&UserID::create(), Some(vec![Role::User]), &now);
 
         let res = create(&user, id.clone(), "dog psychic", true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
@@ -89,7 +89,7 @@ mod tests {
     fn can_update() {
         let id = OccupationID::create();
         let now = util::time::now();
-        let user = make_user(&UserID::create(), &now, Some(vec![Role::SuperAdmin]));
+        let user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
         let mods = create(&user, id.clone(), "bone spurs in chief", true, &now).unwrap().into_modifications();
 
         let subject = mods[0].clone().expect_op::<Occupation>(Op::Create).unwrap();
@@ -105,7 +105,7 @@ mod tests {
         assert_eq!(subject2.updated(), &now2);
         assert_eq!(subject2.inner().role_label(), "coward");
 
-        let user = make_user(&UserID::create(), &now, None);
+        let user = make_user(&UserID::create(), None, &now);
         let res = update(&user, subject.clone(), Some("the best president the best president the best president president unpresidented FALSE ACQUISITIONS".into()), None, &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
@@ -114,7 +114,7 @@ mod tests {
     fn can_delete() {
         let id = OccupationID::create();
         let now = util::time::now();
-        let user = make_user(&UserID::create(), &now, Some(vec![Role::SuperAdmin]));
+        let user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
         let mods = create(&user, id.clone(), "the best president", true, &now).unwrap().into_modifications();
         let subject = mods[0].clone().expect_op::<Occupation>(Op::Create).unwrap();
         let mods = delete(&user, subject.clone(), &now).unwrap().into_modifications();
@@ -123,7 +123,7 @@ mod tests {
         let subject2 = mods[0].clone().expect_op::<Occupation>(Op::Delete).unwrap();
         assert_eq!(subject2.id(), &id);
 
-        let user = make_user(&UserID::create(), &now, None);
+        let user = make_user(&UserID::create(), None, &now);
         let res = delete(&user, subject2, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }

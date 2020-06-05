@@ -73,8 +73,8 @@ mod tests {
         access::Role,
         models::{
             user::User,
+            testutils::{make_user},
         },
-        transactions::tests::make_user,
         util,
     };
 
@@ -82,7 +82,7 @@ mod tests {
     fn can_create() {
         let id = UserID::create();
         let now = util::time::now();
-        let user = make_user(&id, &now, Some(vec![Role::IdentityAdmin]));
+        let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
         let mods = create(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_modifications();
         assert_eq!(mods.len(), 1);
 
@@ -94,7 +94,7 @@ mod tests {
 
         let id = UserID::create();
         let now = util::time::now();
-        let user = make_user(&id, &now, Some(vec![Role::User]));
+        let user = make_user(&id, Some(vec![Role::User]), &now);
 
         let res = create(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
@@ -104,7 +104,7 @@ mod tests {
     fn can_update() {
         let id = UserID::create();
         let now = util::time::now();
-        let user = make_user(&id, &now, Some(vec![Role::IdentityAdmin]));
+        let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
         let mods = create(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_modifications();
 
         let subject = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
@@ -132,7 +132,7 @@ mod tests {
     fn can_set_roles() {
         let id = UserID::create();
         let now = util::time::now();
-        let mut user = make_user(&id, &now, Some(vec![Role::IdentityAdmin]));
+        let mut user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
         user.set_active(false);
 
         // inactive users should not be able to run mods
@@ -161,7 +161,7 @@ mod tests {
     fn can_delete() {
         let id = UserID::create();
         let now = util::time::now();
-        let user = make_user(&id, &now, Some(vec![Role::IdentityAdmin]));
+        let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
         let mods = delete(&user.clone(), user, &now).unwrap().into_modifications();
         assert_eq!(mods.len(), 1);
 

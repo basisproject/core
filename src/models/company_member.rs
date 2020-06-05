@@ -16,12 +16,14 @@ use crate::{
         lib::agent::AgentID,
         occupation::OccupationID,
         process_spec::ProcessSpecID,
+        user::UserID,
     },
 };
 use getset::Getters;
 use om2::{Measure, Unit, NumericUnion};
 use rust_decimal::prelude::*;
 use serde::{Serialize, Deserialize};
+use std::convert::TryInto;
 use vf_rs::vf;
 
 /// How often we pay workers.
@@ -132,11 +134,21 @@ impl CompanyMember {
     }
 
     /// Check if this member can perform an action on a company.
-    pub fn access_check(&self, company_id: &CompanyID, permission: Permission) -> Result<()> {
-        if self.inner().object() != &company_id.clone().into() || !self.can(&permission) {
+    pub fn access_check(&self, user_id: &UserID, company_id: &CompanyID, permission: Permission) -> Result<()> {
+        if self.inner().subject() != &user_id.clone().into() || self.inner().object() != &company_id.clone().into() || !self.can(&permission) {
             Err(Error::InsufficientPrivileges)?;
         }
         Ok(())
+    }
+
+    /// Grab this member's UserID, converted from AgentID
+    pub fn user_id(&self) -> Result<UserID> {
+        self.inner().subject().clone().try_into()
+    }
+
+    /// Grab this member's CompanyID, converted from AgentID
+    pub fn company_id(&self) -> Result<CompanyID> {
+        self.inner().object().clone().try_into()
     }
 }
 
@@ -144,39 +156,59 @@ impl CompanyMember {
 mod test {
     use crate::{
         models::{
-            company::{CompanyID, Permission},
+            company::{CompanyID, Permission as CompanyPermission},
             user::UserID,
+            testutils::make_member,
         },
         util,
     };
-    use rust_decimal_macros::*;
     use super::*;
-    use vf_rs::vf;
-
-    fn make_member() -> CompanyMember {
-        CompanyMember::builder()
-            .id("zing")
-            .inner(
-                vf::AgentRelationship::builder()
-                    .subject(UserID::from("jerry"))
-                    .object(CompanyID::from("jerry's widgets ultd"))
-                    .relationship("CEO")
-                    .build().unwrap()
-            )
-            .active(true)
-            .permissions(vec![Permission::MemberCreate, Permission::MemberSetPermissions, Permission::MemberDelete])
-            .compensation(Some(Compensation::new_hourly(dec!(0.0), "12345")))
-            .process_spec_id(Some("1234444".into()))
-            .created(util::time::now())
-            .updated(util::time::now())
-            .build().unwrap()
-    }
 
     #[test]
     fn can() {
-        let member = make_member();
-        assert!(member.can(&Permission::MemberCreate));
-        assert!(!member.can(&Permission::CompanyDelete));
+        let now = util::time::now();
+        let member = make_member(&CompanyMemberID::create(), &UserID::create(), &CompanyID::create(), &OccupationID::create(), vec![CompanyPermission::MemberCreate, CompanyPermission::MemberUpdate], &now);
+        let user_id: UserID = member.user_id().unwrap();
+        let company_id: CompanyID = member.company_id().unwrap();
+        assert!(member.can(&CompanyPermission::MemberCreate));
+        assert!(member.access_check(&user_id, &company_id, CompanyPermission::MemberCreate).is_ok());
+        assert!(member.access_check(&user_id, &company_id, CompanyPermission::CompanyDelete).is_err());
+
+        let mut member2 = member.clone();
+        member2.set_permissions(vec![CompanyPermission::MemberCreate, CompanyPermission::MemberUpdate, CompanyPermission::CompanyDelete]);
+        assert!(member2.can(&CompanyPermission::MemberCreate));
+        assert!(member2.access_check(&user_id, &company_id, CompanyPermission::MemberCreate).is_ok());
+        assert!(member2.access_check(&user_id, &company_id, CompanyPermission::CompanyDelete).is_ok());
+
+        let mut member3 = member2.clone();
+        member3.set_permissions(vec![]);
+        assert!(!member3.can(&CompanyPermission::MemberCreate));
+        assert!(member3.access_check(&user_id, &company_id, CompanyPermission::MemberCreate).is_err());
+        assert!(member3.access_check(&user_id, &company_id, CompanyPermission::CompanyDelete).is_err());
+
+        let mut member4 = member2.clone();
+        member4.set_deleted(Some(now.clone()));
+        assert!(!member4.can(&CompanyPermission::MemberCreate));
+        assert!(member4.access_check(&user_id, &company_id, CompanyPermission::MemberCreate).is_err());
+        assert!(member4.access_check(&user_id, &company_id, CompanyPermission::CompanyDelete).is_err());
+
+        let mut member5 = member2.clone();
+        member5.set_active(false);
+        assert!(!member5.can(&CompanyPermission::MemberCreate));
+        assert!(member5.access_check(&user_id, &company_id, CompanyPermission::MemberCreate).is_err());
+        assert!(member5.access_check(&user_id, &company_id, CompanyPermission::CompanyDelete).is_err());
+
+        let mut member6 = member2.clone();
+        member6.inner_mut().set_subject(UserID::create().into());
+        assert!(member6.can(&CompanyPermission::MemberCreate));
+        assert!(member6.access_check(&user_id, &company_id, CompanyPermission::MemberCreate).is_err());
+        assert!(member6.access_check(&user_id, &company_id, CompanyPermission::CompanyDelete).is_err());
+
+        let mut member7 = member2.clone();
+        member7.inner_mut().set_object(CompanyID::create().into());
+        assert!(member7.can(&CompanyPermission::MemberCreate));
+        assert!(member7.access_check(&user_id, &company_id, CompanyPermission::MemberCreate).is_err());
+        assert!(member7.access_check(&user_id, &company_id, CompanyPermission::CompanyDelete).is_err());
     }
 }
 

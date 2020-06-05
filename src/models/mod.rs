@@ -118,3 +118,94 @@ impl Modifications {
     }
 }
 
+#[cfg(test)]
+pub(crate) mod testutils {
+    //! Some model-making utilities to make unit testing easier. The full
+    //! end-to-end tests will happen in the integration tests.
+
+    use chrono::{DateTime, Utc};
+    use crate::{
+        access::Role,
+        costs::Costs,
+        models::{
+            company::{Company, CompanyID, CompanyType, Permission as CompanyPermission},
+            company_member::{CompanyMember, CompanyMemberID},
+            occupation::OccupationID,
+            process::{Process, ProcessID},
+            resource::{Resource, ResourceID},
+            user::{User, UserID},
+        },
+    };
+    use om2::Measure;
+    use vf_rs::vf;
+
+    pub fn make_user(user_id: &UserID, roles: Option<Vec<Role>>, now: &DateTime<Utc>) -> User {
+        User::builder()
+            .id(user_id.clone())
+            .roles(roles.unwrap_or(vec![Role::User]))
+            .email("surely@hotmail.com")   // don't call me shirley
+            .name("buzzin' frog")
+            .active(true)
+            .created(now.clone())
+            .updated(now.clone())
+            .build().unwrap()
+    }
+
+    pub fn make_company<T: Into<String>>(id: &CompanyID, ty: CompanyType, name: T, now: &DateTime<Utc>) -> Company {
+        Company::builder()
+            .id(id.clone())
+            .ty(ty)
+            .inner(vf::Agent::builder().name(name).build().unwrap())
+            .email("jerry@widgets.biz")
+            .active(true)
+            .created(now.clone())
+            .updated(now.clone())
+            .build().unwrap()
+    }
+
+    pub fn make_member(member_id: &CompanyMemberID, user_id: &UserID, company_id: &CompanyID, occupation_id: &OccupationID, permissions: Vec<CompanyPermission>, now: &DateTime<Utc>) -> CompanyMember {
+        CompanyMember::builder()
+            .id(member_id.clone())
+            .inner(
+                vf::AgentRelationship::builder()
+                    .subject(user_id.clone())
+                    .object(company_id.clone())
+                    .relationship(occupation_id.clone())
+                    .build().unwrap()
+            )
+            .permissions(permissions)
+            .active(true)
+            .created(now.clone())
+            .updated(now.clone())
+            .build().unwrap()
+    }
+
+    pub fn make_process<T: Into<String>>(id: &ProcessID, company_id: &CompanyID, name: T, costs: &Costs, now: &DateTime<Utc>) -> Process {
+        Process::builder()
+            .id(id.clone())
+            .inner(vf::Process::builder().name(name).build().unwrap())
+            .company_id(company_id.clone())
+            .costs(costs.clone())
+            .created(now.clone())
+            .updated(now.clone())
+            .build().unwrap()
+    }
+
+    pub fn make_resource(id: &ResourceID, company_id: &CompanyID, quantity: &Measure, costs: &Costs, now: &DateTime<Utc>) -> Resource {
+        Resource::builder()
+            .id(id.clone())
+            .inner(
+                vf::EconomicResource::builder()
+                    .accounting_quantity(quantity.clone())
+                    .primary_accountable(company_id.clone())
+                    .conforms_to("6969")
+                    .build().unwrap()
+            )
+            .in_custody_of(company_id.clone())
+            .costs(costs.clone())
+            .created(now.clone())
+            .updated(now.clone())
+            .build().unwrap()
+    }
+}
+

@@ -16,7 +16,7 @@
 //pub mod agreement;
 //pub mod commitment;
 pub mod company;
-//pub mod company_member;
+pub mod company_member;
 //pub mod currency;
 //pub mod event;
 //pub mod intent;
@@ -27,27 +27,4 @@ pub mod region;
 //pub mod resource;
 //pub mod resource_spec;
 pub mod user;
-
-#[cfg(test)]
-mod tests {
-    use chrono::{DateTime, Utc};
-    use crate::{
-        access::Role,
-        models::{
-            user::{User, UserID},
-        },
-    };
-
-    pub fn make_user(user_id: &UserID, now: &DateTime<Utc>, roles: Option<Vec<Role>>) -> User {
-        User::builder()
-            .id(user_id.clone())
-            .roles(roles.unwrap_or(vec![Role::User]))
-            .email("surely@hotmail.com")   // don't call me shirley
-            .name("buzzin' frog")
-            .active(true)
-            .created(now.clone())
-            .updated(now.clone())
-            .build().unwrap()
-    }
-}
 
