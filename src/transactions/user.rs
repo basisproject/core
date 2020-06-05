@@ -151,10 +151,8 @@ mod tests {
         // the user changed their roles to not allow setting roles, so when they
         // try to set their roles back to identity admin it shuould fail lol
         // sucker.
-        match set_roles(&user, user.clone(), vec![Role::IdentityAdmin], &now) {
-            Err(Error::InsufficientPrivileges) => {}
-            _ => panic!("should have failed"),
-        }
+        let res = set_roles(&user, user.clone(), vec![Role::IdentityAdmin], &now);
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
     #[test]

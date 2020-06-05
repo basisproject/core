@@ -8,33 +8,8 @@ use crate::{
         company::CompanyID,
     },
 };
-use getset::Getters;
-use serde::{Serialize, Deserialize};
 use url::Url;
 use vf_rs::vf;
-
-/// Physical dimensions for this resource.
-#[derive(Clone, Debug, Default, PartialEq, Getters, Serialize, Deserialize)]
-#[getset(get = "pub")]
-pub struct Dimensions {
-    /// I refuse to
-    width: f64,
-    /// document these
-    height: f64,
-    /// struct fields.
-    length: f64,
-}
-
-impl Dimensions {
-    /// Create a new dimension set.
-    pub fn new(width: f64, height: f64, length: f64) -> Self {
-        Self {
-            width,
-            height,
-            length,
-        }
-    }
-}
 
 basis_model! {
     /// The `ResourceSpec` model wraps our heroic [vf::ResourceSpecification][vfresource]

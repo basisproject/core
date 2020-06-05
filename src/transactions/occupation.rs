@@ -11,7 +11,7 @@ use crate::{
 };
 use vf_rs::vf;
 
-/// Create a new occupation
+/// Create a new `Occupation`.
 pub fn create<T: Into<String>>(caller: &User, id: OccupationID, label: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::OccupationCreate)?;
     let model = Occupation::builder()
