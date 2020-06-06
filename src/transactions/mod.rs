@@ -22,9 +22,9 @@ pub mod company_member;
 //pub mod intent;
 pub mod occupation;
 //pub mod process;
-//pub mod process_spec;
+pub mod process_spec;
 pub mod region;
-//pub mod resource;
+pub mod resource;
 pub mod resource_spec;
 pub mod user;
 

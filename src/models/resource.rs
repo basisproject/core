@@ -25,7 +25,7 @@ basis_model! {
         id: <<ResourceID>>,
         /// The VF object for this product instance
         inner: vf::EconomicResource<Url, ResourceSpecID, ResourceID, AgentID, ProcessID>,
-        /// The company that has custody of the resource
+        /// The agent that has custody of the resource
         in_custody_of: AgentID,
         /// The costs imbued in this resource. Note that the `inner` field's
         /// `vf::EconomicResource` object can contain a measure (ie, 5kg) and

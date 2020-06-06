@@ -45,6 +45,9 @@ pub enum Permission {
     CompanySetType,
     CompanyUpdateMembers,
     CompanyUpdateResourceSpecs,
+    CompanyUpdateResources,
+    CompanyUpdateProcessSpecs,
+    CompanyUpdateProcesses,
     CompanyClockIn,
     CompanyClockOut,
     CompanySetLaborWage,
@@ -123,6 +126,9 @@ impl Role {
                     Permission::CompanyCreatePrivate,
                     Permission::CompanyUpdateMembers,
                     Permission::CompanyUpdateResourceSpecs,
+                    Permission::CompanyUpdateResources,
+                    Permission::CompanyUpdateProcessSpecs,
+                    Permission::CompanyUpdateProcesses,
                     Permission::CompanyClockIn,
                     Permission::CompanyClockOut,
                     Permission::CompanySetLaborWage,
@@ -214,8 +220,6 @@ pub mod tests {
         assert!(comp_admin.can(&Permission::CompanyAdminUpdate));
         assert!(comp_admin.can(&Permission::CompanyAdminDelete));
         assert!(!comp_admin.can(&Permission::CompanySetType));
-
-        // TODO: ResourceSpecAdmin
     }
 }
 

@@ -133,6 +133,7 @@ pub(crate) mod testutils {
             occupation::OccupationID,
             process::{Process, ProcessID},
             resource::{Resource, ResourceID},
+            resource_spec::{ResourceSpec, ResourceSpecID},
             user::{User, UserID},
         },
     };
@@ -191,13 +192,27 @@ pub(crate) mod testutils {
             .build().unwrap()
     }
 
+    pub fn make_resource_spec<T: Into<String>>(id: &ResourceSpecID, company_id: &CompanyID, name: T, now: &DateTime<Utc>) -> ResourceSpec {
+        ResourceSpec::builder()
+            .id(id.clone())
+            .inner(
+                vf::ResourceSpecification::builder()
+                    .name(name)
+                    .build().unwrap()
+            )
+            .company_id(company_id.clone())
+            .created(now.clone())
+            .updated(now.clone())
+            .build().unwrap()
+    }
+
     pub fn make_resource(id: &ResourceID, company_id: &CompanyID, quantity: &Measure, costs: &Costs, now: &DateTime<Utc>) -> Resource {
         Resource::builder()
             .id(id.clone())
             .inner(
                 vf::EconomicResource::builder()
-                    .accounting_quantity(quantity.clone())
-                    .primary_accountable(company_id.clone())
+                    .accounting_quantity(Some(quantity.clone()))
+                    .primary_accountable(Some(company_id.clone().into()))
                     .conforms_to("6969")
                     .build().unwrap()
             )

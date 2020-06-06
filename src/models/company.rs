@@ -73,6 +73,18 @@ pub enum Permission {
     ResourceSpecUpdate,
     ResourceSpecDelete,
 
+    ResourceCreate,
+    ResourceUpdate,
+    ResourceDelete,
+
+    ProcessSpecCreate,
+    ProcessSpecUpdate,
+    ProcessSpecDelete,
+
+    ProcessCreate,
+    ProcessUpdate,
+    ProcessDelete,
+
     OrderCreate,
     OrderUpdateProcessStatus,
     OrderUpdateShipping,
