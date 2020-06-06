@@ -34,7 +34,7 @@ use serde::{Serialize, Deserialize};
 use std::convert::TryFrom;
 
 #[macro_use]
-mod lib;
+pub(crate) mod lib;
 
 // load all of our pub mod <model>; ... lines
 load_models!{ pub mod }
@@ -132,6 +132,7 @@ pub(crate) mod testutils {
             company_member::{CompanyMember, CompanyMemberID},
             occupation::OccupationID,
             process::{Process, ProcessID},
+            process_spec::{ProcessSpec, ProcessSpecID},
             resource::{Resource, ResourceID},
             resource_spec::{ResourceSpec, ResourceSpecID},
             user::{User, UserID},
@@ -218,6 +219,21 @@ pub(crate) mod testutils {
             )
             .in_custody_of(company_id.clone())
             .costs(costs.clone())
+            .created(now.clone())
+            .updated(now.clone())
+            .build().unwrap()
+    }
+
+    pub fn make_process_spec<T: Into<String>>(id: &ProcessSpecID, company_id: &CompanyID, name: T, active: bool, now: &DateTime<Utc>) -> ProcessSpec {
+        ProcessSpec::builder()
+            .id(id.clone())
+            .inner(
+                vf::ProcessSpecification::builder()
+                    .name(name)
+                    .build().unwrap()
+            )
+            .company_id(company_id.clone())
+            .active(active)
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap()

@@ -21,7 +21,7 @@ pub mod company_member;
 //pub mod event;
 //pub mod intent;
 pub mod occupation;
-//pub mod process;
+pub mod process;
 pub mod process_spec;
 pub mod region;
 pub mod resource;

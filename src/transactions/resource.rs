@@ -88,6 +88,9 @@ pub fn delete(caller: &User, member: &CompanyMember, company: &Company, mut subj
     if company.is_deleted() {
         Err(Error::CompanyIsDeleted)?;
     }
+    if !subject.costs().is_zero() {
+        Err(Error::CannotEraseCosts)?;
+    }
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
@@ -132,6 +135,7 @@ mod tests {
         assert_eq!(resource.inner().note(), &Some("niceee".into()));
         assert_eq!(resource.inner().unit_of_effort(), &Some(Unit::Hour));
         assert_eq!(resource.in_custody_of(), &company.id().clone().into());
+        assert!(resource.costs().is_zero());
         assert_eq!(resource.active(), &true);
         assert_eq!(resource.created(), &now);
         assert_eq!(resource.updated(), &now);

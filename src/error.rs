@@ -15,6 +15,10 @@ pub enum Error {
     /// There was an error while using a builder (likely an internal error)
     #[error("error building object {0}")]
     BuilderFailed(String),
+    /// When we try to perform an operation that would erase costs (such as try
+    /// to delete a Process that has non-zero costs).
+    #[error("cannot erase costs")]
+    CannotEraseCosts,
     /// When we try to perform an operation on a deleted company
     #[error("operation on deleted company")]
     CompanyIsDeleted,
