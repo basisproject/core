@@ -29,7 +29,8 @@ pub enum AgentID {
     UserID(UserID),
 }
 
-macro_rules! impl_for_model_id {
+/// Implements `From<ModelID> for AgentID` and also `TryFrom<AgentID> for ModelID`
+macro_rules! impl_agent_for_model_id {
     ($idty:ident) => {
         impl From<$idty> for AgentID {
             fn from(val: $idty) -> Self {
@@ -50,9 +51,9 @@ macro_rules! impl_for_model_id {
     };
 }
 
-impl_for_model_id! { BankID }
-impl_for_model_id! { CompanyID }
-impl_for_model_id! { CompanyMemberID }
-impl_for_model_id! { RegionID }
-impl_for_model_id! { UserID }
+impl_agent_for_model_id! { BankID }
+impl_agent_for_model_id! { CompanyID }
+impl_agent_for_model_id! { CompanyMemberID }
+impl_agent_for_model_id! { RegionID }
+impl_agent_for_model_id! { UserID }
 
