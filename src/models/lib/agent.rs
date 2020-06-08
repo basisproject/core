@@ -22,7 +22,7 @@ pub enum AgentID {
     #[serde(rename = "company")]
     CompanyID(CompanyID),
     #[serde(rename = "member")]
-    MemberID(CompanyMemberID),
+    CompanyMemberID(CompanyMemberID),
     #[serde(rename = "region")]
     RegionID(RegionID),
     #[serde(rename = "user")]
@@ -30,10 +30,10 @@ pub enum AgentID {
 }
 
 macro_rules! impl_for_model_id {
-    ($idty:ty, $agentfield:ident) => {
+    ($idty:ident) => {
         impl From<$idty> for AgentID {
             fn from(val: $idty) -> Self {
-                AgentID::$agentfield(val)
+                AgentID::$idty(val)
             }
         }
 
@@ -42,7 +42,7 @@ macro_rules! impl_for_model_id {
 
             fn try_from(val: AgentID) -> Result<Self> {
                 Ok(match val {
-                    AgentID::$agentfield(id) => id,
+                    AgentID::$idty(id) => id,
                     _ => Err(Error::WrongAgentIDType)?,
                 })
             }
@@ -50,9 +50,9 @@ macro_rules! impl_for_model_id {
     };
 }
 
-impl_for_model_id! { BankID, BankID }
-impl_for_model_id! { CompanyID, CompanyID }
-impl_for_model_id! { CompanyMemberID, MemberID }
-impl_for_model_id! { RegionID, RegionID }
-impl_for_model_id! { UserID, UserID }
+impl_for_model_id! { BankID }
+impl_for_model_id! { CompanyID }
+impl_for_model_id! { CompanyMemberID }
+impl_for_model_id! { RegionID }
+impl_for_model_id! { UserID }
 
