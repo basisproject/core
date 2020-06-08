@@ -32,6 +32,7 @@ macro_rules! load_models {
             @$($load_type)*
             (account, Account, AccountID),
             (agreement, Agreement, AgreementID),
+            (bank, Bank, BankID),
             (commitment, Commitment, CommitmentID),
             (company, Company, CompanyID),
             (company_member, CompanyMember, CompanyMemberID),

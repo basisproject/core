@@ -1,6 +1,7 @@
 use crate::{
     error::{Result, Error},
     models::{
+        bank::BankID,
         company::CompanyID,
         company_member::CompanyMemberID,
         region::RegionID,
@@ -16,6 +17,8 @@ use std::convert::TryFrom;
 /// VF's model while still constraining ourselves to a limited set of actors.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum AgentID {
+    #[serde(rename = "bank")]
+    BankID(BankID),
     #[serde(rename = "company")]
     CompanyID(CompanyID),
     #[serde(rename = "member")]
@@ -26,6 +29,11 @@ pub enum AgentID {
     UserID(UserID),
 }
 
+impl From<BankID> for AgentID {
+    fn from(val: BankID) -> Self {
+        AgentID::BankID(val)
+    }
+}
 impl From<CompanyID> for AgentID {
     fn from(val: CompanyID) -> Self {
         AgentID::CompanyID(val)
@@ -47,6 +55,16 @@ impl From<UserID> for AgentID {
     }
 }
 
+impl TryFrom<AgentID> for BankID {
+    type Error = Error;
+
+    fn try_from(val: AgentID) -> Result<Self> {
+        Ok(match val {
+            AgentID::BankID(id) => id,
+            _ => Err(Error::WrongAgentIDType)?,
+        })
+    }
+}
 impl TryFrom<AgentID> for CompanyID {
     type Error = Error;
 
