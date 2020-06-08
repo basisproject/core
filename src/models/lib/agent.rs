@@ -29,80 +29,30 @@ pub enum AgentID {
     UserID(UserID),
 }
 
-impl From<BankID> for AgentID {
-    fn from(val: BankID) -> Self {
-        AgentID::BankID(val)
-    }
-}
-impl From<CompanyID> for AgentID {
-    fn from(val: CompanyID) -> Self {
-        AgentID::CompanyID(val)
-    }
-}
-impl From<CompanyMemberID> for AgentID {
-    fn from(val: CompanyMemberID) -> Self {
-        AgentID::MemberID(val)
-    }
-}
-impl From<RegionID> for AgentID {
-    fn from(val: RegionID) -> Self {
-        AgentID::RegionID(val)
-    }
-}
-impl From<UserID> for AgentID {
-    fn from(val: UserID) -> Self {
-        AgentID::UserID(val)
-    }
+macro_rules! impl_for_model_id {
+    ($idty:ty, $agentfield:ident) => {
+        impl From<$idty> for AgentID {
+            fn from(val: $idty) -> Self {
+                AgentID::$agentfield(val)
+            }
+        }
+
+        impl TryFrom<AgentID> for $idty {
+            type Error = Error;
+
+            fn try_from(val: AgentID) -> Result<Self> {
+                Ok(match val {
+                    AgentID::$agentfield(id) => id,
+                    _ => Err(Error::WrongAgentIDType)?,
+                })
+            }
+        }
+    };
 }
 
-impl TryFrom<AgentID> for BankID {
-    type Error = Error;
-
-    fn try_from(val: AgentID) -> Result<Self> {
-        Ok(match val {
-            AgentID::BankID(id) => id,
-            _ => Err(Error::WrongAgentIDType)?,
-        })
-    }
-}
-impl TryFrom<AgentID> for CompanyID {
-    type Error = Error;
-
-    fn try_from(val: AgentID) -> Result<Self> {
-        Ok(match val {
-            AgentID::CompanyID(id) => id,
-            _ => Err(Error::WrongAgentIDType)?,
-        })
-    }
-}
-impl TryFrom<AgentID> for CompanyMemberID {
-    type Error = Error;
-
-    fn try_from(val: AgentID) -> Result<Self> {
-        Ok(match val {
-            AgentID::MemberID(id) => id,
-            _ => Err(Error::WrongAgentIDType)?,
-        })
-    }
-}
-impl TryFrom<AgentID> for RegionID {
-    type Error = Error;
-
-    fn try_from(val: AgentID) -> Result<Self> {
-        Ok(match val {
-            AgentID::RegionID(id) => id,
-            _ => Err(Error::WrongAgentIDType)?,
-        })
-    }
-}
-impl TryFrom<AgentID> for UserID {
-    type Error = Error;
-
-    fn try_from(val: AgentID) -> Result<Self> {
-        Ok(match val {
-            AgentID::UserID(id) => id,
-            _ => Err(Error::WrongAgentIDType)?,
-        })
-    }
-}
+impl_for_model_id! { BankID, BankID }
+impl_for_model_id! { CompanyID, CompanyID }
+impl_for_model_id! { CompanyMemberID, MemberID }
+impl_for_model_id! { RegionID, RegionID }
+impl_for_model_id! { UserID, UserID }
 
