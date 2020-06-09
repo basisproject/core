@@ -162,6 +162,24 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 false
             }
 
+            /// Determine if a set of costs is greater than 0.
+            pub fn is_gt_0(&self) -> bool {
+                let mut count = 0;
+                #(
+                    for (_, v) in self.#field_name().iter() {
+                        if *v > #field_hashval::zero() {
+                            // count how many positive values we have
+                            count += 1;
+                        } else if *v <= #field_hashval::zero() {
+                            // return on ANY negative or 0 vals
+                            return false;
+                        }
+                    }
+                )*
+                // if we have fields and they're all > 0 then this will be true
+                count > 0
+            }
+
             /// Determine if dividing one set of costs by another will result in
             /// a divide-by-zero panic.
             pub fn is_div_by_0(costs1: &Costs, costs2: &Costs) -> bool {

@@ -24,7 +24,7 @@ pub enum Error {
     CompanyIsDeleted,
     /// An error while processing an event. See `models::event::EventError`
     #[error("event error {0:?}")]
-    EventError(#[from] EventError),
+    Event(#[from] EventError),
     /// You don't have permission to perform this action
     #[error("insufficient privileges")]
     InsufficientPrivileges,

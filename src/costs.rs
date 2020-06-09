@@ -416,6 +416,20 @@ mod tests {
     }
 
     #[test]
+    fn is_gt_0() {
+        let mut costs = Costs::new();
+        assert!(!costs.is_gt_0());
+
+        costs.track_labor("athlete", dec!(23.4));
+        costs.track_resource("water", dec!(4.6));
+        costs.track_currency("usd", dec!(3.42));
+        assert!(costs.is_gt_0());
+
+        let costs2 = costs.clone() - Costs::new_with_labor("plumber", 50);
+        assert!(!costs2.is_gt_0());
+    }
+
+    #[test]
     fn is_div_0() {
         let costs1 = Costs::new_with_labor("clown", dec!(0.0));
         let costs2 = Costs::new();

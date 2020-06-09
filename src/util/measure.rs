@@ -4,7 +4,8 @@
 use crate::{
     error::{Error, Result},
 };
-use om2::Measure;
+use om2::{Measure, NumericUnion};
+use rust_decimal::prelude::*;
 
 /// Decrement a Measure by some other Measure.
 ///
@@ -58,5 +59,22 @@ pub fn inc_measure(measure: &mut Measure, inc_by: &Measure) -> Result<bool> {
     }
     measure.set_has_numerical_value(added);
     Ok(true)
+}
+
+/// Either use the given `measure` if it exists, or create a measure of 0 and
+/// return it using the same units/numeric types as `default`.
+pub fn unwrap_or_zero(measure: &Option<Measure>, default: &Measure) -> Measure {
+    measure
+        .clone()
+        .unwrap_or_else(|| {
+            let unit = default.has_unit().clone();
+            let numeric = match default.has_numerical_value().clone() {
+                NumericUnion::Decimal(_) => NumericUnion::Decimal(Decimal::zero()),
+                NumericUnion::Double(_) => NumericUnion::Double(f64::zero()),
+                NumericUnion::Float(_) => NumericUnion::Float(f32::zero()),
+                NumericUnion::Integer(_) => NumericUnion::Integer(i64::zero()),
+            };
+            Measure::new(numeric, unit)
+        })
 }
 

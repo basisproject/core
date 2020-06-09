@@ -90,6 +90,10 @@ pub enum EventError {
     /// The event's resource quantity measurement is missing
     #[error("event is missing resource quantity measurement")]
     MissingResourceQuantity,
+    /// The resource's accounting quantity cannot be zero if the resource has
+    /// non-zero `costs`
+    #[error("event's resource cannot have an accounting quantity == 0 with costs > 0")]
+    ResourceCostQuantityMismatch,
 }
 
 /// When creating a `work` event, we need to know if that event corresponds to
@@ -312,7 +316,21 @@ impl Event {
                 }
             }
             Action::Dropoff => {}
-            Action::Lower => {}
+            Action::Lower => {
+                let mut resource = state.resource.clone().ok_or(EventError::MissingResource)?;
+                let event_measure = self.inner().resource_quantity().clone()
+                    .ok_or(EventError::MissingResourceQuantity)?;
+                let mut accounting_measure = measure::unwrap_or_zero(resource.inner().accounting_quantity(), &event_measure);
+                let mut onhand_measure = measure::unwrap_or_zero(resource.inner().onhand_quantity(), &event_measure);
+                measure::dec_measure(&mut accounting_measure, &event_measure)?;
+                measure::dec_measure(&mut onhand_measure, &event_measure)?;
+                if accounting_measure.has_numerical_value().is_zero() && resource.costs().is_gt_0() {
+                    Err(EventError::ResourceCostQuantityMismatch)?;
+                }
+                resource.inner_mut().set_accounting_quantity(Some(accounting_measure));
+                resource.inner_mut().set_onhand_quantity(Some(onhand_measure));
+                res.modify_resource(resource);
+            }
             Action::Modify => {
                 let mut output_process = state.output_of.clone().ok_or(EventError::MissingOutputProcess)?;
                 let mut resource = state.resource.clone().ok_or(EventError::MissingResource)?;
@@ -352,7 +370,18 @@ impl Event {
                 }
                 res.modify_resource(resource);
             }
-            Action::Raise => {}
+            Action::Raise => {
+                let mut resource = state.resource.clone().ok_or(EventError::MissingResource)?;
+                let event_measure = self.inner().resource_quantity().clone()
+                    .ok_or(EventError::MissingResourceQuantity)?;
+                let mut accounting_measure = measure::unwrap_or_zero(resource.inner().accounting_quantity(), &event_measure);
+                let mut onhand_measure = measure::unwrap_or_zero(resource.inner().onhand_quantity(), &event_measure);
+                measure::inc_measure(&mut accounting_measure, &event_measure)?;
+                measure::inc_measure(&mut onhand_measure, &event_measure)?;
+                resource.inner_mut().set_accounting_quantity(Some(accounting_measure));
+                resource.inner_mut().set_onhand_quantity(Some(onhand_measure));
+                res.modify_resource(resource);
+            }
             Action::Transfer => {
                 // transfer is interesting because we can use it to move a
                 // particular resource between entities, but we can also use it
@@ -453,7 +482,9 @@ impl Event {
                 fields.push("move_costs");
             }
             Action::Dropoff => {}
-            Action::Lower => {}
+            Action::Lower => {
+                fields.push("resource_quantity");
+            }
             Action::Modify => {
                 fields.push("move_costs");
             }
@@ -462,7 +493,9 @@ impl Event {
             Action::Produce => {
                 fields.push("resource_quantity");
             }
-            Action::Raise => {}
+            Action::Raise => {
+                fields.push("resource_quantity");
+            }
             Action::Transfer => {
                 fields.push("transfer_type");
                 match self.transfer_type() {
@@ -507,7 +540,9 @@ impl Event {
                 fields.push("input_of");
             }
             Action::Dropoff => {}
-            Action::Lower => {}
+            Action::Lower => {
+                fields.push("resource");
+            }
             Action::Modify => {
                 fields.push("output_of");
                 fields.push("resource");
@@ -520,7 +555,9 @@ impl Event {
                     fields.push("output_of");
                 }
             }
-            Action::Raise => {}
+            Action::Raise => {
+                fields.push("resource");
+            }
             Action::Transfer => {
                 match self.transfer_type() {
                     Some(TransferType::InternalCostTransfer) => {
@@ -697,6 +734,7 @@ mod tests {
             .inner(
                 vf::EconomicResource::builder()
                     .accounting_quantity(Measure::new(NumericUnion::Integer(10), Unit::One))
+                    .onhand_quantity(Measure::new(NumericUnion::Integer(11), Unit::One))
                     .conforms_to("3330")
                     .build().unwrap()
             )
@@ -787,7 +825,9 @@ mod tests {
                     "costs" => { resource.set_costs(Costs::new()); }
                     "in_custody_of" => { resource.set_in_custody_of(CompanyID::new("<testlol>").into()); }
                     "accounting_quantity" => { resource.inner_mut().set_accounting_quantity(None); }
+                    "onhand_quantity" => { resource.inner_mut().set_onhand_quantity(None); }
                     "primary_accountable" => { resource.inner_mut().set_primary_accountable(None); }
+                    // TODO: all other event-editable resource fields
                     _ => {}
                 }
             }
@@ -861,6 +901,44 @@ mod tests {
     }
 
     #[test]
+    fn lower() {
+        let now = util::time::now();
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, true, &now);
+
+        let event = make_event(vf::Action::Lower, &company_id, &state, &now);
+        fuzz_state(event.clone(), state.clone(), &now);
+
+        let res = event.process(state.clone(), &now).unwrap();
+        let mods = res.modifications();
+        assert_eq!(mods.len(), 1);
+
+        let resource = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
+        assert_eq!(resource.inner().accounting_quantity().as_ref().unwrap(), &Measure::new(4 as i64, Unit::One));
+        assert_eq!(resource.inner().onhand_quantity().as_ref().unwrap(), &Measure::new(5 as i64, Unit::One));
+        check_resource_mods(vec!["accounting_quantity", "onhand_quantity"], &resource, state.resource.as_ref().unwrap());
+
+        let mut event = make_event(vf::Action::Lower, &company_id, &state, &now);
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(15)), Unit::One)));
+        let res = event.process(state.clone(), &now);
+        assert_eq!(res, Err(Error::NegativeMeasurement));
+
+        let mut event = make_event(vf::Action::Lower, &company_id, &state, &now);
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(10)), Unit::One)));
+        let res = event.process(state.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ResourceCostQuantityMismatch)));
+
+        let mut event = make_event(vf::Action::Lower, &company_id, &state, &now);
+        let mut state2 = state.clone();
+        state2.resource.as_mut().map(|x| x.set_costs(Costs::new()));
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(10)), Unit::One)));
+        let mods = event.process(state2, &now).unwrap().modifications();
+        let resource2 = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
+        assert_eq!(resource2.inner().accounting_quantity().as_ref().unwrap(), &Measure::new(0 as i64, Unit::One));
+        assert_eq!(resource2.inner().onhand_quantity().as_ref().unwrap(), &Measure::new(1 as i64, Unit::One));
+    }
+
+    #[test]
     fn modify() {
         let now = util::time::now();
         let company_id = CompanyID::new("jerry's-widgets-1212");
@@ -919,6 +997,30 @@ mod tests {
         event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
         let res = event.process(state, &now);
         assert_eq!(res, Err(Error::NegativeCosts));
+    }
+
+    #[test]
+    fn raise() {
+        let now = util::time::now();
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, true, &now);
+
+        let event = make_event(vf::Action::Raise, &company_id, &state, &now);
+        fuzz_state(event.clone(), state.clone(), &now);
+
+        let res = event.process(state.clone(), &now).unwrap();
+        let mods = res.modifications();
+        assert_eq!(mods.len(), 1);
+
+        let resource = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
+        assert_eq!(resource.inner().accounting_quantity().as_ref().unwrap(), &Measure::new(16 as i64, Unit::One));
+        assert_eq!(resource.inner().onhand_quantity().as_ref().unwrap(), &Measure::new(17 as i64, Unit::One));
+        check_resource_mods(vec!["accounting_quantity", "onhand_quantity"], &resource, state.resource.as_ref().unwrap());
+
+        let mut event = make_event(vf::Action::Raise, &company_id, &state, &now);
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(-15)), Unit::One)));
+        let res = event.process(state.clone(), &now);
+        assert_eq!(res, Err(Error::NegativeMeasurement));
     }
 
     #[test]
@@ -1008,7 +1110,7 @@ mod tests {
     }
 
     #[test]
-    fn r#use() {
+    fn useeee() {
         let now = util::time::now();
         let company_id = CompanyID::new("jerry's-widgets-1212");
         let state = make_state(&company_id, true, &now);
