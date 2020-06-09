@@ -48,3 +48,48 @@ impl CostMover for Resource {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        models::{
+            company::CompanyID,
+            testutils::make_resource,
+        },
+        util,
+    };
+    use om2::{Measure, Unit};
+    use rust_decimal_macros::*;
+
+    #[test]
+    fn compare() {
+        let now = util::time::now();
+        let id1 = ResourceID::new("widget1");
+        let id2 = ResourceID::new("widget2");
+        let company_id1 = CompanyID::new("jerry's widgets");
+        let company_id2 = CompanyID::new("frank's widgets");
+        let measure = Measure::new(50, Unit::Kilogram);
+        let costs = Costs::new_with_labor("machinist", dec!(23.2));
+        let resource1 = make_resource(&id1, &company_id1, &measure, &costs, &now);
+        let resource2 = make_resource(&id2, &company_id2, &measure, &costs, &now);
+
+        assert!(resource1 == resource1);
+        assert!(resource2 == resource2);
+        assert!(resource1.clone() == resource1.clone());
+        assert!(resource2.clone() == resource2.clone());
+        assert!(resource1 != resource2);
+        let mut resource3 = resource2.clone();
+        assert!(resource1 != resource3);
+        resource3.set_id(id1.clone());
+        assert!(resource1 != resource3);
+        resource3.set_in_custody_of(company_id1.clone().into());
+        assert!(resource1 != resource3);
+        resource3.inner_mut().set_primary_accountable(Some(company_id1.clone().into()));
+        assert!(resource1 == resource3);
+        resource3.set_costs(Costs::new_with_labor("machinist", dec!(23.1)));
+        assert!(resource1 != resource3);
+        resource3.set_costs(Costs::new_with_labor("machinist", dec!(23.2)));
+        assert!(resource1 == resource3);
+    }
+}
+
