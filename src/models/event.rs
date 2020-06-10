@@ -49,6 +49,9 @@ use vf_rs::vf::{self, Action, InputOutput, ResourceEffect};
 /// An error type for when event processing goes awry.
 #[derive(Error, Debug, PartialEq)]
 pub enum EventError {
+    /// We're trying to add inputs to a deleted process. No. Bad.
+    #[error("cannot add inputs to a deleted process")]
+    InputOnDeletedProcess,
     /// We expected an InputOutput value but didn't find one
     #[error("missing InputOutput designation")]
     InvalidInputOutput,
@@ -423,6 +426,23 @@ impl Event {
                     _ => {}
                 }
             }
+        }
+
+        match process2.as_ref() {
+            Some(process) => {
+                if process.is_deleted() {
+                    Err(EventError::InputOnDeletedProcess)?;
+                }
+            }
+            _ => {}
+        }
+        match process.as_ref() {
+            Some(process) => {
+                if action.input_output() == Some(InputOutput::Input) && process.is_deleted() {
+                    Err(EventError::InputOnDeletedProcess)?;
+                }
+            }
+            _ => {}
         }
 
         // save these so we can test for changes in our final step
@@ -949,8 +969,13 @@ mod tests {
         let mut event = make_event(vf::Action::Consume, &company_id, &company_id, &state, &now);
         event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(5)), Unit::One)));
         event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
-        let res = event.process(state, &now);
+        let res = event.process(state.clone(), &now);
         assert_eq!(res, Err(Error::NegativeCosts));
+
+        let mut state2 = state.clone();
+        state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
     }
 
     #[test]
@@ -1069,6 +1094,11 @@ mod tests {
         let process = mods[1].clone().expect_op::<Process>(Op::Update).unwrap();
         assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 30));
         check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap());
+
+        let mut state2 = state.clone();
+        state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
     }
 
     #[test]
