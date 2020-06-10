@@ -1003,8 +1003,13 @@ mod tests {
         let mut event = make_event(vf::Action::DeliverService, &company_id, &company2_id, &state, &now);
         event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(5)), Unit::One)));
         event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
-        let res = event.process(state, &now);
+        let res = event.process(state.clone(), &now);
         assert_eq!(res, Err(Error::NegativeCosts));
+
+        let mut state2 = state.clone();
+        state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
     }
 
     #[test]
@@ -1309,6 +1314,11 @@ mod tests {
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
         assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 30));
         check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap());
+
+        let mut state2 = state.clone();
+        state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
     }
 
     #[test]
@@ -1331,6 +1341,11 @@ mod tests {
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
         assert_eq!(process.costs(), &Costs::new_with_labor_hours("CEO", 5));
         check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap());
+
+        let mut state2 = state.clone();
+        state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
     }
 
     #[test]
@@ -1355,7 +1370,12 @@ mod tests {
         costs.track_labor("CEO", 69);
         costs.track_labor_hours("CEO", 12);
         assert_eq!(process.costs(), &costs);
-        check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap())
+        check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap());
+
+        let mut state2 = state.clone();
+        state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
     }
 }
 
