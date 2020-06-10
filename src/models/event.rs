@@ -294,9 +294,6 @@ impl Event {
             }
         }
 
-        // create our result set
-        let mut res = EventProcessResult::new(self.id(), now);
-
         // grab our action and some values from it
         let action = self.inner().action();
         let accounting_effect = Some(action.resource_effect()).and_then(|x| if x == ResourceEffect::NoEffect { None } else { Some(x) });
@@ -346,6 +343,10 @@ impl Event {
             };
             Ok(())
         };
+
+        // create our result set. modifications to this normally happen at the
+        // very bottom, but some actions require pushing mods themselves
+        let mut res = EventProcessResult::new(self.id(), now);
 
         // most of our actions will use the same processing logic, but we also
         // have cases where overrides are necessary because input_output() and
@@ -523,6 +524,15 @@ impl Event {
             }
             if action.onhand_effect() == ResourceEffect::DecrementIncrement {
                 res.set_in_custody_of(self.inner().receiver().clone());
+            }
+        }
+
+        // save any resource modifications
+        if let Some(location) = self.inner().at_location().as_ref() {
+            if resource2.is_some() {
+                resource2.as_mut().map(|res| { res.inner_mut().set_current_location(Some(location.clone())); });
+            } else if resource.is_some() {
+                resource.as_mut().map(|res| { res.inner_mut().set_current_location(Some(location.clone())); });
             }
         }
 
@@ -897,6 +907,7 @@ mod tests {
                     "accounting_quantity" => { resource.inner_mut().set_accounting_quantity(None); }
                     "onhand_quantity" => { resource.inner_mut().set_onhand_quantity(None); }
                     "primary_accountable" => { resource.inner_mut().set_primary_accountable(None); }
+                    "current_location" => { resource.inner_mut().set_current_location(None); }
                     // TODO: all other event-editable resource fields
                     _ => {}
                 }
@@ -1065,9 +1076,14 @@ mod tests {
         let now = util::time::now();
         let company_id = CompanyID::new("jerry's-widgets-1212");
         let state = make_state(&company_id, &company_id, true, &now);
-
+        let location = vf_rs::geo::SpatialThing::builder()
+            .lat(Some(71.665519))
+            .long(Some(129.019811))
+            .alt(Some(500.0))
+            .build().unwrap();
         let mut event = make_event(vf::Action::Move, &company_id, &company_id, &state, &now);
         event.set_move_type(Some(MoveType::Resource));
+        event.inner_mut().set_at_location(Some(location));
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
@@ -1076,13 +1092,15 @@ mod tests {
 
         let resource = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
         assert_eq!(resource.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
+        assert_eq!(resource.inner().current_location(), &None);
         assert_eq!(resource.in_custody_of(), &company_id.clone().into());
         check_resource_mods(vec!["costs", "in_custody_of", "primary_accountable", "accounting_quantity", "onhand_quantity"], &resource, state.resource.as_ref().unwrap());
 
         let resource2 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
         assert_eq!(resource2.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
+        assert_eq!(resource2.inner().current_location().as_ref().unwrap().lat(), &Some(71.665519));
         assert_eq!(resource2.in_custody_of(), &company_id.clone().into());
-        check_resource_mods(vec!["costs", "in_custody_of", "primary_accountable", "accounting_quantity", "onhand_quantity"], &resource2, state.to_resource.as_ref().unwrap());
+        check_resource_mods(vec!["costs", "in_custody_of", "primary_accountable", "accounting_quantity", "onhand_quantity", "current_location"], &resource2, state.to_resource.as_ref().unwrap());
     }
 
     #[test]
