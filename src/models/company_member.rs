@@ -12,6 +12,7 @@ use crate::{
     error::{Error, Result},
     models::{
         account::AccountID,
+        agreement::AgreementID,
         company::{CompanyID, Permission},
         lib::agent::AgentID,
         occupation::OccupationID,
@@ -117,6 +118,8 @@ basis_model! {
         /// of a Process here because Process is generally ephemeral. Must be
         /// defined for the member to perform labor.
         process_spec_id: Option<ProcessSpecID>,
+        /// Agreement under which this membership takes place
+        agreement: Option<AgreementID>,
     }
     CompanyMemberBuilder
 }
