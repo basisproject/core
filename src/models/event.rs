@@ -297,6 +297,14 @@ impl Event {
             }
         }
 
+        // create our result set.
+        let mut res = EventProcessResult::new(self.id(), now);
+
+        // this event is started but not completed, so we don't apply it yet.
+        if self.inner().has_beginning().is_some() && self.inner().has_end().is_none() {
+            return Ok(res);
+        }
+
         // grab our action and some values from it
         let action = self.inner().action();
         let accounting_effect = Some(action.resource_effect()).and_then(|x| if x == ResourceEffect::NoEffect { None } else { Some(x) });
@@ -346,10 +354,6 @@ impl Event {
             };
             Ok(())
         };
-
-        // create our result set. modifications to this normally happen at the
-        // very bottom, but some actions require pushing mods themselves
-        let mut res = EventProcessResult::new(self.id(), now);
 
         // most of our actions will use the same processing logic, but we also
         // have cases where overrides are necessary because input_output() and
@@ -876,6 +880,7 @@ mod tests {
                 vf::EconomicEvent::builder()
                     .action(action)
                     .has_beginning(now.clone())
+                    .has_end(now.clone())
                     .input_of(state.input_of.as_ref().unwrap().id().clone())
                     .output_of(state.output_of.as_ref().unwrap().id().clone())
                     .provider(company_id.clone())
