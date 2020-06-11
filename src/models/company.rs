@@ -57,39 +57,54 @@ pub enum CompanyType {
 pub enum Permission {
     All,
 
-    CompanyUpdate,
+    /// Can delete the company
     CompanyDelete,
+    /// Can update the company's basic info
+    CompanyUpdate,
 
+    /// Can create new members (hire)
     MemberCreate,
-    MemberUpdate,
-    MemberSetPermissions,
-    MemberSetCompensation,
+    /// Can delete a member (fire)
     MemberDelete,
+    /// Can set existing members' company permissions
+    MemberSetPermissions,
+    /// Can set a member's compensation (payment)
+    MemberSetCompensation,
+    /// Can update existing members' basic info
+    MemberUpdate,
 
-    LaborSetClock,
-    LaborSetWage,
-
-    ResourceSpecCreate,
-    ResourceSpecUpdate,
-    ResourceSpecDelete,
-
-    ResourceCreate,
-    ResourceUpdate,
-    ResourceDelete,
-
-    ProcessSpecCreate,
-    ProcessSpecUpdate,
-    ProcessSpecDelete,
-
+    /// Can create a process
     ProcessCreate,
-    ProcessUpdate,
+    /// Can create a process
     ProcessDelete,
+    /// Can create a process
+    ProcessUpdate,
 
-    OrderCreate,
-    OrderUpdateProcessStatus,
-    OrderUpdateShipping,
-    OrderUpdateShippingDates,
-    OrderCancel,
+    /// Can create a process spec
+    ProcessSpecCreate,
+    /// Can create a process spec
+    ProcessSpecDelete,
+    /// Can create a process spec
+    ProcessSpecUpdate,
+
+    /// Can create a resource
+    ResourceCreate,
+    /// Can delete a resource
+    ResourceDelete,
+    /// Can update a resource
+    ResourceUpdate,
+
+    /// Can create a resource spec
+    ResourceSpecCreate,
+    /// Can delete a resource spec
+    ResourceSpecDelete,
+    /// Can update a resource spec
+    ResourceSpecUpdate,
+
+    /// Can record labor
+    Work,
+    /// Can update labor records willy-nilly
+    WorkAdmin,
 }
 
 basis_model! {

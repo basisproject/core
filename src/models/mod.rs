@@ -111,10 +111,15 @@ impl Modifications {
         self.modifications
     }
 
+    /// Push a raw modification object into the mods list.
+    pub fn push_raw(&mut self, modification: Modification) {
+        self.modifications.push(modification);
+    }
+
     /// Push a modification into the list with a `Op` and `Model` (bypasses
     /// having to create a `Modification` by hand)
     pub fn push<T: Into<Model>>(&mut self, op: Op, model: T) {
-        self.modifications.push(Modification::new(op, model.into()));
+        self.push_raw(Modification::new(op, model.into()));
     }
 }
 
