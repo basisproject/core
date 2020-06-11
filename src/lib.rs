@@ -28,9 +28,9 @@
 //! This library does not deal with storage or other external mediums in any way
 //! and is fully self-contained. All data being operated on needs to be passed
 //! in, and the results of the computations are returned and must be stored in a
-//! place of your choosing. This allows Basis to exist beyond one particular
-//! implementation of whatever storage medium du jour and exist beyond one
-//! particular database structure.
+//! place of your choosing. This allows Basis to transcend any particular
+//! storage medium and exist as a self-contained kernel that can be implemented
+//! anywhere its data model is supported.
 //!
 //! To get started, you will want to look at the [transactions]. Transactions
 //! are the main interface for interacting with Basis.
