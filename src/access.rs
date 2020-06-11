@@ -56,8 +56,6 @@ pub enum Permission {
     ResourceSpecCreate,
     ResourceSpecUpdate,
     ResourceSpecDelete,
-    ResourceSpecAdminUpdate,
-    ResourceSpecAdminDelete,
 
     OccupationCreate,
     OccupationUpdate,
@@ -75,7 +73,6 @@ pub enum Role {
     TimeTraveler,
     IdentityAdmin,
     CompanyAdmin,
-    ResourceSpecAdmin,
     Bank,
     User,
     Guest,
@@ -106,12 +103,6 @@ impl Role {
                 vec![
                     Permission::CompanyAdminUpdate,
                     Permission::CompanyAdminDelete,
-                ]
-            }
-            Role::ResourceSpecAdmin => {
-                vec![
-                    Permission::ResourceSpecAdminUpdate,
-                    Permission::ResourceSpecAdminDelete,
                 ]
             }
             Role::Bank => {
