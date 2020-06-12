@@ -64,11 +64,39 @@ pub struct Modification {
 
 impl Modification {
     /// Create a new modification
-    pub fn new(op: Op, model: Model) -> Self {
+    pub(crate) fn new(op: Op, model: Model) -> Self {
         Self { op, model }
     }
 
-    /// Turn this modification into a pair
+    /// Turn this modification into a pair. Good for implementing saving logic:
+    ///
+    /// ```rust
+    /// use basis_core::{
+    ///     models::{
+    ///         Model,
+    ///         Modification,
+    ///         Op,
+    ///         user::{User, UserID},
+    ///     },
+    ///     transactions,
+    /// };
+    /// use chrono::Utc;
+    ///
+    /// fn save_mod(modification: Modification) -> Result<(), String> {
+    ///     match modification.into_pair() {
+    ///         (Op::Create, Model::User(user)) => { /* create a user in your db ... */ }
+    ///         (Op::Update, Model::Process(process)) => { /* update a process in your db ... */ }
+    ///         (Op::Delete, Model::Resource(resource)) => { /* delete a resource in your db ... */ }
+    ///         _ => {}
+    ///     }
+    ///     Ok(())
+    /// }
+    ///
+    /// let mods = transactions::user::create(UserID::create(), "andrew@lyonbros.com", "andrew", true, &Utc::now()).unwrap().into_modifications();
+    /// for modification in mods {
+    ///     save_mod(modification).unwrap();
+    /// }
+    /// ```
     pub fn into_pair(self) -> (Op, Model) {
         (self.op, self.model)
     }
@@ -76,6 +104,24 @@ impl Modification {
     /// Consume this modification, and verify that the `Op` matches the one
     /// passed in, then return the *unwrapped* model (ie, not `Model::User(user)`
     /// but `user as User`).
+    ///
+    /// Very handy for testing:
+    /// ```rust
+    /// use basis_core::{
+    ///     models::{
+    ///         Op,
+    ///         user::{User, UserID},
+    ///     },
+    ///     transactions,
+    /// };
+    /// use chrono::Utc;
+    ///
+    /// let mods = transactions::user::create(UserID::create(), "andrew@lyonbros.com", "andrew", true, &Utc::now()).unwrap().into_modifications();
+    /// // verifies that the first modification is User Create, and returns the
+    /// // User model.
+    /// let user = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
+    /// assert_eq!(user.name(), "andrew");
+    /// ```
     pub fn expect_op<T: TryFrom<Model>>(self, verify_op: Op) -> Result<T> {
         let (op, model) = self.into_pair();
         if op != verify_op {
@@ -95,12 +141,12 @@ pub struct Modifications {
 
 impl Modifications {
     /// Create a new modification set
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Create a new modification set with a single mod
-    pub fn new_single<T: Into<Model>>(op: Op, model: T) -> Self {
+    pub(crate) fn new_single<T: Into<Model>>(op: Op, model: T) -> Self {
         let mut mods = Self::new();
         mods.push(op, model);
         mods
@@ -112,13 +158,13 @@ impl Modifications {
     }
 
     /// Push a raw modification object into the mods list.
-    pub fn push_raw(&mut self, modification: Modification) {
+    pub(crate) fn push_raw(&mut self, modification: Modification) {
         self.modifications.push(modification);
     }
 
     /// Push a modification into the list with a `Op` and `Model` (bypasses
     /// having to create a `Modification` by hand)
-    pub fn push<T: Into<Model>>(&mut self, op: Op, model: T) {
+    pub(crate) fn push<T: Into<Model>>(&mut self, op: Op, model: T) {
         self.push_raw(Modification::new(op, model.into()));
     }
 }
