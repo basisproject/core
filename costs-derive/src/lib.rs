@@ -109,13 +109,9 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                     if val.into() < #field_hashval::zero() {
                         panic!(#fn_track_panic);
                     }
-                    let into_val: #field_hashval = val.into();
-                    // don't track 0 values. why bother.
-                    if into_val == #field_hashval::zero() {
-                        return;
-                    }
                     let entry = self.#field_name_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
-                    *entry += into_val;
+                    *entry += val.into();
+                    self.dezero();
                 }
             )*
             #(
@@ -137,6 +133,21 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 true
             }
 
+            /// Remove all zero values from our ranks.
+            fn dezero(&mut self) {
+                #(
+                    let mut remove = vec![];
+                    for (key, val) in self.#field_name().iter() {
+                        if val == &#field_hashval::zero() {
+                            remove.push(key.clone());
+                        }
+                    }
+                    for key in remove {
+                        self.#field_name_mut().remove(&key);
+                    }
+                )*
+            }
+
             /// Given a set of costs, subtract them from our current costs, but only if
             /// the result is >= 0 for each cost tracked. Then, return a costs object
             /// showing exactly how much was taken.
@@ -150,6 +161,8 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                         new_costs.#fn_track(k.clone(), val.clone());
                     }
                 )*
+                new_costs.dezero();
+                self.dezero();
                 new_costs
             }
 
@@ -213,6 +226,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                         *entry += other.#field_name().get(k).unwrap();
                     }
                 )*
+                self.dezero();
                 self
             }
         }
@@ -227,6 +241,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                         *entry -= other.#field_name().get(k).unwrap();
                     }
                 )*
+                self.dezero();
                 self
             }
         }
@@ -240,6 +255,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                         *val *= rhs.#field_name().get(k).unwrap_or(&#field_hashval::zero());
                     }
                 )*
+                self.dezero();
                 self
             }
         }
@@ -253,6 +269,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                         *val *= rhs;
                     }
                 )*
+                self.dezero();
                 self
             }
         }
@@ -281,24 +298,26 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                         }
                     }
                 )*
+                self.dezero();
                 self
             }
         }
 
         impl Div<Decimal> for Costs {
-           type Output = Self;
+            type Output = Self;
 
-           fn div(mut self, rhs: Decimal) -> Self::Output {
-               if rhs == Decimal::zero() {
-                   panic!("Costs::div() -- divide by zero");
-               }
-               #(
-                   for (_, v) in self.#field_name_mut().iter_mut() {
-                       *v /= rhs;
-                   }
-               )*
-               self
-           }
+            fn div(mut self, rhs: Decimal) -> Self::Output {
+                if rhs == Decimal::zero() {
+                    panic!("Costs::div() -- divide by zero");
+                }
+                #(
+                    for (_, v) in self.#field_name_mut().iter_mut() {
+                        *v /= rhs;
+                    }
+                )*
+                self.dezero();
+                self
+            }
         }
     };
     TokenStream::from(cost_impl)
