@@ -5,6 +5,7 @@ use crate::{
     models::{
         event::EventError,
     },
+    transactions::TransactionError,
 };
 use thiserror::Error;
 
@@ -22,12 +23,15 @@ pub enum Error {
     /// When we try to perform an operation on a deleted company
     #[error("operation on deleted company")]
     CompanyIsDeleted,
-    /// An error while processing an event. See `models::event::EventError`
+    /// An error while processing an event.
     #[error("event error {0:?}")]
     Event(#[from] EventError),
     /// You don't have permission to perform this action
     #[error("insufficient privileges")]
     InsufficientPrivileges,
+    /// Trying to update the wrong object
+    #[error("mismatched object: {0}")]
+    MismatchedObject(String),
     /// Happens when trying to operate on two `Measure` objects with different
     /// units, such as adding 12 Hours to 16 Kilograms
     #[error("operation on measurement with mismatched units")]
@@ -48,6 +52,9 @@ pub enum Error {
     /// match expectation.
     #[error("Op does not match expectation")]
     OpMismatch,
+    /// An error while processing a transaction.
+    #[error("transaction error: {0:?}")]
+    Transaction(#[from] TransactionError),
     /// When we try to perform an operation on a deleted user
     #[error("operation on deleted user")]
     UserIsDeleted,

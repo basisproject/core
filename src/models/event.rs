@@ -49,6 +49,13 @@ use vf_rs::vf::{self, Action, InputOutput, ResourceEffect};
 /// An error type for when event processing goes awry.
 #[derive(Error, Debug, PartialEq)]
 pub enum EventError {
+    /// Bad dates. Your begin time is probably >= your end time. Shame.
+    #[error("end time must be after begin time")]
+    BadDates,
+    /// We're trying to set `has_end` with `has_beginning` being blank. This
+    /// does not make sense and I'm afraid I cannot allow this to happen.
+    #[error("cannot specify an end date without a begin date")]
+    DateEndMustHaveBegin,
     /// We're trying to add inputs to a deleted process. No. Bad.
     #[error("cannot add inputs to a deleted process")]
     InputOnDeletedProcess,
@@ -76,15 +83,15 @@ pub enum EventError {
     /// The event is missing the `move_costs` field
     #[error("event requires the `move_costs` field")]
     MissingCosts,
+    /// The event is missing the `effort_quantity` field
+    #[error("event requires the `effort_quantity` field")]
+    MissingEffortQuantity,
     /// The event is missing the `resource_quantity` field
     #[error("event requires the `resource_quantity` field")]
     MissingEventMeasure,
     /// The event is missing the `input_of` object
     #[error("this event requires the `input_of` process")]
     MissingInputProcess,
-    /// The event is missing the `labor_type` field
-    #[error("event requires the `labor_type` field")]
-    MissingLaborType,
     /// The event is missing the `move_type` field
     #[error("event requires the `move_type` field")]
     MissingMoveType,
@@ -107,32 +114,6 @@ pub enum EventError {
     /// non-zero `costs`
     #[error("event's resource cannot have an accounting quantity == 0 with costs > 0")]
     ResourceCostQuantityMismatch,
-}
-
-/// When creating a `work` event, we need to know if that event corresponds to
-/// wages, labor hours, or both. This lets our event processor know.
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub enum LaborType {
-    /// This event signifies a wage cost.
-    ///
-    /// We would use this if we want to record a wage cost (ie, `Costs.labor`)
-    /// but not a labor hour cost. For instance, if a worker is on salary but
-    /// they also record their hours (ie via clocking in/out) separately, they
-    /// would create two separate work events with `LaborType::Wage` and
-    /// `LaborType::Hours` to represent both.
-    Wage,
-    /// This event signifies a labor hour cost
-    ///
-    /// We would use this if we want to record a labor our cost (ie
-    /// `Costs.labor_hours`) but not a labor age cost.
-    Hours,
-    /// This event should be counted toward both wages and hours.
-    ///
-    /// This can be used for an hourly worker that records hours worked and
-    /// hourly wage at the same time, or it can be used for a salaried worker
-    /// that doesn't track their hours at all and wants to create automatic
-    /// entries for their labor hours that also signify their labor wage.
-    WageAndHours,
 }
 
 /// When creating a `transfer` event, we need to know if that event transfers
@@ -163,9 +144,6 @@ basis_model! {
         /// the process' costs and transfer them either into another Process or
         /// into a Resource
         move_costs: Option<Costs>,
-        /// When recording a work event, this lets us know if it should apply to
-        /// the `labor` and/or `labor_hours` buckets of our Costs object.
-        labor_type: Option<LaborType>,
         /// The type of move (if using `Action::Move`). Can be cost-based
         /// (exclusively for moving costs between resources and processes) or
         /// resource-based (moving a resource internally in a company).
@@ -296,11 +274,23 @@ impl Event {
                 Err(EventError::MismatchedProviderID)?;
             }
         }
+        if self.inner().has_beginning().is_none() && self.inner().has_end().is_some() {
+            Err(EventError::DateEndMustHaveBegin)?;
+        }
+        match (self.inner().has_beginning().as_ref(), self.inner().has_end().as_ref()) {
+            (Some(begin), Some(end)) => {
+                if end < begin {
+                    Err(EventError::BadDates)?;
+                }
+            }
+            _ => {}
+        }
 
         // create our result set.
         let mut res = EventProcessResult::new(self.id(), now);
 
-        // this event is started but not completed, so we don't apply it yet.
+        // this event is started but not completed, so it's pending and we don't
+        // apply it yet.
         if self.inner().has_beginning().is_some() && self.inner().has_end().is_none() {
             return Ok(res);
         }
@@ -386,38 +376,31 @@ impl Event {
             Action::Work => {
                 let mut input_process = state.input_of.clone().ok_or(EventError::MissingInputProcess)?;
                 let member = state.provider.clone().ok_or(EventError::MissingProvider)?;
-                let labor_type = self.labor_type().clone().ok_or(EventError::MissingLaborType)?;
                 let occupation_id = member.inner().relationship().clone();
-                let get_hours = || -> Result<Decimal> {
-                    match self.inner().effort_quantity() {
-                        Some(Measure { has_unit: Unit::Hour, has_numerical_value: hours }) => {
-                            let num_hours = NumericUnion::Decimal(Decimal::zero()).add(hours.clone())
-                                .map_err(|e| Error::NumericUnionOpError(e))?;
-                            match num_hours {
-                                NumericUnion::Decimal(val) => Ok(val),
-                                _ => Err(Error::NumericUnionOpError(format!("error converting to Decimal: {:?}", num_hours)))?,
-                            }
+                let move_costs = self.move_costs().as_ref().ok_or(EventError::MissingCosts)?;
+
+                // grab JUST this occupation's costs from the event. in other
+                // words, we only accept costs specific to this occupation. it
+                // would be stupid for the transaction creating this event to
+                // pass in any costs that weren't just relating to this
+                // occupation, but better safe than sorry.
+                let occupation_costs = move_costs.get_labor(occupation_id.clone());
+                let hours = match self.inner().effort_quantity() {
+                    Some(Measure { has_unit: Unit::Hour, has_numerical_value: hours }) => {
+                        let num_hours = NumericUnion::Decimal(Decimal::zero()).add(hours.clone())
+                            .map_err(|e| Error::NumericUnionOpError(e))?;
+                        match num_hours {
+                            NumericUnion::Decimal(val) => val,
+                            _ => Err(Error::NumericUnionOpError(format!("error converting to Decimal: {:?}", num_hours)))?,
                         }
-                        _ => Err(EventError::LaborMustBeHours)?,
                     }
+                    None => Err(EventError::MissingEffortQuantity)?,
+                    _ => Err(EventError::LaborMustBeHours)?,
                 };
-                match labor_type {
-                    // for wage costs, we effectively use `Event.move_costs` 
-                    LaborType::Wage => {
-                        let costs = self.move_costs().clone().ok_or(EventError::MissingCosts)?;
-                        input_process.receive_costs(&costs)?;
-                    }
-                    LaborType::Hours => {
-                        let hours = get_hours()?;
-                        input_process.receive_costs(&Costs::new_with_labor_hours(occupation_id, hours))?;
-                    }
-                    LaborType::WageAndHours => {
-                        let hours = get_hours()?;
-                        let mut costs = self.move_costs().clone().ok_or(EventError::MissingCosts)?;
-                        costs.track_labor_hours(occupation_id, hours);
-                        input_process.receive_costs(&costs)?;
-                    }
-                }
+                let mut costs = Costs::new();
+                costs.track_labor(occupation_id.clone(), occupation_costs);
+                costs.track_labor_hours(occupation_id, hours);
+                input_process.receive_costs(&costs)?;
                 res.modify_process(input_process);
             }
             _ => {
@@ -589,13 +572,8 @@ impl Event {
                 }
             }
             Action::Work => {
-                fields.push("labor_type");
-                match self.labor_type() {
-                    Some(LaborType::Wage) | Some(LaborType::WageAndHours) => {
-                        fields.push("move_costs");
-                    }
-                    _ => {}
-                }
+                fields.push("move_costs");
+                fields.push("effort_quantity");
             }
             _ => {
                 match (action.input_output(), bundle_effect.clone()) {
@@ -756,19 +734,19 @@ mod tests {
     /// `required_event_fields` and `required_state_fields`.
     fn fuzz_state(event: Event, state: EventProcessState, now: &DateTime<Utc>) {
         let all_field_combos = generate_combinations(&vec!["input_of", "output_of", "provider", "resource", "to_resource"]);
-        let all_event_combos = generate_combinations(&vec!["move_costs", "move_type", "labor_type", "resource_quantity"]);
+        let all_event_combos = generate_combinations(&vec!["move_costs", "move_type", "resource_quantity", "effort_quantity"]);
         for evfields in &all_event_combos {
             let mut event2 = event.clone();
             event2.set_move_costs(None);
             event2.set_move_type(None);
-            event2.set_labor_type(None);
             event2.inner_mut().set_resource_quantity(None);
+            event2.inner_mut().set_effort_quantity(None);
             for evfield in evfields {
                 match *evfield {
                     "move_costs" => { event2.set_move_costs(event.move_costs().clone()); }
                     "move_type" => { event2.set_move_type(event.move_type().clone()); }
-                    "labor_type" => { event2.set_labor_type(event.labor_type().clone()); }
                     "resource_quantity" => { event2.inner_mut().set_resource_quantity(event.inner().resource_quantity().clone()); }
+                    "effort_quantity" => { event2.inner_mut().set_effort_quantity(event.inner().effort_quantity().clone()); }
                     _ => {}
                 }
             }
@@ -891,7 +869,6 @@ mod tests {
                     .build().unwrap()
             )
             .move_costs(Costs::new_with_labor("machinist", dec!(30.0)))
-            .labor_type(None)
             .move_type(None)
             .created(now.clone())
             .updated(now.clone())
@@ -1308,8 +1285,12 @@ mod tests {
         let state = make_state(&company_id, &company_id, false, &now);
 
         let mut event = make_event(vf::Action::Work, &company_id, &company_id, &state, &now);
-        event.set_labor_type(Some(LaborType::Wage));
+        let mut costs = Costs::new();
+        costs.track_labor("CEO", 69);   // should be tracked, our member is CEO
+        costs.track_labor("machinist", 42);    // should not be tracked
+        event.set_move_costs(Some(costs));
         event.inner_mut().set_provider(state.provider.as_ref().unwrap().id().clone().into());
+        event.inner_mut().set_effort_quantity(Some(Measure::new(dec!(0), Unit::Hour)));
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
@@ -1317,7 +1298,7 @@ mod tests {
         assert_eq!(mods.len(), 1);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
-        assert_eq!(process.costs(), &Costs::new_with_labor("machinist", 30));
+        assert_eq!(process.costs(), &Costs::new_with_labor("CEO", 69));
         check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap());
 
         let mut state2 = state.clone();
@@ -1333,10 +1314,9 @@ mod tests {
         let state = make_state(&company_id, &company_id, false, &now);
 
         let mut event = make_event(vf::Action::Work, &company_id, &company_id, &state, &now);
-        event.set_labor_type(Some(LaborType::Hours));
-        event.set_move_costs(None);
+        event.set_move_costs(Some(Costs::new()));
         event.inner_mut().set_provider(state.provider.as_ref().unwrap().id().clone().into());
-        event.inner_mut().set_effort_quantity(Some(Measure::new(NumericUnion::Integer(5), Unit::Hour)));
+        event.inner_mut().set_effort_quantity(Some(Measure::new(dec!(5.4), Unit::Hour)));
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
@@ -1344,7 +1324,7 @@ mod tests {
         assert_eq!(mods.len(), 1);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
-        assert_eq!(process.costs(), &Costs::new_with_labor_hours("CEO", 5));
+        assert_eq!(process.costs(), &Costs::new_with_labor_hours("CEO", dec!(5.4)));
         check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap());
 
         let mut state2 = state.clone();
@@ -1360,8 +1340,10 @@ mod tests {
         let state = make_state(&company_id, &company_id, false, &now);
 
         let mut event = make_event(vf::Action::Work, &company_id, &company_id, &state, &now);
-        event.set_labor_type(Some(LaborType::WageAndHours));
-        event.set_move_costs(Some(Costs::new_with_labor("CEO", 69)));
+        let mut costs = Costs::new();
+        costs.track_labor("CEO", 69);   // should be tracked, our member is CEO
+        costs.track_labor("gerrymandering", 42);    // should not be tracked
+        event.set_move_costs(Some(costs));
         event.inner_mut().set_provider(state.provider.as_ref().unwrap().id().clone().into());
         event.inner_mut().set_effort_quantity(Some(Measure::new(NumericUnion::Integer(12), Unit::Hour)));
         fuzz_state(event.clone(), state.clone(), &now);
