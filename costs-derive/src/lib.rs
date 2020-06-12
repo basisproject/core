@@ -109,8 +109,13 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                     if val.into() < #field_hashval::zero() {
                         panic!(#fn_track_panic);
                     }
+                    let into_val: #field_hashval = val.into();
+                    // don't track 0 values. why bother.
+                    if into_val == #field_hashval::zero() {
+                        return;
+                    }
                     let entry = self.#field_name_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
-                    *entry += val.into();
+                    *entry += into_val;
                 }
             )*
             #(

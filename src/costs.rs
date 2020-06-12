@@ -375,6 +375,16 @@ mod tests {
     }
 
     #[test]
+    fn track_0() {
+        let mut costs = Costs::new();
+        costs.track_labor("hippie", 0);
+        costs.track_labor_hours("treeslider", 0);
+        costs.track_currency("usd", 0);
+        costs.track_resource("oil", 0);
+        assert_eq!(costs, Costs::new());
+    }
+
+    #[test]
     fn div_0_by_0() {
         let costs1 = Costs::new_with_labor("clown", dec!(0.0));
         let costs2 = Costs::new();
