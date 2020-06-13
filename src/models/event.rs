@@ -10,7 +10,7 @@
 //! our economic network. Most REA systems, to my understanding, have a
 //! recording/observation process, and afterwards an analysis process. Because
 //! the economic graph is so vast and complex, we don't have the luxury of doing
-//! and analysis process: observation and analysis must happen at the same time!
+//! an analysis process: observation and analysis must happen at the same time!
 //!
 //! For clarity on events and how they tie in with intents and commitments:
 //!

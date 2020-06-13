@@ -92,7 +92,7 @@ impl Modification {
     ///     Ok(())
     /// }
     ///
-    /// let mods = transactions::user::create(UserID::create(), "andrew@lyonbros.com", "andrew", true, &Utc::now()).unwrap().into_vec();
+    /// let mods = transactions::user::create(UserID::create(), "andrew@lyonbros.com", "andrew", true, &Utc::now()).unwrap();
     /// for modification in mods {
     ///     save_mod(modification).unwrap();
     /// }
@@ -133,6 +133,10 @@ impl Modification {
 }
 
 /// A set of modifications we want to make to any number of models.
+///
+/// This is passed back by successfully run transactions. You can use a set of
+/// modifications either by converting into a vec (`into_vec()`), or using an
+/// iterator.
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Modifications {
     /// The model modifications we're making
