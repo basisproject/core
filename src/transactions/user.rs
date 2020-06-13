@@ -95,7 +95,7 @@ mod tests {
     fn can_create() {
         let id = UserID::create();
         let now = util::time::now();
-        let mods = create(id.clone(), "zing@lyonbros.com", "leonard", true, &now).unwrap().into_modifications();
+        let mods = create(id.clone(), "zing@lyonbros.com", "leonard", true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let model = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
@@ -110,7 +110,7 @@ mod tests {
         let id = UserID::create();
         let now = util::time::now();
         let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
-        let mods = create_permissioned(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_modifications();
+        let mods = create_permissioned(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let model = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
@@ -132,20 +132,20 @@ mod tests {
         let id = UserID::create();
         let now = util::time::now();
         let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
-        let mods = create_permissioned(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_modifications();
+        let mods = create_permissioned(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_vec();
 
         let subject = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
         assert_eq!(subject.email(), "zing@lyonbros.com");
         assert_eq!(subject.name(), "leonard");
         assert_eq!(subject.active(), &true);
 
-        let mods = update(&user, subject, Some("obvious_day@camp.stupid".into()), None, None, &now).unwrap().into_modifications();
+        let mods = update(&user, subject, Some("obvious_day@camp.stupid".into()), None, None, &now).unwrap().into_vec();
         let subject2 = mods[0].clone().expect_op::<User>(Op::Update).unwrap();
         assert_eq!(subject2.email(), "obvious_day@camp.stupid");
         assert_eq!(subject2.name(), "leonard");
         assert_eq!(subject2.active(), &true);
 
-        let mods = update(&subject2.clone(), subject2, None, None, Some(false), &now).unwrap().into_modifications();
+        let mods = update(&subject2.clone(), subject2, None, None, Some(false), &now).unwrap().into_vec();
         let subject3 = mods[0].clone().expect_op::<User>(Op::Update).unwrap();
         assert_eq!(subject3.email(), "obvious_day@camp.stupid");
         assert_eq!(subject3.name(), "leonard");
@@ -168,7 +168,7 @@ mod tests {
 
         // set back to active and continue lol
         user.set_active(true);
-        let mods = set_roles(&user, user.clone(), vec![Role::User], &now).unwrap().into_modifications();
+        let mods = set_roles(&user, user.clone(), vec![Role::User], &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let user = mods[0].clone().expect_op::<User>(Op::Update).unwrap();
@@ -187,7 +187,7 @@ mod tests {
         let id = UserID::create();
         let now = util::time::now();
         let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
-        let mods = delete(&user.clone(), user, &now).unwrap().into_modifications();
+        let mods = delete(&user.clone(), user, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let deleted = mods[0].clone().expect_op::<User>(Op::Delete).unwrap();

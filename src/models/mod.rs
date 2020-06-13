@@ -92,7 +92,7 @@ impl Modification {
     ///     Ok(())
     /// }
     ///
-    /// let mods = transactions::user::create(UserID::create(), "andrew@lyonbros.com", "andrew", true, &Utc::now()).unwrap().into_modifications();
+    /// let mods = transactions::user::create(UserID::create(), "andrew@lyonbros.com", "andrew", true, &Utc::now()).unwrap().into_vec();
     /// for modification in mods {
     ///     save_mod(modification).unwrap();
     /// }
@@ -116,7 +116,7 @@ impl Modification {
     /// };
     /// use chrono::Utc;
     ///
-    /// let mods = transactions::user::create(UserID::create(), "andrew@lyonbros.com", "andrew", true, &Utc::now()).unwrap().into_modifications();
+    /// let mods = transactions::user::create(UserID::create(), "andrew@lyonbros.com", "andrew", true, &Utc::now()).unwrap().into_vec();
     /// // verifies that the first modification is User Create, and returns the
     /// // User model.
     /// let user = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
@@ -153,7 +153,7 @@ impl Modifications {
     }
 
     /// Consume the modification set and return the list of modifications
-    pub fn into_modifications(self) -> Vec<Modification> {
+    pub fn into_vec(self) -> Vec<Modification> {
         self.modifications
     }
 
@@ -166,6 +166,58 @@ impl Modifications {
     /// having to create a `Modification` by hand)
     pub(crate) fn push<T: Into<Model>>(&mut self, op: Op, model: T) {
         self.push_raw(Modification::new(op, model.into()));
+    }
+}
+
+impl IntoIterator for Modifications {
+    type Item = Modification;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.modifications.into_iter()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        models::{
+            process::Process,
+            user::{User, UserID},
+        },
+        util,
+    };
+
+    #[test]
+    fn modifications() {
+        let now = util::time::now();
+        let user = testutils::make_user(&UserID::new("slappy"), None, &now);
+        let mut modifications = Modifications::new_single(Op::Create, user.clone());
+        modifications.push(Op::Update, user);
+
+        for modi in modifications.clone() {
+            match modi.into_pair() {
+                (_, Model::User(_)) => {}
+                _ => panic!("modification mismatch"),
+            }
+        }
+
+        let mods = modifications.into_vec();
+        let user = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
+        assert_eq!(user.id(), &UserID::new("slappy"));
+        let user = mods[1].clone().expect_op::<User>(Op::Update).unwrap();
+        assert_eq!(user.id(), &UserID::new("slappy"));
+        let res = mods[0].clone().expect_op::<Process>(Op::Create);
+        assert_eq!(res, Err(Error::WrongModelType));
+        let res = mods[1].clone().expect_op::<Process>(Op::Update);
+        assert_eq!(res, Err(Error::WrongModelType));
+        let res = mods[0].clone().expect_op::<User>(Op::Update);
+        assert_eq!(res, Err(Error::OpMismatch));
+        let res = mods[1].clone().expect_op::<User>(Op::Create);
+        assert_eq!(res, Err(Error::OpMismatch));
+        let res = mods[0].clone().expect_op::<Process>(Op::Update);
+        assert_eq!(res, Err(Error::OpMismatch));
     }
 }
 

@@ -118,7 +118,7 @@ mod tests {
         let new_user = make_user(&UserID::create(), None, &now);
         let existing_member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::MemberCreate], &now);
 
-        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), occupation_id.clone(), vec![], Some(agreement_id.clone()), true, &now).unwrap().into_modifications();
+        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), occupation_id.clone(), vec![], Some(agreement_id.clone()), true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
         let member = mods[0].clone().expect_op::<CompanyMember>(Op::Create).unwrap();
         assert_eq!(member.id(), &id);
@@ -164,7 +164,7 @@ mod tests {
         let new_user = make_user(&UserID::create(), None, &now);
         let mut existing_member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::MemberCreate], &now);
 
-        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), occupation_id.clone(), vec![], None, true, &now).unwrap().into_modifications();
+        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), occupation_id.clone(), vec![], None, true, &now).unwrap().into_vec();
         let member = mods[0].clone().expect_op::<CompanyMember>(Op::Create).unwrap();
 
         // fails because existing_member doesn't have update perm
@@ -174,7 +174,7 @@ mod tests {
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         existing_member.set_permissions(vec![CompanyPermission::MemberUpdate]);
-        let mods = update(&user, &existing_member, member.clone(), Some(new_occupation.clone()), Some(agreement_id.clone()), None, &now2).unwrap().into_modifications();
+        let mods = update(&user, &existing_member, member.clone(), Some(new_occupation.clone()), Some(agreement_id.clone()), None, &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let member2 = mods[0].clone().expect_op::<CompanyMember>(Op::Update).unwrap();
@@ -204,7 +204,7 @@ mod tests {
         let new_user = make_user(&UserID::create(), None, &now);
         let mut existing_member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::MemberCreate], &now);
 
-        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), occupation_id.clone(), vec![], None, true, &now).unwrap().into_modifications();
+        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), occupation_id.clone(), vec![], None, true, &now).unwrap().into_vec();
         let member = mods[0].clone().expect_op::<CompanyMember>(Op::Create).unwrap();
 
         // fails because existing_member doesn't have set_perms perm
@@ -213,7 +213,7 @@ mod tests {
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         existing_member.set_permissions(vec![CompanyPermission::MemberSetPermissions]);
-        let mods = set_permissions(&user, &existing_member, member.clone(), vec![CompanyPermission::ResourceSpecCreate], &now2).unwrap().into_modifications();
+        let mods = set_permissions(&user, &existing_member, member.clone(), vec![CompanyPermission::ResourceSpecCreate], &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
         let member2 = mods[0].clone().expect_op::<CompanyMember>(Op::Update).unwrap();
         assert_eq!(member2.permissions(), &vec![CompanyPermission::ResourceSpecCreate]);
@@ -237,7 +237,7 @@ mod tests {
         let new_user = make_user(&UserID::create(), None, &now);
         let mut existing_member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::MemberCreate], &now);
 
-        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), occupation_id.clone(), vec![], None, true, &now).unwrap().into_modifications();
+        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), occupation_id.clone(), vec![], None, true, &now).unwrap().into_vec();
         let member = mods[0].clone().expect_op::<CompanyMember>(Op::Create).unwrap();
 
         let compensation = Compensation::new_hourly(32 as u32, AccountID::create());
@@ -247,7 +247,7 @@ mod tests {
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         existing_member.set_permissions(vec![CompanyPermission::MemberSetCompensation]);
-        let mods = set_compensation(&user, &existing_member, member.clone(), compensation.clone(), &now2).unwrap().into_modifications();
+        let mods = set_compensation(&user, &existing_member, member.clone(), compensation.clone(), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
         let member2 = mods[0].clone().expect_op::<CompanyMember>(Op::Update).unwrap();
         assert_eq!(member.compensation(), &None);
@@ -271,7 +271,7 @@ mod tests {
         let new_user = make_user(&UserID::create(), None, &now);
         let mut existing_member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::MemberCreate], &now);
 
-        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), occupation_id.clone(), vec![], None, true, &now).unwrap().into_modifications();
+        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), occupation_id.clone(), vec![], None, true, &now).unwrap().into_vec();
         let member = mods[0].clone().expect_op::<CompanyMember>(Op::Create).unwrap();
 
         let now2 = util::time::now();
@@ -280,7 +280,7 @@ mod tests {
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         existing_member.set_permissions(vec![CompanyPermission::MemberDelete]);
-        let mods = delete(&user, &existing_member, member.clone(), &now2).unwrap().into_modifications();
+        let mods = delete(&user, &existing_member, member.clone(), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let member2 = mods[0].clone().expect_op::<CompanyMember>(Op::Delete).unwrap();

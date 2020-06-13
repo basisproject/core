@@ -121,7 +121,7 @@ mod tests {
         let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
         let spec = make_process_spec(&ProcessSpecID::create(), company.id(), "Make Gazelle Freestyle", true, &now);
 
-        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_modifications();
+        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Create).unwrap();
@@ -164,7 +164,7 @@ mod tests {
         let user = make_user(&UserID::create(), None, &now);
         let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
         let spec = make_process_spec(&ProcessSpecID::create(), company.id(), "Make Gazelle Freestyle", true, &now);
-        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_modifications();
+        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
         let process = mods[0].clone().expect_op::<Process>(Op::Create).unwrap();
 
         let res = update(&user, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now.clone()), Some(vec![company.id().clone().into()]), Some(false), &now);
@@ -172,7 +172,7 @@ mod tests {
 
         member.set_permissions(vec![CompanyPermission::ProcessUpdate]);
         let now2 = util::time::now();
-        let mods = update(&user, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.id().clone().into()]), Some(false), &now2).unwrap().into_modifications();
+        let mods = update(&user, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.id().clone().into()]), Some(false), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let process2 = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -210,7 +210,7 @@ mod tests {
         let user = make_user(&UserID::create(), None, &now);
         let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
         let spec = make_process_spec(&ProcessSpecID::create(), company.id(), "Make Gazelle Freestyle", true, &now);
-        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_modifications();
+        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
         let process = mods[0].clone().expect_op::<Process>(Op::Create).unwrap();
 
         let now2 = util::time::now();
@@ -218,7 +218,7 @@ mod tests {
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         member.set_permissions(vec![CompanyPermission::ProcessDelete]);
-        let mods = delete(&user, &member, &company, process.clone(), &now2).unwrap().into_modifications();
+        let mods = delete(&user, &member, &company, process.clone(), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let process2 = mods[0].clone().expect_op::<Process>(Op::Delete).unwrap();

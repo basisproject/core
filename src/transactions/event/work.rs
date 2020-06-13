@@ -84,7 +84,7 @@ pub fn work(caller: &User, member: &CompanyMember, company: &Company, id: EventI
         .updated(now.clone())
         .build()
         .map_err(|e| Error::BuilderFailed(e))?;
-    let evmods = event.process(state, now)?.modifications();
+    let evmods = event.process(state, now)?.into_vec();
     let mut mods = Modifications::new();
     mods.push(Op::Create, event);
     for evmod in evmods {
@@ -121,7 +121,7 @@ mod tests {
         let worker = member.clone();
         let process = make_process(&ProcessID::create(), company.id(), "make widgets", &Costs::new_with_labor(occupation_id.clone(), dec!(177.5)), &now);
 
-        let mods = work(&user, &member, &company, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2).unwrap().into_modifications();
+        let mods = work(&user, &member, &company, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 2);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         assert_eq!(event.id(), &id);

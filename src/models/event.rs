@@ -27,7 +27,6 @@ use crate::{
     error::{Error, Result},
     models::{
         Op,
-        Modification,
         Modifications,
 
         agreement::AgreementID,
@@ -205,8 +204,8 @@ impl EventProcessResult {
     }
 
     /// Consume the result and return the modification list
-    pub fn modifications(self) -> Vec<Modification> {
-        self.modifications.into_modifications()
+    pub fn into_modifications(self) -> Modifications {
+        self.modifications
     }
 
     /// Push an event to create into the result set
@@ -252,7 +251,7 @@ impl Event {
     /// Note that this method *assumes the event is legitimate* and doesn't do
     /// any kind of checking as to whether or not the event should exist. That
     /// should happen when the event is created.
-    pub fn process(&self, state: EventProcessState, now: &DateTime<Utc>) -> Result<EventProcessResult> {
+    pub fn process(&self, state: EventProcessState, now: &DateTime<Utc>) -> Result<Modifications> {
         // some low-hanging fruit error checking. basically make sure that if we
         // pass in a process/resource that it's id matches the one we have in
         // the event's data.
@@ -291,7 +290,7 @@ impl Event {
         // this event is started but not completed, so it's pending and we don't
         // apply it yet.
         if self.inner().has_beginning().is_some() && self.inner().has_end().is_none() {
-            return Ok(res);
+            return Ok(res.into_modifications());
         }
 
         // grab our action and some values from it
@@ -548,7 +547,7 @@ impl Event {
         if resource != resource_clone { res.modify_resource(resource.unwrap()); }
         if resource2 != resource2_clone { res.modify_resource(resource2.unwrap()); }
 
-        Ok(res)
+        Ok(res.into_modifications())
     }
 
     /// Return a list of fields that the `Event` object needs to have to
@@ -967,7 +966,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 2);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -1002,7 +1001,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 2);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -1035,7 +1034,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 1);
 
         let resource = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
@@ -1057,7 +1056,7 @@ mod tests {
         let mut state2 = state.clone();
         state2.resource.as_mut().map(|x| x.set_costs(Costs::new()));
         event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(10)), Unit::One)));
-        let mods = event.process(state2, &now).unwrap().modifications();
+        let mods = event.process(state2, &now).unwrap().into_vec();
         let resource2 = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
         assert_eq!(resource2.inner().accounting_quantity().as_ref().unwrap(), &Measure::new(0 as i64, Unit::One));
         assert_eq!(resource2.inner().onhand_quantity().as_ref().unwrap(), &Measure::new(1 as i64, Unit::One));
@@ -1073,7 +1072,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 2);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -1102,7 +1101,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 2);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -1135,7 +1134,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 2);
 
         let resource = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
@@ -1163,7 +1162,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 2);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -1194,7 +1193,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 1);
 
         let resource = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
@@ -1220,7 +1219,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 2);
 
         let resource = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
@@ -1245,7 +1244,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 2);
 
         let resource = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
@@ -1268,7 +1267,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 2);
 
         let resource = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
@@ -1291,7 +1290,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 2);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -1325,7 +1324,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 1);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -1351,7 +1350,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 1);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -1380,7 +1379,7 @@ mod tests {
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
-        let mods = res.modifications();
+        let mods = res.into_vec();
         assert_eq!(mods.len(), 1);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();

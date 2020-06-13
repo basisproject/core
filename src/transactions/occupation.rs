@@ -74,7 +74,7 @@ mod tests {
         let id = OccupationID::create();
         let now = util::time::now();
         let user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
-        let mods = create(&user, id.clone(), "machinist", "builds things", true, &now).unwrap().into_modifications();
+        let mods = create(&user, id.clone(), "machinist", "builds things", true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let model = mods[0].clone().expect_op::<Occupation>(Op::Create).unwrap();
@@ -95,7 +95,7 @@ mod tests {
         let id = OccupationID::create();
         let now = util::time::now();
         let user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
-        let mods = create(&user, id.clone(), "bone spurs in chief", "glorious leader", true, &now).unwrap().into_modifications();
+        let mods = create(&user, id.clone(), "bone spurs in chief", "glorious leader", true, &now).unwrap().into_vec();
 
         let subject = mods[0].clone().expect_op::<Occupation>(Op::Create).unwrap();
         assert_eq!(subject.inner().role_label(), "bone spurs in chief");
@@ -103,7 +103,7 @@ mod tests {
 
         let now2 = util::time::now();
         // not truly an update but ok
-        let mods = update(&user, subject.clone(), Some("coward".into()), None, None, &now2).unwrap().into_modifications();
+        let mods = update(&user, subject.clone(), Some("coward".into()), None, None, &now2).unwrap().into_vec();
         let subject2 = mods[0].clone().expect_op::<Occupation>(Op::Update).unwrap();
         assert_eq!(subject.created(), subject2.created());
         assert_eq!(subject2.created(), &now);
@@ -121,9 +121,9 @@ mod tests {
         let id = OccupationID::create();
         let now = util::time::now();
         let user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
-        let mods = create(&user, id.clone(), "the best president", "false acquisitions", true, &now).unwrap().into_modifications();
+        let mods = create(&user, id.clone(), "the best president", "false acquisitions", true, &now).unwrap().into_vec();
         let subject = mods[0].clone().expect_op::<Occupation>(Op::Create).unwrap();
-        let mods = delete(&user, subject.clone(), &now).unwrap().into_modifications();
+        let mods = delete(&user, subject.clone(), &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let subject2 = mods[0].clone().expect_op::<Occupation>(Op::Delete).unwrap();

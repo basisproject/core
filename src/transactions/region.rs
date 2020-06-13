@@ -51,7 +51,7 @@ mod tests {
         let id = RegionID::create();
         let now = util::time::now();
         let user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
-        let mods = create(&user, id.clone(), "xina", true, &now).unwrap().into_modifications();
+        let mods = create(&user, id.clone(), "xina", true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let model = mods[0].clone().expect_op::<Region>(Op::Create).unwrap();
@@ -71,15 +71,15 @@ mod tests {
         let id = RegionID::create();
         let now = util::time::now();
         let mut user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
-        let mods = create(&user, id.clone(), "fine", true, &now).unwrap().into_modifications();
+        let mods = create(&user, id.clone(), "fine", true, &now).unwrap().into_vec();
         let region = mods[0].clone().expect_op::<Region>(Op::Create).unwrap();
-        let mods = delete(&user, region, &now).unwrap().into_modifications();
+        let mods = delete(&user, region, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let model = mods[0].clone().expect_op::<Region>(Op::Delete).unwrap();
         assert_eq!(model.id(), &id);
 
-        let mods = create(&user, id.clone(), "fine", true, &now).unwrap().into_modifications();
+        let mods = create(&user, id.clone(), "fine", true, &now).unwrap().into_vec();
         let region = mods[0].clone().expect_op::<Region>(Op::Create).unwrap();
         user.set_active(false);
         let res = delete(&user, region, &now);

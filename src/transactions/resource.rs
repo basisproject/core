@@ -122,7 +122,7 @@ mod tests {
             .batch_number("123")
             .build().unwrap();
 
-        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), Some(lot.clone()), Some("widget batch".into()), None, vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()], Some("niceee".into()), Some(Unit::Hour), true, &now).unwrap().into_modifications();
+        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), Some(lot.clone()), Some("widget batch".into()), None, vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()], Some("niceee".into()), Some(Unit::Hour), true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let resource = mods[0].clone().expect_op::<Resource>(Op::Create).unwrap();
@@ -168,7 +168,7 @@ mod tests {
         let lot = dfc::ProductBatch::builder()
             .batch_number("123")
             .build().unwrap();
-        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), Some(lot.clone()), Some("widget batch".into()), None, vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()], Some("niceee".into()), Some(Unit::Hour), true, &now).unwrap().into_modifications();
+        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), Some(lot.clone()), Some("widget batch".into()), None, vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()], Some("niceee".into()), Some(Unit::Hour), true, &now).unwrap().into_vec();
         let resource = mods[0].clone().expect_op::<Resource>(Op::Create).unwrap();
 
         let res = update(&user, &member, &company, resource.clone(), None, Some("better widgets".into()), Some("444-computers-and-equipment".into()), None, None, Some(Unit::WattHour), Some(false), &now);
@@ -176,7 +176,7 @@ mod tests {
 
         member.set_permissions(vec![CompanyPermission::ResourceUpdate]);
         let now2 = util::time::now();
-        let mods = update(&user, &member, &company, resource.clone(), None, Some("better widgets".into()), Some("444-computers-and-equipment".into()), None, None, Some(Unit::WattHour), Some(false), &now).unwrap().into_modifications();
+        let mods = update(&user, &member, &company, resource.clone(), None, Some("better widgets".into()), Some("444-computers-and-equipment".into()), None, None, Some(Unit::WattHour), Some(false), &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let resource2 = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
@@ -216,7 +216,7 @@ mod tests {
         let lot = dfc::ProductBatch::builder()
             .batch_number("123")
             .build().unwrap();
-        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), Some(lot.clone()), Some("widget batch".into()), None, vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()], Some("niceee".into()), Some(Unit::Hour), true, &now).unwrap().into_modifications();
+        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), Some(lot.clone()), Some("widget batch".into()), None, vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()], Some("niceee".into()), Some(Unit::Hour), true, &now).unwrap().into_vec();
         let resource = mods[0].clone().expect_op::<Resource>(Op::Create).unwrap();
 
         let now2 = util::time::now();
@@ -224,7 +224,7 @@ mod tests {
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         member.set_permissions(vec![CompanyPermission::ResourceDelete]);
-        let mods = delete(&user, &member, &company, resource.clone(), &now2).unwrap().into_modifications();
+        let mods = delete(&user, &member, &company, resource.clone(), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let resource2 = mods[0].clone().expect_op::<Resource>(Op::Delete).unwrap();

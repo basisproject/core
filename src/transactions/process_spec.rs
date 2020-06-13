@@ -92,7 +92,7 @@ mod tests {
         let user = make_user(&UserID::create(), None, &now);
         let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
 
-        let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_modifications();
+        let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let recspec = mods[0].clone().expect_op::<ProcessSpec>(Op::Create).unwrap();
@@ -128,7 +128,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
-        let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_modifications();
+        let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_vec();
         let recspec = mods[0].clone().expect_op::<ProcessSpec>(Op::Create).unwrap();
 
         let res = update(&user, &member, &company, recspec.clone(), Some("best widget".into()), None, Some(false), &now);
@@ -136,7 +136,7 @@ mod tests {
 
         member.set_permissions(vec![CompanyPermission::ProcessSpecUpdate]);
         let now2 = util::time::now();
-        let mods = update(&user, &member, &company, recspec.clone(), Some("best widget".into()), None, Some(false), &now2).unwrap().into_modifications();
+        let mods = update(&user, &member, &company, recspec.clone(), Some("best widget".into()), None, Some(false), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let recspec2 = mods[0].clone().expect_op::<ProcessSpec>(Op::Update).unwrap();
@@ -167,7 +167,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
-        let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_modifications();
+        let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_vec();
         let recspec = mods[0].clone().expect_op::<ProcessSpec>(Op::Create).unwrap();
 
         let now2 = util::time::now();
@@ -175,7 +175,7 @@ mod tests {
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         member.set_permissions(vec![CompanyPermission::ProcessSpecDelete]);
-        let mods = delete(&user, &member, &company, recspec.clone(), &now2).unwrap().into_modifications();
+        let mods = delete(&user, &member, &company, recspec.clone(), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let recspec2 = mods[0].clone().expect_op::<ProcessSpec>(Op::Delete).unwrap();

@@ -102,7 +102,7 @@ mod tests {
         // it was actually pretty fun. hey if you're free later maybe we could
         // make some widgets togethe...oh, you're busy? oh ok, that's cool, no
         // problem. hey, maybe next time.
-        let mods = create_private(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_modifications();
+        let mods = create_private(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 2);
 
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
@@ -131,13 +131,13 @@ mod tests {
         let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
         let now = util::time::now();
         let mut user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
-        let mods = create_private(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_modifications();
+        let mods = create_private(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
         let founder = mods[1].clone().expect_op::<CompanyMember>(Op::Create).unwrap();
 
         user.set_roles(vec![Role::User]);
         let now2 = util::time::now();
-        let mods = update_private(&user, Some(&founder), company.clone(), Some("Cool Widgets Ltd".into()), None, Some(false), &now2).unwrap().into_modifications();
+        let mods = update_private(&user, Some(&founder), company.clone(), Some("Cool Widgets Ltd".into()), None, Some(false), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
         let company2 = mods[0].clone().expect_op::<Company>(Op::Update).unwrap();
         assert_eq!(company2.id(), company.id());
@@ -162,13 +162,13 @@ mod tests {
         let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
         let now = util::time::now();
         let mut user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
-        let mods = create_private(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_modifications();
+        let mods = create_private(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
         let founder = mods[1].clone().expect_op::<CompanyMember>(Op::Create).unwrap();
 
         user.set_roles(vec![Role::User]);
         let now2 = util::time::now();
-        let mods = delete_private(&user, Some(&founder), company.clone(), &now2).unwrap().into_modifications();
+        let mods = delete_private(&user, Some(&founder), company.clone(), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
         let company2 = mods[0].clone().expect_op::<Company>(Op::Delete).unwrap();
         assert_eq!(company2.created(), &now);
