@@ -49,9 +49,9 @@ use vf_rs::vf::{self, Action, InputOutput, ResourceEffect};
 /// An error type for when event processing goes awry.
 #[derive(Error, Debug, PartialEq)]
 pub enum EventError {
-    /// Bad dates. Your begin time is probably >= your end time. Shame.
+    /// An event's end date must be after its begin date
     #[error("end time must be after begin time")]
-    BadDates,
+    DateEndBeforeBegin,
     /// We're trying to set `has_end` with `has_beginning` being blank. This
     /// does not make sense and I'm afraid I cannot allow this to happen.
     #[error("cannot specify an end date without a begin date")]
@@ -279,7 +279,7 @@ impl Event {
         match (self.inner().has_beginning().as_ref(), self.inner().has_end().as_ref()) {
             (Some(begin), Some(end)) => {
                 if end < begin {
-                    Err(EventError::BadDates)?;
+                    Err(EventError::DateEndBeforeBegin)?;
                 }
             }
             _ => {}
@@ -835,7 +835,6 @@ mod tests {
                 .active(true)
                 .permissions(vec![Permission::MemberCreate, Permission::MemberSetPermissions, Permission::MemberDelete])
                 .compensation(Some(Compensation::new_hourly(dec!(0.0), "12345")))
-                .process_spec_id(Some("1234444".into()))
                 .created(now.clone())
                 .updated(now.clone())
                 .build().unwrap();
@@ -921,6 +920,39 @@ mod tests {
         let res2_ser = serde_json::to_string(&resource_prev).unwrap();
         // only resource.costs/custody/quantity/accountable should be changed
         assert_eq!(res_ser, res2_ser);
+    }
+
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn validate_begin_end() {
+        let now: DateTime<Utc> = "2018-06-06T00:00:00Z".parse().unwrap();
+        let now2: DateTime<Utc> = "2018-06-06T06:52:00Z".parse().unwrap();
+        let company_id = CompanyID::new("jerry's-widgets-1212");
+        let state = make_state(&company_id, &company_id, true, &now);
+        let event = make_event(vf::Action::Consume, &company_id, &company_id, &state, &now);
+
+        let res = event.process(state.clone(), &now);
+        assert!(res.is_ok());
+
+        let mut event2 = event.clone();
+        event2.inner_mut().set_has_end(Some(now2.clone()));
+        let res = event2.process(state.clone(), &now);
+        assert!(res.is_ok());
+
+        // end with no begin
+        let mut event3 = event.clone();
+        event3.inner_mut().set_has_beginning(None);
+        event3.inner_mut().set_has_end(Some(now.clone()));
+        let res = event3.process(state.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::DateEndMustHaveBegin)));
+
+        // begin after end
+        let mut event4 = event.clone();
+        event4.inner_mut().set_has_beginning(Some(now2.clone()));
+        event4.inner_mut().set_has_end(Some(now.clone()));
+        let res = event4.process(state.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::DateEndBeforeBegin)));
     }
 
     // -------------------------------------------------------------------------
