@@ -12,19 +12,6 @@
 //! could (in theory) be used without needing to couple any of the logic to the
 //! storage mechanism.
 
-use thiserror::Error;
-
-/// An error type for when transaction processing goes awry.
-#[derive(Error, Debug, PartialEq)]
-pub enum TransactionError {
-    /// Event is finalized already
-    #[error("this event is already finalized")]
-    EventAlreadyFinalized,
-    /// A work event needs a cost parameter but it wasn't given
-    #[error("work even missing costs parameter")]
-    MissingWorkCosts,
-}
-
 //pub mod account;
 //pub mod agreement;
 //pub mod commitment;

@@ -5,7 +5,6 @@ use crate::{
     models::{
         event::EventError,
     },
-    transactions::TransactionError,
 };
 use thiserror::Error;
 
@@ -52,9 +51,6 @@ pub enum Error {
     /// match expectation.
     #[error("Op does not match expectation")]
     OpMismatch,
-    /// An error while processing a transaction.
-    #[error("transaction error: {0:?}")]
-    Transaction(#[from] TransactionError),
     /// When we try to perform an operation on a deleted user
     #[error("operation on deleted user")]
     UserIsDeleted,
