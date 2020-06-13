@@ -140,9 +140,8 @@ basis_model! {
         id: <<EventID>>,
         /// The event's core VF type
         inner: vf::EconomicEvent<AgreementID, AgentID, ProcessID, AgentID, AgreementID, (), ResourceSpecID, ResourceID, EventID>,
-        /// If this event is an output of a process, move some fixed amount of
-        /// the process' costs and transfer them either into another Process or
-        /// into a Resource
+        /// If this event is an input/output of a process or resource, move some
+        /// fixed amount of costs between the two objects.
         move_costs: Option<Costs>,
         /// The type of move (if using `Action::Move`). Can be cost-based
         /// (exclusively for moving costs between resources and processes) or
@@ -304,7 +303,7 @@ impl Event {
         // attempt to grab our primary and (if applicable) secondary process and
         // resource.
         let mut process: Option<Process> = match action.input_output() {
-            Some(InputOutput::Input) => Some(state.input_of.clone().ok_or(EventError::MissingResource)?),
+            Some(InputOutput::Input) => Some(state.input_of.clone().ok_or(EventError::MissingInputProcess)?),
             Some(InputOutput::Output) => Some(state.output_of.clone().ok_or(EventError::MissingOutputProcess)?),
             None => None,
         };
