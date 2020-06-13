@@ -37,7 +37,7 @@ pub fn create(caller: &User, member: &CompanyMember, id: CompanyMemberID, user: 
                 .map_err(|e| Error::BuilderFailed(e))?
         )
         .permissions(permissions)
-        .agreement(agreement_id)
+        .agreement_id(agreement_id)
         .active(active)
         .created(now.clone())
         .updated(now.clone())
@@ -55,7 +55,7 @@ pub fn update(caller: &User, member: &CompanyMember, mut subject: CompanyMember,
         subject.inner_mut().set_relationship(occupation_id);
     }
     if agreement_id.is_some() {
-        subject.set_agreement(agreement_id);
+        subject.set_agreement_id(agreement_id);
     }
     if let Some(active) = active {
         subject.set_active(active);
@@ -126,7 +126,7 @@ mod tests {
         assert_eq!(member.inner().object(), &company.id().clone().into());
         assert_eq!(member.inner().relationship(), &occupation_id);
         assert_eq!(member.permissions().len(), 0);
-        assert_eq!(member.agreement(), &Some(agreement_id.clone()));
+        assert_eq!(member.agreement_id(), &Some(agreement_id.clone()));
         assert_eq!(member.active(), &true);
         assert_eq!(member.created(), &now);
         assert_eq!(member.updated(), &now);
@@ -182,8 +182,8 @@ mod tests {
         assert_eq!(member.created(), member2.created());
         assert!(member.updated() != member2.updated());
         assert_eq!(member2.updated(), &now2);
-        assert!(member.agreement() != member2.agreement());
-        assert_eq!(member2.agreement(), &Some(agreement_id.clone()));
+        assert!(member.agreement_id() != member2.agreement_id());
+        assert_eq!(member2.agreement_id(), &Some(agreement_id.clone()));
         assert_eq!(member2.active(), &true);
         assert_eq!(member2.inner().relationship(), &new_occupation);
 

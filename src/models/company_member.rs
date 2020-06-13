@@ -16,7 +16,6 @@ use crate::{
         company::{CompanyID, Permission},
         lib::agent::AgentID,
         occupation::OccupationID,
-        process_spec::ProcessSpecID,
         user::UserID,
     },
 };
@@ -112,14 +111,8 @@ basis_model! {
         /// Describes how the member is compensated for their labor. Must be
         /// defined for the member to perform labor.
         compensation: Option<Compensation>,
-        /// A process spec that the member attributes their labor to by default.
-        /// This allows some amount of automation when determining what inner
-        /// process to count their labor towards. We use a ProcessSpec instead
-        /// of a Process here because Process is generally ephemeral. Must be
-        /// defined for the member to perform labor.
-        process_spec_id: Option<ProcessSpecID>,
         /// Agreement under which this membership takes place
-        agreement: Option<AgreementID>,
+        agreement_id: Option<AgreementID>,
     }
     CompanyMemberBuilder
 }
