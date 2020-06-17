@@ -15,8 +15,8 @@ pub enum Error {
     /// There was an error while using a builder (likely an internal error)
     #[error("error building object {0}")]
     BuilderFailed(String),
-    /// When we try to perform an operation that would erase costs (such as try
-    /// to delete a Process that has non-zero costs).
+    /// When we try to perform an operation that would erase costs (such as
+    /// trying to delete a Process that has non-zero costs).
     #[error("cannot erase costs")]
     CannotEraseCosts,
     /// When we try to perform an operation on a deleted company
@@ -31,6 +31,11 @@ pub enum Error {
     /// Trying to update the wrong object
     #[error("mismatched object: {0}")]
     MismatchedObject(String),
+    /// We get this when trying to pull a measure out of a resource and come up
+    /// blank, for instance when using `consume` on a resource that hasn't had
+    /// its quantities initialized via `produce`/`raise`/`transfer`/etc.
+    #[error("a resource measurement (account/onhand quantity) is missing")]
+    ResourceMeasureMissing,
     /// Happens when trying to operate on two `Measure` objects with different
     /// units, such as adding 12 Hours to 16 Kilograms
     #[error("operation on measurement with mismatched units")]
