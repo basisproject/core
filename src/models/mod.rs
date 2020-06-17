@@ -320,6 +320,7 @@ pub(crate) mod testutils {
             .inner(
                 vf::EconomicResource::builder()
                     .accounting_quantity(Some(quantity.clone()))
+                    .onhand_quantity(Some(quantity.clone()))
                     .primary_accountable(Some(company_id.clone().into()))
                     .conforms_to("6969")
                     .build().unwrap()
