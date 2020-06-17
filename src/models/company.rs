@@ -62,6 +62,9 @@ pub enum Permission {
     /// Can update the company's basic info
     CompanyUpdate,
 
+    /// Can consume a resource
+    Consume,
+
     /// Can create new members (hire)
     MemberCreate,
     /// Can delete a member (fire)
@@ -86,6 +89,9 @@ pub enum Permission {
     ProcessSpecDelete,
     /// Can create a process spec
     ProcessSpecUpdate,
+
+    /// Can produce a resource
+    Produce,
 
     /// Can create a resource
     ResourceCreate,

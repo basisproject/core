@@ -1,6 +1,7 @@
 //! Work events record labor in the system. They are how labor costs (both waged
-//! and hourly labor) get recorded in the system, and also act as the systemic
-//! marker for paying company members. Record labor, get paid.
+//! and hourly labor) get attributed to processes (and as a result resources).
+//! They also act as the systemic marker for paying company members. Record
+//! labor, get paid.
 
 use chrono::{DateTime, Utc};
 use crate::{
@@ -129,7 +130,7 @@ mod tests {
         assert_eq!(event.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(event.inner().has_end(), &Some(now2.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
-        assert_eq!(event.inner().provider().clone(), member.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), worker.id().clone().into());
         assert_eq!(event.inner().receiver().clone(), company.id().clone().into());
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor(occupation_id.clone(), dec!(78.4))));
         assert_eq!(event.active(), &true);
@@ -156,6 +157,51 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now2.clone()));
         let res = work(&user, &member, &company2, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
+        assert_eq!(res, Err(Error::CompanyIsDeleted));
+
+        // test worker != member
+        let mut worker2 = worker.clone();
+        worker2.set_id(CompanyMemberID::create());
+        let res = work(&user, &member, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut member2 = member.clone();
+        member2.set_permissions(vec![CompanyPermission::WorkAdmin]);
+        let mods = work(&user, &member2, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2).unwrap().into_vec();
+        assert_eq!(mods.len(), 2);
+        let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
+        assert_eq!(event.id(), &id);
+        assert_eq!(event.inner().agreed_in(), member2.agreement_id());
+        assert_eq!(event.inner().has_beginning(), &Some(now.clone()));
+        assert_eq!(event.inner().has_end(), &Some(now2.clone()));
+        assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
+        assert_eq!(event.inner().provider().clone(), worker2.id().clone().into());
+        assert_eq!(event.inner().receiver().clone(), company.id().clone().into());
+        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor(occupation_id.clone(), dec!(78.4))));
+        assert_eq!(event.active(), &true);
+        assert_eq!(event.created(), &now2);
+        assert_eq!(event.updated(), &now2);
+        let mut costs2 = Costs::new();
+        costs2.track_labor(occupation_id.clone(), dec!(177.5) + dec!(78.4));
+        costs2.track_labor_hours(occupation_id.clone(), dec!(6.8666666666666666666666666666));
+        let process2 = mods[1].clone().expect_op::<Process>(Op::Update).unwrap();
+        assert_eq!(process2.id(), process.id());
+        assert_eq!(process2.company_id(), company.id());
+        assert_eq!(process2.inner().name(), "make widgets");
+        assert_eq!(process2.costs(), &costs2);
+
+        let user2 = make_user(&UserID::create(), Some(vec![]), &now);
+        let res = work(&user2, &member2, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut member3 = member2.clone();
+        member3.set_permissions(vec![]);
+        let res = work(&user, &member3, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut company2 = company.clone();
+        company2.set_deleted(Some(now2.clone()));
+        let res = work(&user, &member2, &company2, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
         assert_eq!(res, Err(Error::CompanyIsDeleted));
     }
 }

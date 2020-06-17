@@ -13,6 +13,7 @@ use crate::{
         resource_spec::ResourceSpecID,
     },
 };
+use om2::Unit;
 use url::Url;
 use vf_rs::vf;
 
@@ -36,6 +37,14 @@ basis_model! {
         costs: Costs,
     }
     ResourceBuilder
+}
+
+impl Resource {
+    /// Get this resource's Unit (if it has it)
+    pub fn get_unit(&self) -> Option<Unit> {
+        self.inner().accounting_quantity().clone().or_else(|| self.inner().onhand_quantity().clone())
+            .map(|measure| measure.has_unit().clone())
+    }
 }
 
 impl CostMover for Resource {
@@ -90,6 +99,24 @@ mod tests {
         assert!(resource1 != resource3);
         resource3.set_costs(Costs::new_with_labor("machinist", dec!(23.2)));
         assert!(resource1 == resource3);
+    }
+
+    #[test]
+    fn get_unit() {
+        let now = util::time::now();
+        let resource = make_resource(&ResourceID::create(), &CompanyID::create(), &Measure::new(69, Unit::Litre), &Costs::new_with_labor("TUNA", 54), &now);
+        let mut resource2 = resource.clone();
+        resource2.inner_mut().set_accounting_quantity(None);
+        let mut resource3 = resource.clone();
+        resource3.inner_mut().set_onhand_quantity(None);
+        let mut resource4 = resource2.clone();
+        resource4.inner_mut().set_onhand_quantity(None);
+        assert_eq!(resource.get_unit(), Some(Unit::Litre));
+        assert_eq!(resource2.get_unit(), Some(Unit::Litre));
+        assert_eq!(resource3.get_unit(), Some(Unit::Litre));
+        assert_eq!(resource4.get_unit(), None);
+
+
     }
 }
 
