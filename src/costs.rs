@@ -385,6 +385,22 @@ mod tests {
     }
 
     #[test]
+    fn eq() {
+        let mut costs1 = Costs::new();
+        costs1.track_labor("trucker", 13);
+        costs1.track_labor("machinist", 17);
+
+        let mut costs2 = Costs::new();
+        costs2.track_labor("machinist", 17);
+        costs2.track_labor("trucker", 13);
+
+        assert!(costs1 == costs1.clone());
+        assert!(costs1 == costs2);
+        assert!(costs1 != Costs::new_with_labor("trucker", 13));
+        assert!(costs1 != Costs::new_with_labor("machinist", 17));
+    }
+
+    #[test]
     fn div_0_by_0() {
         let costs1 = Costs::new_with_labor("clown", dec!(0.0));
         let costs2 = Costs::new();
