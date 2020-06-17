@@ -103,9 +103,6 @@ pub enum EventError {
     /// The event is missing the `resource` object
     #[error("this event requires the `resource` object")]
     MissingResource,
-    /// The event's resource quantity measurement is missing
-    #[error("event is missing resource quantity measurement")]
-    MissingResourceQuantity,
     /// The event is missing the `resource_to` object
     #[error("this event requires the `resource_to` object")]
     MissingResourceTo,
@@ -1133,17 +1130,55 @@ mod tests {
         event.inner_mut().set_at_location(Some(location));
         fuzz_state(event.clone(), state.clone(), &now);
 
+        // going to move costs and counts
         let res = event.process(state.clone(), &now).unwrap();
         let mods = res.into_vec();
         assert_eq!(mods.len(), 2);
 
+        let mut costs = Costs::new();
+        costs.track_labor("machinist", dec!(34.91) - dec!(30.0));
         let resource = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
+        assert_eq!(resource.costs(), &costs);
+        assert_eq!(resource.inner().accounting_quantity(), &Some(Measure::new(10 - 6, Unit::One)));
         assert_eq!(resource.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
         assert_eq!(resource.inner().current_location(), &None);
         assert_eq!(resource.in_custody_of(), &company_id.clone().into());
         check_resource_mods(vec!["costs", "in_custody_of", "primary_accountable", "accounting_quantity", "onhand_quantity"], &resource, state.resource.as_ref().unwrap());
 
+        let mut costs = Costs::new();
+        costs.track_labor("trucker", dec!(29.8));
+        costs.track_labor("machinist", dec!(30.0));
         let resource2 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
+        assert_eq!(resource2.costs(), &costs);
+        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(1 + 6, Unit::One)));
+        assert_eq!(resource2.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
+        assert_eq!(resource2.inner().current_location().as_ref().unwrap().lat(), &Some(71.665519));
+        assert_eq!(resource2.in_custody_of(), &company_id.clone().into());
+        check_resource_mods(vec!["costs", "in_custody_of", "primary_accountable", "accounting_quantity", "onhand_quantity", "current_location"], &resource2, state.to_resource.as_ref().unwrap());
+
+        // going to move just costs (set count to 0 lol)
+        let mut event2 = event.clone();
+        event2.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(13.2))));
+        event2.inner_mut().set_resource_quantity(Some(Measure::new(dec!(0), Unit::One)));
+        let mods = event2.process(state.clone(), &now).unwrap().into_vec();
+        assert_eq!(mods.len(), 2);
+
+        let mut costs = Costs::new();
+        costs.track_labor("machinist", dec!(34.91) - dec!(13.2));
+        let resource = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
+        assert_eq!(resource.costs(), &costs);
+        assert_eq!(resource.inner().accounting_quantity(), &Some(Measure::new(10, Unit::One)));
+        assert_eq!(resource.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
+        assert_eq!(resource.inner().current_location(), &None);
+        assert_eq!(resource.in_custody_of(), &company_id.clone().into());
+        check_resource_mods(vec!["costs", "in_custody_of", "primary_accountable", "accounting_quantity", "onhand_quantity"], &resource, state.resource.as_ref().unwrap());
+
+        let mut costs = Costs::new();
+        costs.track_labor("machinist", dec!(13.2));
+        costs.track_labor("trucker", dec!(29.8));
+        let resource2 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
+        assert_eq!(resource2.costs(), &costs);
+        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(1, Unit::One)));
         assert_eq!(resource2.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
         assert_eq!(resource2.inner().current_location().as_ref().unwrap().lat(), &Some(71.665519));
         assert_eq!(resource2.in_custody_of(), &company_id.clone().into());
