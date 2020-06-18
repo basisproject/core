@@ -45,6 +45,9 @@ pub fn work(caller: &User, member: &CompanyMember, company: &Company, id: EventI
     if company.is_deleted() {
         Err(Error::CompanyIsDeleted)?;
     }
+    if process.company_id() != company.id() {
+        Err(Error::ProcessOwnerMismatch)?;
+    }
 
     let effort = {
         let milliseconds = end.timestamp_millis() - begin.timestamp_millis();
@@ -203,6 +206,12 @@ mod tests {
         company2.set_deleted(Some(now2.clone()));
         let res = work(&user, &member2, &company2, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
         assert_eq!(res, Err(Error::CompanyIsDeleted));
+
+        // can't work into a process you don't own
+        let mut process3 = process.clone();
+        process3.set_company_id(CompanyID::new("zing"));
+        let res = work(&user, &member2, &company, id.clone(), worker2.clone(), process3.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
+        assert_eq!(res, Err(Error::ProcessOwnerMismatch));
     }
 }
 

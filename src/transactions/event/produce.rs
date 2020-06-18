@@ -30,6 +30,17 @@ pub fn produce<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, com
     if company.is_deleted() {
         Err(Error::CompanyIsDeleted)?;
     }
+    if process.company_id() != company.id() {
+        Err(Error::ProcessOwnerMismatch)?;
+    }
+    if resource.inner().primary_accountable() != &Some(company.id().clone().into()) {
+        // can't consume a resource that ain't yours
+        Err(Error::ResourceOwnerMismatch)?;
+    }
+    if resource.in_custody_of() != &company.id().clone().into() {
+        // can't consume a resource that ain't yours
+        Err(Error::ResourceCustodyMismatch)?;
+    }
 
     let measure = {
         let unit = resource.get_unit().ok_or(Error::ResourceMeasureMissing)?;
@@ -158,6 +169,24 @@ mod tests {
         company2.set_deleted(Some(now.clone()));
         let res = produce(&user, &member, &company2, id.clone(), process.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
         assert_eq!(res, Err(Error::CompanyIsDeleted));
+
+        // can't produce from a process you don't own
+        let mut process3 = process.clone();
+        process3.set_company_id(CompanyID::new("zing"));
+        let res = produce(&user, &member, &company, id.clone(), process3.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        assert_eq!(res, Err(Error::ProcessOwnerMismatch));
+
+        // a company that doesn't own a resource can't consume it
+        let mut resource3 = resource.clone();
+        resource3.inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
+        let res = produce(&user, &member, &company, id.clone(), process.clone(), resource3.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        assert_eq!(res, Err(Error::ResourceOwnerMismatch));
+
+        // a company that doesn't have posession of a resource can't consume it
+        let mut resource4 = resource.clone();
+        resource4.set_in_custody_of(CompanyID::new("ziggy").into());
+        let res = produce(&user, &member, &company, id.clone(), process.clone(), resource4.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        assert_eq!(res, Err(Error::ResourceCustodyMismatch));
     }
 }
 
