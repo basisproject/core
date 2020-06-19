@@ -32,9 +32,7 @@ pub fn consume<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, com
     if company.is_deleted() {
         Err(Error::CompanyIsDeleted)?;
     }
-    if process.company_id() != company.id() {
-        Err(Error::ProcessOwnerMismatch)?;
-    }
+    /*
     if resource.inner().primary_accountable() != &Some(company.id().clone().into()) {
         // can't consume a resource that ain't yours
         Err(Error::ResourceOwnerMismatch)?;
@@ -43,6 +41,7 @@ pub fn consume<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, com
         // can't consume a resource that ain't yours
         Err(Error::ResourceCustodyMismatch)?;
     }
+    */
 
     let measure = {
         let unit = resource.get_unit().ok_or(Error::ResourceMeasureMissing)?;
@@ -94,7 +93,7 @@ mod tests {
         models::{
             company::{CompanyID, CompanyType},
             company_member::CompanyMemberID,
-            event::EventID,
+            event::{EventID, EventError},
             occupation::OccupationID,
             process::ProcessID,
             resource::ResourceID,
@@ -175,19 +174,19 @@ mod tests {
         let mut process3 = process.clone();
         process3.set_company_id(CompanyID::new("zing"));
         let res = consume(&user, &member, &company, id.clone(), resource.clone(), process3.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
-        assert_eq!(res, Err(Error::ProcessOwnerMismatch));
+        assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         // a company that doesn't own a resource can't consume it
         let mut resource3 = resource.clone();
         resource3.inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
         let res = consume(&user, &member, &company, id.clone(), resource3.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
-        assert_eq!(res, Err(Error::ResourceOwnerMismatch));
+        assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
 
         // a company that doesn't have posession of a resource can't consume it
         let mut resource4 = resource.clone();
         resource4.set_in_custody_of(CompanyID::new("ziggy").into());
         let res = consume(&user, &member, &company, id.clone(), resource4.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
-        assert_eq!(res, Err(Error::ResourceCustodyMismatch));
+        assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 }
 

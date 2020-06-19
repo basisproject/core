@@ -106,10 +106,19 @@ pub enum EventError {
     /// The event is missing the `resource_to` object
     #[error("this event requires the `resource_to` object")]
     MissingResourceTo,
+    /// When we try to run an operation on a process we don't own
+    #[error("operation on a resource you don't own")]
+    ProcessOwnerMismatch,
     /// The resource's accounting quantity cannot be zero if the resource has
     /// non-zero `costs`
     #[error("event's resource cannot have an accounting quantity == 0 with costs > 0")]
     ResourceCostQuantityMismatch,
+    /// When performing an operation on a resource that isn't in your custody
+    #[error("operation on a resource you don't have custody of")]
+    ResourceCustodyMismatch,
+    /// When performing an operation on a resource that doesn't belong to you
+    #[error("operation on a resource you don't own")]
+    ResourceOwnerMismatch,
 }
 
 /// When creating a `transfer` event, we need to know if that event transfers
@@ -299,8 +308,22 @@ impl Event {
         // attempt to grab our primary and (if applicable) secondary process and
         // resource.
         let mut process: Option<Process> = match action.input_output() {
-            Some(InputOutput::Input) => Some(state.input_of.clone().ok_or(EventError::MissingInputProcess)?),
-            Some(InputOutput::Output) => Some(state.output_of.clone().ok_or(EventError::MissingOutputProcess)?),
+            Some(InputOutput::Input) => {
+                let process = state.input_of.clone().ok_or(EventError::MissingInputProcess)?;
+                // make sure the receiver owns the process we're inputting into
+                if self.inner().receiver() != &process.company_id().clone().into() {
+                    Err(EventError::ProcessOwnerMismatch)?;
+                }
+                Some(process)
+            }
+            Some(InputOutput::Output) => {
+                let process = state.output_of.clone().ok_or(EventError::MissingOutputProcess)?;
+                // make sure the provider owns the process we're outputting from
+                if self.inner().provider() != &process.company_id().clone().into() {
+                    Err(EventError::ProcessOwnerMismatch)?;
+                }
+                Some(process)
+            }
             None => None,
         };
         // we fill these in either by hand in the action matcher or using our
@@ -410,18 +433,67 @@ impl Event {
             }
         }
 
-        match process2.as_ref() {
-            Some(process) => {
-                if process.is_deleted() {
+        match (process.as_ref(), process2.as_ref()) {
+            (Some(process1), Some(process2)) => {
+                if self.inner().provider() != &process1.company_id().clone().into() {
+                    Err(EventError::ProcessOwnerMismatch)?;
+                }
+                if self.inner().receiver() != &process2.company_id().clone().into() {
+                    Err(EventError::ProcessOwnerMismatch)?;
+                }
+                if process2.is_deleted() {
+                    Err(EventError::InputOnDeletedProcess)?;
+                }
+            }
+            (Some(process), None) => {
+                if action.input_output() == Some(InputOutput::Output) && self.inner().provider() != &process.company_id().clone().into() {
+                    Err(EventError::ProcessOwnerMismatch)?;
+                }
+                if action.input_output() == Some(InputOutput::Input) && self.inner().receiver() != &process.company_id().clone().into() {
+                    Err(EventError::ProcessOwnerMismatch)?;
+                }
+                if action.input_output() == Some(InputOutput::Input) && process.is_deleted() {
                     Err(EventError::InputOnDeletedProcess)?;
                 }
             }
             _ => {}
         }
-        match process.as_ref() {
-            Some(process) => {
-                if action.input_output() == Some(InputOutput::Input) && process.is_deleted() {
-                    Err(EventError::InputOnDeletedProcess)?;
+
+        // make sure the primary resource is being acted on by its owner and/or
+        // custodian
+        match resource.as_ref() {
+            Some(resource) => {
+                if (accounting_effect == Some(ResourceEffect::Decrement) || accounting_effect == Some(ResourceEffect::DecrementIncrement)) && resource.inner().primary_accountable().as_ref() != Some(self.inner().provider()) {
+                    Err(EventError::ResourceOwnerMismatch)?;
+                }
+                if accounting_effect == Some(ResourceEffect::Increment) && resource.inner().primary_accountable().as_ref() != Some(self.inner().receiver()) {
+                    Err(EventError::ResourceOwnerMismatch)?;
+                }
+                if self.inner().provider() == self.inner().receiver() && resource.inner().primary_accountable().as_ref() != Some(self.inner().provider()) {
+                    Err(EventError::ResourceOwnerMismatch)?;
+                }
+                if (onhand_effect == Some(ResourceEffect::Decrement) || onhand_effect == Some(ResourceEffect::DecrementIncrement)) && resource.in_custody_of() != self.inner().provider() {
+                    Err(EventError::ResourceCustodyMismatch)?;
+                }
+                if onhand_effect == Some(ResourceEffect::Increment) && resource.in_custody_of() != self.inner().receiver() {
+                    Err(EventError::ResourceCustodyMismatch)?;
+                }
+                if self.inner().provider() == self.inner().receiver() && resource.in_custody_of() != self.inner().provider() {
+                    Err(EventError::ResourceCustodyMismatch)?;
+                }
+            }
+            _ => {}
+        }
+
+        // make sure the secondary resource is being acted on by its owner
+        // and/or custodian
+        match resource2.as_ref() {
+            Some(resource) => {
+                if resource.inner().primary_accountable().as_ref() != Some(self.inner().receiver()) {
+                    Err(EventError::ResourceOwnerMismatch)?;
+                }
+                if resource.in_custody_of() != self.inner().receiver() {
+                    Err(EventError::ResourceCustodyMismatch)?;
                 }
             }
             _ => {}
@@ -985,6 +1057,11 @@ mod tests {
         state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
         let res = event.process(state2.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
+
+        let mut state3 = state.clone();
+        state3.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
+        let res = event.process(state3.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
     }
 
     #[test]
@@ -1113,6 +1190,16 @@ mod tests {
         state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
         let res = event.process(state2.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
+
+        let mut state3 = state.clone();
+        state3.output_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
+        let res = event.process(state3.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
+
+        let mut state4 = state.clone();
+        state4.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
+        let res = event.process(state4.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
     }
 
     #[test]
@@ -1183,6 +1270,16 @@ mod tests {
         assert_eq!(resource2.inner().current_location().as_ref().unwrap().lat(), &Some(71.665519));
         assert_eq!(resource2.in_custody_of(), &company_id.clone().into());
         check_resource_mods(vec!["costs", "in_custody_of", "primary_accountable", "accounting_quantity", "onhand_quantity", "current_location"], &resource2, state.to_resource.as_ref().unwrap());
+
+        let mut state2 = state.clone();
+        state2.resource.as_mut().map(|x| x.inner_mut().set_primary_accountable(Some(CompanyID::new("bliv").into())));
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
+
+        let mut state3 = state.clone();
+        state3.resource.as_mut().map(|x| x.set_in_custody_of(CompanyID::new("bliv").into()));
+        let res = event.process(state3.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 
     #[test]
@@ -1214,8 +1311,13 @@ mod tests {
         let mut event = make_event(vf::Action::Produce, &company_id, &company_id, &state, &now);
         event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(5)), Unit::One)));
         event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
-        let res = event.process(state, &now);
+        let res = event.process(state.clone(), &now);
         assert_eq!(res, Err(Error::NegativeCosts));
+
+        let mut state2 = state.clone();
+        state2.output_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
     }
 
     #[test]
@@ -1266,6 +1368,16 @@ mod tests {
         assert_eq!(resource2.inner().primary_accountable().clone().unwrap(), company2_id.clone().into());
         assert_eq!(resource2.in_custody_of(), &company2_id.clone().into());
         check_resource_mods(vec!["costs", "in_custody_of", "primary_accountable", "accounting_quantity", "onhand_quantity"], &resource2, state.to_resource.as_ref().unwrap());
+
+        let mut state2 = state.clone();
+        state2.resource.as_mut().map(|x| x.inner_mut().set_primary_accountable(Some(CompanyID::new("bliv").into())));
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
+
+        let mut state3 = state.clone();
+        state3.resource.as_mut().map(|x| x.set_in_custody_of(CompanyID::new("bliv").into()));
+        let res = event.process(state3.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 
     #[test]
@@ -1289,6 +1401,16 @@ mod tests {
         let resource2 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
         assert_eq!(resource2.inner().primary_accountable().clone().unwrap(), company2_id.clone().into());
         check_resource_mods(vec!["costs", "primary_accountable", "accounting_quantity"], &resource2, state.to_resource.as_ref().unwrap());
+
+        let mut state2 = state.clone();
+        state2.resource.as_mut().map(|x| x.inner_mut().set_primary_accountable(Some(CompanyID::new("bliv").into())));
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
+
+        let mut state3 = state.clone();
+        state3.resource.as_mut().map(|x| x.set_in_custody_of(CompanyID::new("bliv").into()));
+        let res = event.process(state3.clone(), &now);
+        assert!(res.is_ok());
     }
 
     #[test]
@@ -1313,6 +1435,16 @@ mod tests {
         let resource2 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
         assert_eq!(resource2.in_custody_of().clone(), company2_id.clone().into());
         check_resource_mods(vec!["costs", "in_custody_of", "onhand_quantity"], &resource2, state.to_resource.as_ref().unwrap());
+
+        let mut state2 = state.clone();
+        state2.resource.as_mut().map(|x| x.inner_mut().set_primary_accountable(Some(CompanyID::new("bliv").into())));
+        let res = event.process(state2.clone(), &now);
+        assert!(res.is_ok());
+
+        let mut state3 = state.clone();
+        state3.resource.as_mut().map(|x| x.set_in_custody_of(CompanyID::new("bliv").into()));
+        let res = event.process(state3.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 
     #[test]
@@ -1337,10 +1469,25 @@ mod tests {
         assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", dec!(4.91)));
         check_resource_mods(vec!["costs", "in_custody_of"], &resource, state.resource.as_ref().unwrap());
 
-        let mut event = make_event(vf::Action::Use, &company_id, &company_id, &state, &now);
-        event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
-        let res = event.process(state, &now);
+        let mut event2 = make_event(vf::Action::Use, &company_id, &company_id, &state, &now);
+        event2.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
+        let res = event2.process(state.clone(), &now);
         assert_eq!(res, Err(Error::NegativeCosts));
+
+        let mut state2 = state.clone();
+        state2.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
+
+        let mut state3 = state.clone();
+        state3.resource.as_mut().map(|x| x.inner_mut().set_primary_accountable(Some(CompanyID::new("bliv").into())));
+        let res = event.process(state3.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
+
+        let mut state4 = state.clone();
+        state4.resource.as_mut().map(|x| x.set_in_custody_of(CompanyID::new("bliv").into()));
+        let res = event.process(state4.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 
     #[test]
@@ -1370,6 +1517,11 @@ mod tests {
         state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
         let res = event.process(state2.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
+
+        let mut state3 = state.clone();
+        state3.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
+        let res = event.process(state3.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
     }
 
     #[test]
@@ -1396,6 +1548,11 @@ mod tests {
         state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
         let res = event.process(state2.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
+
+        let mut state3 = state.clone();
+        state3.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
+        let res = event.process(state3.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
     }
 
     #[test]
@@ -1428,6 +1585,11 @@ mod tests {
         state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
         let res = event.process(state2.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
+
+        let mut state3 = state.clone();
+        state3.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
+        let res = event.process(state3.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
     }
 }
 

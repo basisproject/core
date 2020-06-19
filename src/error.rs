@@ -56,15 +56,6 @@ pub enum Error {
     /// match expectation.
     #[error("Op does not match expectation")]
     OpMismatch,
-    /// When we try to run an operation on a process we don't own
-    #[error("operation on a resource you don't own")]
-    ProcessOwnerMismatch,
-    /// When performing an operation on a resource that isn't in your custody
-    #[error("operation on a resource you don't have custody of")]
-    ResourceCustodyMismatch,
-    /// When performing an operation on a resource that doesn't belong to you
-    #[error("operation on a resource you don't own")]
-    ResourceOwnerMismatch,
     /// When we try to perform an operation on a deleted user
     #[error("operation on deleted user")]
     UserIsDeleted,

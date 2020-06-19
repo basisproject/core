@@ -45,9 +45,6 @@ pub fn work(caller: &User, member: &CompanyMember, company: &Company, id: EventI
     if company.is_deleted() {
         Err(Error::CompanyIsDeleted)?;
     }
-    if process.company_id() != company.id() {
-        Err(Error::ProcessOwnerMismatch)?;
-    }
 
     let effort = {
         let milliseconds = end.timestamp_millis() - begin.timestamp_millis();
@@ -104,7 +101,7 @@ mod tests {
         models::{
             company::{CompanyID, CompanyType},
             company_member::CompanyMemberID,
-            event::{Event, EventID},
+            event::{Event, EventID, EventError},
             occupation::OccupationID,
             process::ProcessID,
             testutils::{make_user, make_company, make_member, make_process},
@@ -211,7 +208,7 @@ mod tests {
         let mut process3 = process.clone();
         process3.set_company_id(CompanyID::new("zing"));
         let res = work(&user, &member2, &company, id.clone(), worker2.clone(), process3.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
-        assert_eq!(res, Err(Error::ProcessOwnerMismatch));
+        assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
     }
 }
 
