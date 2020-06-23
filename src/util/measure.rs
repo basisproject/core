@@ -78,3 +78,14 @@ pub fn unwrap_or_zero(measure: &Option<Measure>, default: &Measure) -> Measure {
         })
 }
 
+/// Set a Measure's count to zero (preserves Unit and NumericUnion types).
+pub fn set_zero(measure: &mut Measure) {
+    let num = match measure.has_numerical_value() {
+        NumericUnion::Decimal(_) => NumericUnion::Decimal(Zero::zero()),
+        NumericUnion::Double(_) => NumericUnion::Double(Zero::zero()),
+        NumericUnion::Float(_) => NumericUnion::Float(Zero::zero()),
+        NumericUnion::Integer(_) => NumericUnion::Integer(Zero::zero()),
+    };
+    measure.set_has_numerical_value(num);
+}
+

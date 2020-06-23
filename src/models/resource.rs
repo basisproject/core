@@ -12,6 +12,7 @@ use crate::{
         process::ProcessID,
         resource_spec::ResourceSpecID,
     },
+    util::measure,
 };
 use om2::Unit;
 use url::Url;
@@ -44,6 +45,14 @@ impl Resource {
     pub fn get_unit(&self) -> Option<Unit> {
         self.inner().accounting_quantity().clone().or_else(|| self.inner().onhand_quantity().clone())
             .map(|measure| measure.has_unit().clone())
+    }
+
+    /// Zero out the accounting/onhand quantity measurements for this resource.
+    pub fn zero_measures(&mut self) {
+        self.inner_mut().accounting_quantity_mut().as_mut()
+            .map(|x| measure::set_zero(x));
+        self.inner_mut().onhand_quantity_mut().as_mut()
+            .map(|x| measure::set_zero(x));
     }
 }
 

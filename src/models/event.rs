@@ -2,15 +2,12 @@
 //! room together. Processing events is what allows moving `Costs` through the
 //! system.
 //!
-//! It's important to note that in many REA systems, only events are recorded
-//! and all the other objects are willed into existence from there. For our
-//! purposes, events will operate on and mutate *known* objects. The reason is
-//! that we want to build a picture of ongoing state as it happens to avoid the
-//! need to walk back our event tree on every operation or do graph traversal on
-//! our economic network. Most REA systems, to my understanding, have a
+//! It's important to note that many REA systems, to my understanding, have a
 //! recording/observation process, and afterwards an analysis process. Because
 //! the economic graph is so vast and complex, we don't have the luxury of doing
 //! an analysis process: observation and analysis must happen at the same time!
+//! This means we have to forego some of the niceties we might get in other REA
+//! systems.
 //!
 //! For clarity on events and how they tie in with intents and commitments:
 //!
@@ -303,6 +300,11 @@ impl Event {
         let action = self.inner().action();
         let accounting_effect = Some(action.resource_effect()).and_then(|x| if x == ResourceEffect::NoEffect { None } else { Some(x) });
         let onhand_effect = Some(action.onhand_effect()).and_then(|x| if x == ResourceEffect::NoEffect { None } else { Some(x) });
+        // note that the following line only works because accounting/onhand
+        // effects are paired in concert with each other. if there was every a
+        // case where accounting increased and onhand decreased in the same
+        // action, much of the logic using bundle_effect would need to be
+        // rewritten.
         let bundle_effect = accounting_effect.clone().or(onhand_effect.clone());
 
         // attempt to grab our primary and (if applicable) secondary process and
@@ -331,6 +333,7 @@ impl Event {
         let mut process2: Option<Process> = None;
         let mut resource: Option<Resource> = None;
         let mut resource2: Option<Resource> = None;
+        let mut resource2_is_create = false;
         let mut move_costs: Option<Costs> = None;
 
         // tries to guess if we *need* a primary resource, and if so, grabs it
@@ -343,10 +346,27 @@ impl Event {
             Ok(())
         };
         // tries to guess if we *need* a secondary resource, and if so, grabs it
-        // from the state
-        let mut default_resource2 = || -> Result<()> {
+        // from the state. however, if we specify a to_resource id in the event
+        // data but neglect to send in a to resource in our state, this means we
+        // want to *create* a new resource copied from the primary resource.
+        let mut default_resource2 = |resource1: &Option<Resource>| -> Result<()> {
             resource2 = match &bundle_effect {
-                &Some(ResourceEffect::DecrementIncrement) => Some(state.to_resource.clone().ok_or(EventError::MissingResourceTo)?.clone()),
+                &Some(ResourceEffect::DecrementIncrement) => {
+                    match (state.to_resource.as_ref(), resource1.as_ref(), self.inner().to_resource_inventoried_as().as_ref()) {
+                        (Some(resource), _, _) => {
+                            Some(resource.clone())
+                        }
+                        (None, Some(primary_resource), Some(resource_id)) => {
+                            let mut res_tmp = primary_resource.clone();
+                            res_tmp.set_id(resource_id.clone());
+                            res_tmp.set_costs(Costs::new());
+                            res_tmp.zero_measures();
+                            resource2_is_create = true;
+                            Some(res_tmp)
+                        }
+                        _ => Err(EventError::MissingResourceTo)?,
+                    }
+                }
                 _ => None,
             };
             Ok(())
@@ -382,7 +402,7 @@ impl Event {
                     }
                     Some(MoveType::Resource) => {
                         default_resource()?;
-                        default_resource2()?;
+                        default_resource2(&resource)?;
                     }
                     None => Err(EventError::MissingMoveType)?,
                 }
@@ -423,7 +443,7 @@ impl Event {
             }
             _ => {
                 default_resource()?;
-                default_resource2()?;
+                default_resource2(&resource)?;
                 match (action.input_output(), &bundle_effect) {
                     (Some(_), _) | (_, &Some(ResourceEffect::DecrementIncrement)) => {
                         default_move_costs()?;
@@ -487,16 +507,18 @@ impl Event {
 
         // make sure the secondary resource is being acted on by its owner
         // and/or custodian
-        match resource2.as_ref() {
-            Some(resource) => {
-                if resource.inner().primary_accountable().as_ref() != Some(self.inner().receiver()) {
-                    Err(EventError::ResourceOwnerMismatch)?;
+        if !resource2_is_create {
+            match resource2.as_ref() {
+                Some(resource) => {
+                    if resource.inner().primary_accountable().as_ref() != Some(self.inner().receiver()) {
+                        Err(EventError::ResourceOwnerMismatch)?;
+                    }
+                    if resource.in_custody_of() != self.inner().receiver() {
+                        Err(EventError::ResourceCustodyMismatch)?;
+                    }
                 }
-                if resource.in_custody_of() != self.inner().receiver() {
-                    Err(EventError::ResourceCustodyMismatch)?;
-                }
+                _ => {}
             }
-            _ => {}
         }
 
         // save these so we can test for changes in our final step
@@ -614,107 +636,13 @@ impl Event {
         if process != process_clone { res.modify_process(process.unwrap()); }
         if process2 != process2_clone { res.modify_process(process2.unwrap()); }
         if resource != resource_clone { res.modify_resource(resource.unwrap()); }
-        if resource2 != resource2_clone { res.modify_resource(resource2.unwrap()); }
+        if resource2_is_create {
+            res.create_resource(resource2.unwrap());
+        } else if resource2 != resource2_clone {
+            res.modify_resource(resource2.unwrap());
+        }
 
         Ok(res.into_modifications())
-    }
-
-    /// Return a list of fields that the `Event` object needs to have to
-    /// successfully process itself.
-    pub fn required_event_fields(&self) -> Vec<&'static str> {
-        let mut fields = vec![];
-        let action = self.inner().action();
-        let accounting_effect = Some(action.resource_effect()).and_then(|x| if x == ResourceEffect::NoEffect { None } else { Some(x) });
-        let onhand_effect = Some(action.onhand_effect()).and_then(|x| if x == ResourceEffect::NoEffect { None } else { Some(x) });
-        let bundle_effect = accounting_effect.clone().or(onhand_effect.clone());
-        match action {
-            Action::Move => {
-                fields.push("move_type");
-                fields.push("move_costs");
-                match self.move_type() {
-                    Some(MoveType::Resource) => {
-                        fields.push("resource_quantity");
-                    }
-                    _ => {}
-                }
-            }
-            Action::Work => {
-                fields.push("move_costs");
-                fields.push("effort_quantity");
-            }
-            _ => {
-                match (action.input_output(), bundle_effect.clone()) {
-                    (Some(_), _) | (_, Some(ResourceEffect::DecrementIncrement)) => {
-                        fields.push("move_costs");
-                    }
-                    _ => {}
-                }
-                match bundle_effect {
-                    Some(_) => {
-                        fields.push("resource_quantity");
-                    }
-                    _ => {}
-                }
-            }
-        }
-        fields.sort();
-        fields
-    }
-
-    /// Return a list of fields that the `EventProcessState` object needs to
-    /// have to successfully process this event.
-    pub fn required_state_fields(&self) -> Vec<&'static str> {
-        let mut fields = vec![];
-        let action = self.inner().action();
-        let accounting_effect = Some(action.resource_effect()).and_then(|x| if x == ResourceEffect::NoEffect { None } else { Some(x) });
-        let onhand_effect = Some(action.onhand_effect()).and_then(|x| if x == ResourceEffect::NoEffect { None } else { Some(x) });
-        let bundle_effect = accounting_effect.clone().or(onhand_effect.clone());
-        match action {
-            Action::DeliverService => {
-                fields.push("input_of");
-                fields.push("output_of");
-            }
-            Action::Move => {
-                match self.move_type() {
-                    Some(MoveType::ProcessCosts) => {
-                        fields.push("input_of");
-                        fields.push("output_of");
-                    }
-                    Some(MoveType::Resource) => {
-                        fields.push("resource");
-                        fields.push("to_resource");
-                    }
-                    _ => {}
-                }
-            }
-            Action::Use => {
-                fields.push("resource");
-                fields.push("input_of");
-            }
-            Action::Work => {
-                fields.push("input_of");
-                fields.push("provider");
-            }
-            _ => {
-                match action.input_output() {
-                    Some(InputOutput::Input) => {
-                        fields.push("input_of");
-                    }
-                    Some(InputOutput::Output) => {
-                        fields.push("output_of");
-                    }
-                    _ => {}
-                }
-                if bundle_effect.is_some() {
-                    fields.push("resource");
-                }
-                if bundle_effect == Some(ResourceEffect::DecrementIncrement) {
-                    fields.push("to_resource");
-                }
-            }
-        }
-        fields.sort();
-        fields
     }
 }
 
@@ -735,6 +663,97 @@ mod tests {
     use om2::{Measure, NumericUnion, Unit};
     use rust_decimal_macros::*;
     use vf_rs::vf;
+
+    fn required_fields(event: &Event, state: &EventProcessState) -> (Vec<&'static str>, Vec<&'static str>) {
+        let mut event_fields = vec![];
+        let mut state_fields = vec![];
+        let action = event.inner().action();
+        let accounting_effect = Some(action.resource_effect()).and_then(|x| if x == ResourceEffect::NoEffect { None } else { Some(x) });
+        let onhand_effect = Some(action.onhand_effect()).and_then(|x| if x == ResourceEffect::NoEffect { None } else { Some(x) });
+        let bundle_effect = accounting_effect.clone().or(onhand_effect.clone());
+        match action {
+            Action::Move => {
+                event_fields.push("move_type");
+                event_fields.push("move_costs");
+                match event.move_type() {
+                    Some(MoveType::Resource) => {
+                        event_fields.push("resource_quantity");
+                        event_fields.push("to_resource_inventoried_as");
+                    }
+                    _ => {}
+                }
+            }
+            Action::Work => {
+                event_fields.push("move_costs");
+                event_fields.push("effort_quantity");
+            }
+            _ => {
+                match (action.input_output(), bundle_effect.clone()) {
+                    (Some(_), _) | (_, Some(ResourceEffect::DecrementIncrement)) => {
+                        event_fields.push("move_costs");
+                    }
+                    _ => {}
+                }
+                if bundle_effect == Some(ResourceEffect::DecrementIncrement) {
+                    event_fields.push("to_resource_inventoried_as");
+                }
+                match bundle_effect {
+                    Some(_) => {
+                        event_fields.push("resource_quantity");
+                    }
+                    _ => {}
+                }
+            }
+        }
+        match action {
+            Action::DeliverService => {
+                state_fields.push("input_of");
+                state_fields.push("output_of");
+            }
+            Action::Move => {
+                match event.move_type() {
+                    Some(MoveType::ProcessCosts) => {
+                        state_fields.push("input_of");
+                        state_fields.push("output_of");
+                    }
+                    Some(MoveType::Resource) => {
+                        state_fields.push("resource");
+                        // to_resource not required because we can create the
+                        // resource via to_resource_inventoried_as
+                    }
+                    _ => {}
+                }
+            }
+            Action::Use => {
+                state_fields.push("resource");
+                state_fields.push("input_of");
+            }
+            Action::Work => {
+                state_fields.push("input_of");
+                state_fields.push("provider");
+            }
+            _ => {
+                match action.input_output() {
+                    Some(InputOutput::Input) => {
+                        state_fields.push("input_of");
+                    }
+                    Some(InputOutput::Output) => {
+                        state_fields.push("output_of");
+                    }
+                    _ => {}
+                }
+                if bundle_effect.is_some() {
+                    state_fields.push("resource");
+                }
+            }
+        }
+        if state.to_resource.is_some() && !event_fields.contains(&"to_resource_inventoried_as") {
+            event_fields.push("to_resource_inventoried_as");
+        }
+        event_fields.sort();
+        state_fields.sort();
+        (event_fields, state_fields)
+    }
 
     fn state_with_fields(state: &EventProcessState, fields: Vec<&'static str>) -> EventProcessState {
         let mut builder = EventProcessState::builder();
@@ -800,30 +819,31 @@ mod tests {
     /// In other words, we test actual results against the methods
     /// `required_event_fields` and `required_state_fields`.
     fn fuzz_state(event: Event, state: EventProcessState, now: &DateTime<Utc>) {
-        let all_field_combos = generate_combinations(&vec!["input_of", "output_of", "provider", "resource", "to_resource"]);
-        let all_event_combos = generate_combinations(&vec!["move_costs", "move_type", "resource_quantity", "effort_quantity"]);
+        let all_state_combos = generate_combinations(&vec!["input_of", "output_of", "provider", "resource", "to_resource"]);
+        let all_event_combos = generate_combinations(&vec!["move_costs", "move_type", "resource_quantity", "effort_quantity", "to_resource_inventoried_as"]);
         for evfields in &all_event_combos {
             let mut event2 = event.clone();
             event2.set_move_costs(None);
             event2.set_move_type(None);
             event2.inner_mut().set_resource_quantity(None);
             event2.inner_mut().set_effort_quantity(None);
+            event2.inner_mut().set_to_resource_inventoried_as(None);
             for evfield in evfields {
                 match *evfield {
                     "move_costs" => { event2.set_move_costs(event.move_costs().clone()); }
                     "move_type" => { event2.set_move_type(event.move_type().clone()); }
                     "resource_quantity" => { event2.inner_mut().set_resource_quantity(event.inner().resource_quantity().clone()); }
                     "effort_quantity" => { event2.inner_mut().set_effort_quantity(event.inner().effort_quantity().clone()); }
+                    "to_resource_inventoried_as" => { event2.inner_mut().set_to_resource_inventoried_as(event.inner().to_resource_inventoried_as().clone()); }
                     _ => {}
                 }
             }
-            let must_event_fields = event2.required_event_fields();
-            let must_state_fields = event2.required_state_fields();
-            for fieldset in &all_field_combos {
+            for fieldset in &all_state_combos {
+                let state = state_with_fields(&state, fieldset.clone());
+                let (must_event_fields, must_state_fields) = required_fields(&event2, &state);
                 let has_event_fields = must_event_fields.iter().fold(true, |acc, x| acc && evfields.contains(x));
                 let has_state_fields = must_state_fields.iter().fold(true, |acc, x| acc && fieldset.contains(x));
                 let should_pass = has_event_fields && has_state_fields;
-                let state = state_with_fields(&state, fieldset.clone());
                 match event2.process(state, now) {
                     Ok(_) => {
                         if !should_pass {
@@ -916,7 +936,8 @@ mod tests {
             .build().unwrap()
     }
 
-    /// Create a test event. Change it how you want after the fact.
+    /// Create a test event. Change it how you want after the fact. Or don't. I
+    /// don't care.
     fn make_event(action: vf::Action, company_id: &CompanyID, company_to: &CompanyID, state: &EventProcessState, now: &DateTime<Utc>) -> Event {
         Event::builder()
             .id(EventID::create())
@@ -1252,24 +1273,24 @@ mod tests {
 
         let mut costs = Costs::new();
         costs.track_labor("machinist", dec!(34.91) - dec!(13.2));
-        let resource = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
-        assert_eq!(resource.costs(), &costs);
-        assert_eq!(resource.inner().accounting_quantity(), &Some(Measure::new(10, Unit::One)));
-        assert_eq!(resource.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
-        assert_eq!(resource.inner().current_location(), &None);
-        assert_eq!(resource.in_custody_of(), &company_id.clone().into());
-        check_resource_mods(vec!["costs", "in_custody_of", "primary_accountable", "accounting_quantity", "onhand_quantity"], &resource, state.resource.as_ref().unwrap());
+        let resource3 = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
+        assert_eq!(resource3.costs(), &costs);
+        assert_eq!(resource3.inner().accounting_quantity(), &Some(Measure::new(10, Unit::One)));
+        assert_eq!(resource3.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
+        assert_eq!(resource3.inner().current_location(), &None);
+        assert_eq!(resource3.in_custody_of(), &company_id.clone().into());
+        check_resource_mods(vec!["costs", "in_custody_of", "primary_accountable", "accounting_quantity", "onhand_quantity"], &resource3, state.resource.as_ref().unwrap());
 
         let mut costs = Costs::new();
         costs.track_labor("machinist", dec!(13.2));
         costs.track_labor("trucker", dec!(29.8));
-        let resource2 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
-        assert_eq!(resource2.costs(), &costs);
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(1, Unit::One)));
-        assert_eq!(resource2.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
-        assert_eq!(resource2.inner().current_location().as_ref().unwrap().lat(), &Some(71.665519));
-        assert_eq!(resource2.in_custody_of(), &company_id.clone().into());
-        check_resource_mods(vec!["costs", "in_custody_of", "primary_accountable", "accounting_quantity", "onhand_quantity", "current_location"], &resource2, state.to_resource.as_ref().unwrap());
+        let resource4 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
+        assert_eq!(resource4.costs(), &costs);
+        assert_eq!(resource4.inner().accounting_quantity(), &Some(Measure::new(1, Unit::One)));
+        assert_eq!(resource4.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
+        assert_eq!(resource4.inner().current_location().as_ref().unwrap().lat(), &Some(71.665519));
+        assert_eq!(resource4.in_custody_of(), &company_id.clone().into());
+        check_resource_mods(vec!["costs", "in_custody_of", "primary_accountable", "accounting_quantity", "onhand_quantity", "current_location"], &resource4, state.to_resource.as_ref().unwrap());
 
         let mut state2 = state.clone();
         state2.resource.as_mut().map(|x| x.inner_mut().set_primary_accountable(Some(CompanyID::new("bliv").into())));
@@ -1280,6 +1301,19 @@ mod tests {
         state3.resource.as_mut().map(|x| x.set_in_custody_of(CompanyID::new("bliv").into()));
         let res = event.process(state3.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
+
+        let now4 = util::time::now();
+        let mut state4 = state.clone();
+        state4.to_resource = None;
+        let mods = event.process(state4.clone(), &now4).unwrap().into_vec();
+        let resource5 = mods[1].clone().expect_op::<Resource>(Op::Create).unwrap();
+        let mut resource2_clone = resource2.clone();
+        resource2_clone.inner_mut().accounting_quantity_mut().as_mut().map(|x| x.set_has_numerical_value(NumericUnion::Integer(6)));
+        resource2_clone.set_costs(Costs::new_with_labor("machinist", dec!(30.0)));
+        resource2_clone.set_created(now4.clone());
+        resource2_clone.set_updated(now4.clone());
+        assert_eq!(resource5.id(), event.inner().to_resource_inventoried_as().as_ref().unwrap());
+        assert_eq!(resource5, resource2_clone);
     }
 
     #[test]
@@ -1378,6 +1412,19 @@ mod tests {
         state3.resource.as_mut().map(|x| x.set_in_custody_of(CompanyID::new("bliv").into()));
         let res = event.process(state3.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
+
+        let now4 = util::time::now();
+        let mut state4 = state.clone();
+        state4.to_resource = None;
+        let mods = event.process(state4.clone(), &now4).unwrap().into_vec();
+        let resource5 = mods[1].clone().expect_op::<Resource>(Op::Create).unwrap();
+        let mut resource2_clone = resource2.clone();
+        resource2_clone.inner_mut().accounting_quantity_mut().as_mut().map(|x| x.set_has_numerical_value(NumericUnion::Integer(6)));
+        resource2_clone.set_costs(Costs::new_with_labor("machinist", dec!(30.0)));
+        resource2_clone.set_created(now4.clone());
+        resource2_clone.set_updated(now4.clone());
+        assert_eq!(resource5.id(), event.inner().to_resource_inventoried_as().as_ref().unwrap());
+        assert_eq!(resource5, resource2_clone);
     }
 
     #[test]
@@ -1396,10 +1443,12 @@ mod tests {
 
         let resource = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
         assert_eq!(resource.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
+        assert_eq!(resource.in_custody_of().clone(), company_id.clone().into());
         check_resource_mods(vec!["costs", "primary_accountable", "accounting_quantity"], &resource, state.resource.as_ref().unwrap());
 
         let resource2 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
         assert_eq!(resource2.inner().primary_accountable().clone().unwrap(), company2_id.clone().into());
+        assert_eq!(resource.in_custody_of().clone(), company_id.clone().into());
         check_resource_mods(vec!["costs", "primary_accountable", "accounting_quantity"], &resource2, state.to_resource.as_ref().unwrap());
 
         let mut state2 = state.clone();
@@ -1411,6 +1460,22 @@ mod tests {
         state3.resource.as_mut().map(|x| x.set_in_custody_of(CompanyID::new("bliv").into()));
         let res = event.process(state3.clone(), &now);
         assert!(res.is_ok());
+
+        let now4 = util::time::now();
+        let mut state4 = state.clone();
+        state4.to_resource = None;
+        let mods = event.process(state4.clone(), &now4).unwrap().into_vec();
+        let resource5 = mods[1].clone().expect_op::<Resource>(Op::Create).unwrap();
+        let mut resource2_clone = resource2.clone();
+        resource2_clone.inner_mut().accounting_quantity_mut().as_mut().map(|x| x.set_has_numerical_value(NumericUnion::Integer(6)));
+        resource2_clone.inner_mut().onhand_quantity_mut().as_mut().map(|x| x.set_has_numerical_value(NumericUnion::Integer(0)));
+        resource2_clone.set_in_custody_of(company_id.clone().into());
+        resource2_clone.inner_mut().set_primary_accountable(Some(company2_id.clone().into()));
+        resource2_clone.set_costs(Costs::new_with_labor("machinist", dec!(30.0)));
+        resource2_clone.set_created(now4.clone());
+        resource2_clone.set_updated(now4.clone());
+        assert_eq!(resource5.id(), event.inner().to_resource_inventoried_as().as_ref().unwrap());
+        assert_eq!(resource5, resource2_clone);
     }
 
     #[test]
@@ -1445,6 +1510,22 @@ mod tests {
         state3.resource.as_mut().map(|x| x.set_in_custody_of(CompanyID::new("bliv").into()));
         let res = event.process(state3.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
+
+        let now4 = util::time::now();
+        let mut state4 = state.clone();
+        state4.to_resource = None;
+        let mods = event.process(state4.clone(), &now4).unwrap().into_vec();
+        let resource5 = mods[1].clone().expect_op::<Resource>(Op::Create).unwrap();
+        let mut resource2_clone = resource2.clone();
+        resource2_clone.inner_mut().accounting_quantity_mut().as_mut().map(|x| x.set_has_numerical_value(NumericUnion::Integer(0)));
+        resource2_clone.inner_mut().onhand_quantity_mut().as_mut().map(|x| x.set_has_numerical_value(NumericUnion::Integer(6)));
+        resource2_clone.set_in_custody_of(company2_id.clone().into());
+        resource2_clone.inner_mut().set_primary_accountable(Some(company_id.clone().into()));
+        resource2_clone.set_costs(Costs::new_with_labor("machinist", dec!(30.0)));
+        resource2_clone.set_created(now4.clone());
+        resource2_clone.set_updated(now4.clone());
+        assert_eq!(resource5.id(), event.inner().to_resource_inventoried_as().as_ref().unwrap());
+        assert_eq!(resource5, resource2_clone);
     }
 
     #[test]
