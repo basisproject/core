@@ -32,16 +32,6 @@ pub fn consume<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, com
     if company.is_deleted() {
         Err(Error::CompanyIsDeleted)?;
     }
-    /*
-    if resource.inner().primary_accountable() != &Some(company.id().clone().into()) {
-        // can't consume a resource that ain't yours
-        Err(Error::ResourceOwnerMismatch)?;
-    }
-    if resource.in_custody_of() != &company.id().clone().into() {
-        // can't consume a resource that ain't yours
-        Err(Error::ResourceCustodyMismatch)?;
-    }
-    */
 
     let measure = {
         let unit = resource.get_unit().ok_or(Error::ResourceMeasureMissing)?;
