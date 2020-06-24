@@ -107,6 +107,9 @@ pub enum Permission {
     /// Can update a resource spec
     ResourceSpecUpdate,
 
+    /// Can use a resource in a productive process
+    Use,
+
     /// Can record labor
     Work,
     /// Can update labor records willy-nilly
