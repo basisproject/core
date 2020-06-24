@@ -1,16 +1,16 @@
-//! Welcome to the Basis Core. While we realize there are many choices when it
-//! comes to rust-based economic libraries that facilitate a profitless
-//! socialist mode of production, we like to believe this one is the most
-//! complete and featureful.
+//! Welcome to the Basis Core. We realize there are many choices when evaluating
+//! rust-based economic libraries that facilitate a socialist mode of production
+//! and appreciate your choice of using Basis to further your revolutionary
+//! goals.
 //!
-//! This library, as said above, provides a functional interface for interacting
-//! with a graph of economic nodes engaging in a socialist mode of production.
-//! What this means is that we start from the concepts that
+//! This library provides a functional interface for interacting with a graph of
+//! economic nodes engaging in a socialist mode of production. What this means
+//! is that we start from the concepts that
 //!
-//! 1. People should be free to determine their own path in life (bottom-up
+//! 1. People should be free to determine an fulfill their own needs (bottom-up
 //! organization)
 //! 1. Companies started within this network operate without profit
-//! 1. Economic planning is built-in but not required
+//! 1. Productive instruments are shared and managed by members
 //!
 //! Effectively, this is a codebase designed to support [the free association
 //! of producers][freeassoc],
@@ -20,10 +20,10 @@
 //!
 //! While this ideal is a long ways away, it is nonetheless worth striving for.
 //! We also recognize that there will be inevitable transitional periods between
-//! our current capitalist system and, *ahem*, better arrangements, so this
-//! library also contains methods for interacting with capitalist markets in a
-//! way that does not require compromising the ideals of the member companies.
-//! For more information on the Basis project, see [the project website][basis].
+//! our current capitalist system and better arrangements, so this library also
+//! contains methods for interacting with capitalist markets in a way that does
+//! not require compromising the ideals of the member companies. For more
+//! information on the Basis project, see [the project website][basis].
 //!
 //! This library does not deal with storage or other external mediums in any way
 //! and is fully self-contained. All data being operated on needs to be passed
