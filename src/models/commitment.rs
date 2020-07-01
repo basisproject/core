@@ -46,6 +46,8 @@ impl Commitment {
     /// - matches the current commitment (meaning the companies, processes, and
     /// resources in the event are the same as they are in the commitment)
     /// - does not require a commitment (ie, an internal transfer or something)
+    ///
+    /// TODO: remove this?
     pub fn validate_event(&self, event: &Event) -> Result<()> {
         match event.inner().action() {
             // inter-organizational actions actions need validation
