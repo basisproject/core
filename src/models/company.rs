@@ -107,6 +107,13 @@ pub enum Permission {
     /// Can update a resource spec
     ResourceSpecUpdate,
 
+    /// Transfer ownership/custody to another agent
+    Transfer,
+    /// Transfer ownership to another agent
+    TransferAllRights,
+    /// Transfer custody to another agent
+    TransferCustody,
+
     /// Can use a resource in a productive process
     Use,
 
