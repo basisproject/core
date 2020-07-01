@@ -235,6 +235,7 @@ pub(crate) mod testutils {
         access::Role,
         costs::Costs,
         models::{
+            commitment::{Commitment, CommitmentID},
             company::{Company, CompanyID, CompanyType, Permission as CompanyPermission},
             company_member::{CompanyMember, CompanyMemberID},
             occupation::OccupationID,
@@ -246,15 +247,25 @@ pub(crate) mod testutils {
         },
     };
     use om2::Measure;
+    use rust_decimal_macros::*;
     use vf_rs::vf;
 
-    pub fn make_user(user_id: &UserID, roles: Option<Vec<Role>>, now: &DateTime<Utc>) -> User {
-        User::builder()
-            .id(user_id.clone())
-            .roles(roles.unwrap_or(vec![Role::User]))
-            .email("surely@hotmail.com")   // don't call me shirley
-            .name("buzzin' frog")
-            .active(true)
+    pub fn make_commitment(action: vf::Action, company_id: &CompanyID, company_to: &CompanyID, input_of: Option<&ProcessID>, output_of: Option<&ProcessID>, resource: Option<&ResourceID>, quantity: Option<Measure>, now: &DateTime<Utc>) -> Commitment {
+        Commitment::builder()
+            .id(CommitmentID::create())
+            .inner(
+                vf::Commitment::builder()
+                    .action(action)
+                    .has_point_in_time(now.clone())
+                    .input_of(input_of.map(|x| x.clone()))
+                    .output_of(output_of.map(|x| x.clone()))
+                    .provider(company_id.clone())
+                    .receiver(company_to.clone())
+                    .resource_inventoried_as(resource.map(|x| x.clone()))
+                    .resource_quantity(quantity)
+                    .build().unwrap()
+            )
+            .move_costs(Costs::new_with_labor("machinist", dec!(27.0)))
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap()
@@ -300,15 +311,16 @@ pub(crate) mod testutils {
             .build().unwrap()
     }
 
-    pub fn make_resource_spec<T: Into<String>>(id: &ResourceSpecID, company_id: &CompanyID, name: T, now: &DateTime<Utc>) -> ResourceSpec {
-        ResourceSpec::builder()
+    pub fn make_process_spec<T: Into<String>>(id: &ProcessSpecID, company_id: &CompanyID, name: T, active: bool, now: &DateTime<Utc>) -> ProcessSpec {
+        ProcessSpec::builder()
             .id(id.clone())
             .inner(
-                vf::ResourceSpecification::builder()
+                vf::ProcessSpecification::builder()
                     .name(name)
                     .build().unwrap()
             )
             .company_id(company_id.clone())
+            .active(active)
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap()
@@ -332,16 +344,27 @@ pub(crate) mod testutils {
             .build().unwrap()
     }
 
-    pub fn make_process_spec<T: Into<String>>(id: &ProcessSpecID, company_id: &CompanyID, name: T, active: bool, now: &DateTime<Utc>) -> ProcessSpec {
-        ProcessSpec::builder()
+    pub fn make_resource_spec<T: Into<String>>(id: &ResourceSpecID, company_id: &CompanyID, name: T, now: &DateTime<Utc>) -> ResourceSpec {
+        ResourceSpec::builder()
             .id(id.clone())
             .inner(
-                vf::ProcessSpecification::builder()
+                vf::ResourceSpecification::builder()
                     .name(name)
                     .build().unwrap()
             )
             .company_id(company_id.clone())
-            .active(active)
+            .created(now.clone())
+            .updated(now.clone())
+            .build().unwrap()
+    }
+
+    pub fn make_user(user_id: &UserID, roles: Option<Vec<Role>>, now: &DateTime<Utc>) -> User {
+        User::builder()
+            .id(user_id.clone())
+            .roles(roles.unwrap_or(vec![Role::User]))
+            .email("surely@hotmail.com")   // don't call me shirley
+            .name("buzzin' frog")
+            .active(true)
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap()
