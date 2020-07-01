@@ -19,6 +19,10 @@ pub enum Error {
     /// trying to delete a Process that has non-zero costs).
     #[error("cannot erase costs")]
     CannotEraseCosts,
+    /// When you try to do something that requires a commitment but the given
+    /// commitment doesn't match the action being performed.
+    #[error("commitment is invalid")]
+    CommitmentInvalid,
     /// When we try to perform an operation on a deleted company
     #[error("operation on deleted company")]
     CompanyIsDeleted,
