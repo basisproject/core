@@ -389,6 +389,12 @@ impl Event {
         //
         // that said, we can still use defaults where applicable.
         match action {
+            // needed because we can't determine the resource from the action
+            // resource effects
+            Action::Cite => {
+                move_costs = Some(self.move_costs().clone().ok_or(EventError::MissingCosts)?);
+                resource = Some(state.resource.clone().ok_or(EventError::MissingResource)?);
+            }
             Action::DeliverService => {
                 move_costs = Some(self.move_costs().clone().ok_or(EventError::MissingCosts)?);
                 process2 = Some(state.input_of.clone().ok_or(EventError::MissingInputProcess)?);
@@ -407,6 +413,8 @@ impl Event {
                     None => Err(EventError::MissingMoveType)?,
                 }
             }
+            // needed because we can't determine the resource from the action
+            // resource effects
             Action::Use => {
                 move_costs = Some(self.move_costs().clone().ok_or(EventError::MissingCosts)?);
                 resource = Some(state.resource.clone().ok_or(EventError::MissingResource)?);

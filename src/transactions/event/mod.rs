@@ -21,9 +21,9 @@ pub enum ResourceMover {
     Update(Resource),
 }
 
-pub mod consume;
-pub mod produce;
+pub mod delivery;
+pub mod production;
+pub mod service;
 pub mod transfer;
-pub mod r#use;
 pub mod work;
 

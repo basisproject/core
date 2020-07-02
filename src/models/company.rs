@@ -57,6 +57,9 @@ pub enum CompanyType {
 pub enum Permission {
     All,
 
+    /// Can cite a resource
+    Cite,
+
     /// Can delete the company
     CompanyDelete,
     /// Can update the company's basic info
