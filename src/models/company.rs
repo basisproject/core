@@ -68,6 +68,9 @@ pub enum Permission {
     /// Can consume a resource
     Consume,
 
+    /// Can deliver a service
+    DeliverService,
+
     /// Can create new members (hire)
     MemberCreate,
     /// Can delete a member (fire)
