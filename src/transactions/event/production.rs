@@ -1,6 +1,6 @@
 //! Production is about using, consuming, and producing resources. The `use` and
 //! `consume` actions are inputs to the productive process and `produce` is the
-//! output the creates the final resource.
+//! output the creates a resource.
 
 use chrono::{DateTime, Utc};
 use crate::{
