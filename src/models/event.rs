@@ -399,6 +399,10 @@ impl Event {
                 move_costs = Some(self.move_costs().clone().ok_or(EventError::MissingCosts)?);
                 process2 = Some(state.input_of.clone().ok_or(EventError::MissingInputProcess)?);
             }
+            Action::Dropoff => {
+                move_costs = Some(self.move_costs().clone().ok_or(EventError::MissingCosts)?);
+                resource = Some(state.resource.clone().ok_or(EventError::MissingResource)?);
+            }
             Action::Move => {
                 move_costs = Some(self.move_costs().clone().ok_or(EventError::MissingCosts)?);
                 match self.move_type() {
@@ -412,6 +416,10 @@ impl Event {
                     }
                     None => Err(EventError::MissingMoveType)?,
                 }
+            }
+            Action::Pickup => {
+                move_costs = Some(self.move_costs().clone().ok_or(EventError::MissingCosts)?);
+                resource = Some(state.resource.clone().ok_or(EventError::MissingResource)?);
             }
             // needed because we can't determine the resource from the action
             // resource effects

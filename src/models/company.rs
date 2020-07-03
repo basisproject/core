@@ -55,7 +55,11 @@ pub enum CompanyType {
 /// with. 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Permission {
+    /// Can do anything
     All,
+
+    /// Can accept a resource (for repair)
+    Accept,
 
     /// Can cite a resource
     Cite,
@@ -71,6 +75,12 @@ pub enum Permission {
     /// Can deliver a service
     DeliverService,
 
+    /// Can drop off (for delivery) a resource
+    Dropoff,
+
+    /// Can lower resource quantities within the company
+    Lower,
+
     /// Can create new members (hire)
     MemberCreate,
     /// Can delete a member (fire)
@@ -81,6 +91,15 @@ pub enum Permission {
     MemberSetCompensation,
     /// Can update existing members' basic info
     MemberUpdate,
+
+    /// Can modify a resource (for repair)
+    Modify,
+
+    /// Can move resources or costs internally within the company
+    Move,
+
+    /// Can pick up (for delivery) a resource
+    Pickup,
 
     /// Can create a process
     ProcessCreate,
@@ -98,6 +117,9 @@ pub enum Permission {
 
     /// Can produce a resource
     Produce,
+
+    /// Can raise resource quantities within the company
+    Raise,
 
     /// Can create a resource
     ResourceCreate,
