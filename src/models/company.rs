@@ -95,8 +95,10 @@ pub enum Permission {
     /// Can modify a resource (for repair)
     Modify,
 
-    /// Can move resources or costs internally within the company
-    Move,
+    /// Can move costs internally within the company
+    MoveCosts,
+    /// Can move resources internally within the company
+    MoveResource,
 
     /// Can pick up (for delivery) a resource
     Pickup,
