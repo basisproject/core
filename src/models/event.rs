@@ -334,6 +334,7 @@ impl Event {
         let mut resource: Option<Resource> = None;
         let mut resource2: Option<Resource> = None;
         let mut resource2_is_create = false;
+        let mut resource_owner_must_match = true;
         let mut move_costs: Option<Costs> = None;
 
         // tries to guess if we *need* a primary resource, and if so, grabs it
@@ -402,6 +403,7 @@ impl Event {
             Action::Dropoff => {
                 move_costs = Some(self.move_costs().clone().ok_or(EventError::MissingCosts)?);
                 resource = Some(state.resource.clone().ok_or(EventError::MissingResource)?);
+                resource_owner_must_match = false;
             }
             Action::Move => {
                 move_costs = Some(self.move_costs().clone().ok_or(EventError::MissingCosts)?);
@@ -420,6 +422,7 @@ impl Event {
             Action::Pickup => {
                 move_costs = Some(self.move_costs().clone().ok_or(EventError::MissingCosts)?);
                 resource = Some(state.resource.clone().ok_or(EventError::MissingResource)?);
+                resource_owner_must_match = false;
             }
             // needed because we can't determine the resource from the action
             // resource effects
@@ -506,7 +509,9 @@ impl Event {
                     Err(EventError::ResourceOwnerMismatch)?;
                 }
                 if self.inner().provider() == self.inner().receiver() && resource.inner().primary_accountable().as_ref() != Some(self.inner().provider()) {
-                    Err(EventError::ResourceOwnerMismatch)?;
+                    if resource_owner_must_match {
+                        Err(EventError::ResourceOwnerMismatch)?;
+                    }
                 }
                 if (onhand_effect == Some(ResourceEffect::Decrement) || onhand_effect == Some(ResourceEffect::DecrementIncrement)) && resource.in_custody_of() != self.inner().provider() {
                     Err(EventError::ResourceCustodyMismatch)?;

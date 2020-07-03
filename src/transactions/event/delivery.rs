@@ -72,6 +72,11 @@ pub fn dropoff(caller: &User, member: &CompanyMember, company: &Company, id: Eve
     Ok(mods)
 }
 
+/// Signifies that a delivery has been picked up from its origin. Note that
+/// custody must have been transfered to the picker-upper previously (via the
+/// `transfer-custody` event).
+///
+/// This operates on a whole resource.
 pub fn pickup(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Pickup)?;
@@ -209,11 +214,10 @@ mod tests {
         let res = dropoff(&user, &member, &company, id.clone(), process3.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
-        // a company that doesn't own a resource can't drop it off
         let mut resource3 = resource.clone();
         resource3.inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
         let res = dropoff(&user, &member, &company, id.clone(), process.clone(), resource3.clone(), process.costs().clone(), Some(loc.clone()), &now);
-        assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
+        assert!(res.is_ok());
 
         // a company that doesn't have posession of a resource can't drop it off
         let mut resource4 = resource.clone();
@@ -273,13 +277,12 @@ mod tests {
         let res = pickup(&user, &member, &company, id.clone(), resource.clone(), process3.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
-        // a company that doesn't own a resource can't consume it
         let mut resource3 = resource.clone();
         resource3.inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
         let res = pickup(&user, &member, &company, id.clone(), resource3.clone(), process.clone(), &now);
-        assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
+        assert!(res.is_ok());
 
-        // a company that doesn't have posession of a resource can't consume it
+        // a company that doesn't have posession of a resource can't pick it up
         let mut resource4 = resource.clone();
         resource4.set_in_custody_of(CompanyID::new("ziggy").into());
         let res = pickup(&user, &member, &company, id.clone(), resource4.clone(), process.clone(), &now);
