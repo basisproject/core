@@ -390,6 +390,12 @@ impl Event {
         //
         // that said, we can still use defaults where applicable.
         match action {
+            // needed because we need to override `resource_owner_must_match`
+            Action::Accept => {
+                move_costs = Some(self.move_costs().clone().ok_or(EventError::MissingCosts)?);
+                resource = Some(state.resource.clone().ok_or(EventError::MissingResource)?);
+                resource_owner_must_match = false;
+            }
             // needed because we can't determine the resource from the action
             // resource effects
             Action::Cite => {
