@@ -581,6 +581,5 @@ mod tests {
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
 
     }
-
 }
 
