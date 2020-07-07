@@ -7,7 +7,7 @@
 //! economic nodes engaging in a socialist mode of production. What this means
 //! is that we start from the concepts that
 //!
-//! 1. People should be free to determine an fulfill their own needs (bottom-up
+//! 1. People should be free to determine and fulfill their own needs (bottom-up
 //! organization)
 //! 1. Companies started within this network operate without profit
 //! 1. Productive instruments are shared and managed by members

@@ -1,4 +1,4 @@
-//! The user is the point of access to the entire system. User's have
+//! The user is the point of access to the entire system. Users have
 //! permissions, users own accounts, users are linked to companies (via
 //! `CompanyMember` objects), and much more.
 //!
