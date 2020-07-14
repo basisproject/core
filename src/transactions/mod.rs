@@ -19,7 +19,7 @@ pub mod company;
 pub mod company_member;
 //pub mod currency;
 pub mod event;
-//pub mod intent;
+pub mod intent;
 pub mod occupation;
 pub mod process;
 pub mod process_spec;
