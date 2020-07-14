@@ -9,6 +9,7 @@
 //! [Event]: ../event/struct.Event.html
 
 use crate::{
+    costs::Costs,
     models::{
         agreement::AgreementID,
         lib::agent::AgentID,
@@ -28,7 +29,11 @@ basis_model! {
     /// [vfintent]: https://valueflo.ws/introduction/flows.html#intent
     pub struct Intent {
         id: <<IntentID>>,
+        /// Our inner VF intent type
         inner: vf::Intent<AgreementID, AgentID, ProcessID, AgentID, (), ResourceSpecID, ResourceID>,
+        /// If this event is an input/output of a process or resource, move some
+        /// fixed amount of costs between the two objects.
+        move_costs: Option<Costs>,
     }
     IntentBuilder
 }
