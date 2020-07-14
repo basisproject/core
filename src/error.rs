@@ -32,9 +32,6 @@ pub enum Error {
     /// You don't have permission to perform this action
     #[error("insufficient privileges")]
     InsufficientPrivileges,
-    /// Trying to update the wrong object
-    #[error("mismatched object: {0}")]
-    MismatchedObject(String),
     /// We get this when trying to pull a measure out of a resource and come up
     /// blank, for instance when using `consume` on a resource that hasn't had
     /// its quantities initialized via `produce`/`raise`/`transfer`/etc.
