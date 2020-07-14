@@ -64,6 +64,9 @@ pub enum Permission {
     /// Can cite a resource
     Cite,
 
+    /// Can create a commitment
+    CommitmentCreate,
+
     /// Can delete the company
     CompanyDelete,
     /// Can update the company's basic info
@@ -77,6 +80,13 @@ pub enum Permission {
 
     /// Can drop off (for delivery) a resource
     Dropoff,
+
+    /// Can create a new intent
+    IntentCreate,
+    /// Can delete an intent
+    IntentDelete,
+    /// Can update an intent
+    IntentUpdate,
 
     /// Can lower resource quantities within the company
     Lower,
