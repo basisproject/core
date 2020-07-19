@@ -1,10 +1,8 @@
 use crate::{
     error::{Result, Error},
     models::{
-        bank::BankID,
         company::CompanyID,
         company_member::CompanyMemberID,
-        region::RegionID,
         user::UserID,
     },
 };
@@ -17,14 +15,10 @@ use std::convert::TryFrom;
 /// VF's model while still constraining ourselves to a limited set of actors.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum AgentID {
-    #[serde(rename = "bank")]
-    BankID(BankID),
     #[serde(rename = "company")]
     CompanyID(CompanyID),
     #[serde(rename = "member")]
     CompanyMemberID(CompanyMemberID),
-    #[serde(rename = "region")]
-    RegionID(RegionID),
     #[serde(rename = "user")]
     UserID(UserID),
 }
@@ -51,9 +45,7 @@ macro_rules! impl_agent_for_model_id {
     };
 }
 
-impl_agent_for_model_id! { BankID }
 impl_agent_for_model_id! { CompanyID }
 impl_agent_for_model_id! { CompanyMemberID }
-impl_agent_for_model_id! { RegionID }
 impl_agent_for_model_id! { UserID }
 

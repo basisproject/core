@@ -32,7 +32,6 @@ macro_rules! load_models {
             @$($load_type)*
             (account, Account, AccountID),
             (agreement, Agreement, AgreementID),
-            (bank, Bank, BankID),
             (commitment, Commitment, CommitmentID),
             (company, Company, CompanyID),
             (company_member, CompanyMember, CompanyMemberID),
@@ -42,7 +41,6 @@ macro_rules! load_models {
             (occupation, Occupation, OccupationID),
             (process, Process, ProcessID),
             (process_spec, ProcessSpec, ProcessSpecID),
-            (region, Region, RegionID),
             (resource, Resource, ResourceID),
             (resource_spec, ResourceSpec, ResourceSpecID, Dimensions),
             (user, User, UserID),
