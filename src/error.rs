@@ -41,6 +41,9 @@ pub enum Error {
     /// units, such as adding 12 Hours to 16 Kilograms
     #[error("operation on measurement with mismatched units")]
     MeasureUnitsMismatched,
+    /// We're missing required fields in a call
+    #[error("fields missing {0:?}")]
+    MissingFields(Vec<String>),
     /// Negative costs cannot be created, as they would represent a surplus
     /// (aka profit). Frowned upon here!
     #[error("operation creates negative costs")]
