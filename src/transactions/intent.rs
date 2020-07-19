@@ -21,22 +21,13 @@ use crate::{
         resource_spec::ResourceSpecID,
         user::User,
     },
+    transactions::OrderAction,
 };
 use om2::Measure;
 use vf_rs::{vf, geo::SpatialThing};
 
-/// This is the action we're hoping will happen if this intent is fulfilled.
-pub enum IntentAction {
-    /// A service will be delivered
-    DeliverService,
-    /// A resource will be transferred (ownership and custody)
-    Transfer,
-    /// A resource's custody will be transferred for a period of time (rental)
-    TransferCustody,
-}
-
 /// Create a new intent
-pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: IntentID, move_costs: Option<Costs>, action: IntentAction, agreed_in: Option<AgreementID>, at_location: Option<SpatialThing>, available_quantity: Option<Measure>, due: Option<DateTime<Utc>>, effort_quantity: Option<Measure>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, has_point_in_time: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, name: Option<String>, note: Option<String>, provider: Option<AgentID>, receiver: Option<AgentID>, resource_conforms_to: Option<ResourceSpecID>, resource_inventoried_as: Option<ResourceID>, resource_quantity: Option<Measure>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: IntentID, move_costs: Option<Costs>, action: OrderAction, agreed_in: Option<AgreementID>, at_location: Option<SpatialThing>, available_quantity: Option<Measure>, due: Option<DateTime<Utc>>, effort_quantity: Option<Measure>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, has_point_in_time: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, name: Option<String>, note: Option<String>, provider: Option<AgentID>, receiver: Option<AgentID>, resource_conforms_to: Option<ResourceSpecID>, resource_inventoried_as: Option<ResourceID>, resource_quantity: Option<Measure>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateIntents)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::IntentCreate)?;
     if company.is_deleted() {
@@ -52,9 +43,9 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: Inte
         Err(Error::InsufficientPrivileges)?;
     }
     let event_action = match action {
-        IntentAction::DeliverService => vf::Action::DeliverService,
-        IntentAction::Transfer => vf::Action::Transfer,
-        IntentAction::TransferCustody => vf::Action::TransferCustody,
+        OrderAction::DeliverService => vf::Action::DeliverService,
+        OrderAction::Transfer => vf::Action::Transfer,
+        OrderAction::TransferCustody => vf::Action::TransferCustody,
     };
     let model = Intent::builder()
         .id(id)
@@ -91,7 +82,7 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: Inte
 }
 
 /// Update an intent
-pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: Intent, move_costs: Option<Option<Costs>>, action: Option<IntentAction>, agreed_in: Option<Option<AgreementID>>, at_location: Option<Option<SpatialThing>>, available_quantity: Option<Option<Measure>>, due: Option<Option<DateTime<Utc>>>, effort_quantity: Option<Option<Measure>>, finished: Option<Option<bool>>, has_beginning: Option<Option<DateTime<Utc>>>, has_end: Option<Option<DateTime<Utc>>>, has_point_in_time: Option<Option<DateTime<Utc>>>, in_scope_of: Option<Vec<AgentID>>, name: Option<Option<String>>, note: Option<Option<String>>, provider: Option<Option<AgentID>>, receiver: Option<Option<AgentID>>, resource_conforms_to: Option<Option<ResourceSpecID>>, resource_inventoried_as: Option<Option<ResourceID>>, resource_quantity: Option<Option<Measure>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: Intent, move_costs: Option<Option<Costs>>, action: Option<OrderAction>, agreed_in: Option<Option<AgreementID>>, at_location: Option<Option<SpatialThing>>, available_quantity: Option<Option<Measure>>, due: Option<Option<DateTime<Utc>>>, effort_quantity: Option<Option<Measure>>, finished: Option<Option<bool>>, has_beginning: Option<Option<DateTime<Utc>>>, has_end: Option<Option<DateTime<Utc>>>, has_point_in_time: Option<Option<DateTime<Utc>>>, in_scope_of: Option<Vec<AgentID>>, name: Option<Option<String>>, note: Option<Option<String>>, provider: Option<Option<AgentID>>, receiver: Option<Option<AgentID>>, resource_conforms_to: Option<Option<ResourceSpecID>>, resource_inventoried_as: Option<Option<ResourceID>>, resource_quantity: Option<Option<Measure>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateIntents)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::IntentUpdate)?;
     if company.is_deleted() {
@@ -118,9 +109,9 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
     }
     let event_action = action.map(|x| {
         match x {
-            IntentAction::DeliverService => vf::Action::DeliverService,
-            IntentAction::Transfer => vf::Action::Transfer,
-            IntentAction::TransferCustody => vf::Action::TransferCustody,
+            OrderAction::DeliverService => vf::Action::DeliverService,
+            OrderAction::Transfer => vf::Action::Transfer,
+            OrderAction::TransferCustody => vf::Action::TransferCustody,
         }
     });
 
@@ -221,7 +212,7 @@ mod tests {
             .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
             .build().unwrap();
 
-        let mods = create(&user, &member, &company, id.clone(), Some(costs.clone()), IntentAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
+        let mods = create(&user, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let intent = mods[0].clone().expect_op::<Intent>(Op::Create).unwrap();
@@ -252,27 +243,27 @@ mod tests {
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![CompanyPermission::ProcessDelete]);
-        let res = create(&user, &member2, &company, id.clone(), Some(costs.clone()), IntentAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
+        let res = create(&user, &member2, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut user2 = user.clone();
         user2.set_roles(vec![]);
-        let res = create(&user2, &member, &company, id.clone(), Some(costs.clone()), IntentAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
+        let res = create(&user2, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
-        let res = create(&user, &member, &company2, id.clone(), Some(costs.clone()), IntentAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
+        let res = create(&user, &member, &company2, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
         assert_eq!(res, Err(Error::CompanyIsDeleted));
 
         let mut company3 = company.clone();
         company3.set_id(CompanyID::new("bill's company"));
-        let res = create(&user, &member, &company3, id.clone(), Some(costs.clone()), IntentAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
+        let res = create(&user, &member, &company3, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
-        let res = create(&user, &member, &company3, id.clone(), Some(costs.clone()), IntentAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), None, Some(company.id().clone().into()), None, Some(ResourceID::new("widget1")), None, true, &now);
+        let res = create(&user, &member, &company3, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), None, Some(company.id().clone().into()), None, Some(ResourceID::new("widget1")), None, true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let res = create(&user, &member, &company, id.clone(), Some(costs.clone()), IntentAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), None, None, None, Some(ResourceID::new("widget1")), None, true, &now);
+        let res = create(&user, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), None, None, None, Some(ResourceID::new("widget1")), None, true, &now);
         assert_eq!(res, Err(Error::MissingFields(vec!["provider".into(), "receiver".into()])));
     }
 
@@ -289,7 +280,7 @@ mod tests {
             .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
             .build().unwrap();
 
-        let mods = create(&user, &member, &company, id.clone(), Some(costs1.clone()), IntentAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
+        let mods = create(&user, &member, &company, id.clone(), Some(costs1.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
         let intent1 = mods[0].clone().expect_op::<Intent>(Op::Create).unwrap();
         let now2 = util::time::now();
         let mods = update(&user, &member, &company, intent1.clone(), Some(Some(costs2.clone())), None, None, Some(None), None, None, None, None, None, None, None, Some(vec![]), Some(Some("buy widget".into())), None, None, None, None, None, None, Some(false), &now2).unwrap().into_vec();
@@ -358,7 +349,7 @@ mod tests {
             .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
             .build().unwrap();
 
-        let mods = create(&user, &member, &company, id.clone(), Some(costs.clone()), IntentAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
+        let mods = create(&user, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
         let intent1 = mods[0].clone().expect_op::<Intent>(Op::Create).unwrap();
 
         let now2 = util::time::now();

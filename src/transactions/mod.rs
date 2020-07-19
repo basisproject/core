@@ -12,6 +12,17 @@
 //! could (in theory) be used without needing to couple any of the logic to the
 //! storage mechanism.
 
+/// An action that happens between companies. This is used for intents and
+/// commitments.
+pub enum OrderAction {
+    /// A service will be delivered
+    DeliverService,
+    /// A resource will be transferred (ownership and custody)
+    Transfer,
+    /// A resource's custody will be transferred for a period of time (rental)
+    TransferCustody,
+}
+
 //pub mod account;
 //pub mod agreement;
 //pub mod commitment;
