@@ -19,7 +19,7 @@ pub enum OrderAction {
     DeliverService,
     /// A resource will be transferred (ownership and custody)
     Transfer,
-    /// A resource's custody will be transferred for a period of time (rental)
+    /// A resource's custody will be transferred for a period of time (delivery/rental)
     TransferCustody,
 }
 
