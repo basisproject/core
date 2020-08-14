@@ -12,7 +12,6 @@ use crate::{
     models::{
         Op,
         Modifications,
-        agreement::AgreementID,
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
         lib::agent::AgentID,
@@ -24,10 +23,11 @@ use crate::{
     transactions::OrderAction,
 };
 use om2::Measure;
+use url::Url;
 use vf_rs::{vf, geo::SpatialThing};
 
 /// Create a new intent
-pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: IntentID, move_costs: Option<Costs>, action: OrderAction, agreed_in: Option<AgreementID>, at_location: Option<SpatialThing>, available_quantity: Option<Measure>, due: Option<DateTime<Utc>>, effort_quantity: Option<Measure>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, has_point_in_time: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, name: Option<String>, note: Option<String>, provider: Option<AgentID>, receiver: Option<AgentID>, resource_conforms_to: Option<ResourceSpecID>, resource_inventoried_as: Option<ResourceID>, resource_quantity: Option<Measure>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: IntentID, move_costs: Option<Costs>, action: OrderAction, agreed_in: Option<Url>, at_location: Option<SpatialThing>, available_quantity: Option<Measure>, due: Option<DateTime<Utc>>, effort_quantity: Option<Measure>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, has_point_in_time: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, name: Option<String>, note: Option<String>, provider: Option<AgentID>, receiver: Option<AgentID>, resource_conforms_to: Option<ResourceSpecID>, resource_inventoried_as: Option<ResourceID>, resource_quantity: Option<Measure>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateIntents)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::IntentCreate)?;
     if company.is_deleted() {
@@ -82,7 +82,7 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: Inte
 }
 
 /// Update an intent
-pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: Intent, move_costs: Option<Option<Costs>>, action: Option<OrderAction>, agreed_in: Option<Option<AgreementID>>, at_location: Option<Option<SpatialThing>>, available_quantity: Option<Option<Measure>>, due: Option<Option<DateTime<Utc>>>, effort_quantity: Option<Option<Measure>>, finished: Option<Option<bool>>, has_beginning: Option<Option<DateTime<Utc>>>, has_end: Option<Option<DateTime<Utc>>>, has_point_in_time: Option<Option<DateTime<Utc>>>, in_scope_of: Option<Vec<AgentID>>, name: Option<Option<String>>, note: Option<Option<String>>, provider: Option<Option<AgentID>>, receiver: Option<Option<AgentID>>, resource_conforms_to: Option<Option<ResourceSpecID>>, resource_inventoried_as: Option<Option<ResourceID>>, resource_quantity: Option<Option<Measure>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: Intent, move_costs: Option<Option<Costs>>, action: Option<OrderAction>, agreed_in: Option<Option<Url>>, at_location: Option<Option<SpatialThing>>, available_quantity: Option<Option<Measure>>, due: Option<Option<DateTime<Utc>>>, effort_quantity: Option<Option<Measure>>, finished: Option<Option<bool>>, has_beginning: Option<Option<DateTime<Utc>>>, has_end: Option<Option<DateTime<Utc>>>, has_point_in_time: Option<Option<DateTime<Utc>>>, in_scope_of: Option<Vec<AgentID>>, name: Option<Option<String>>, note: Option<Option<String>>, provider: Option<Option<AgentID>>, receiver: Option<Option<AgentID>>, resource_conforms_to: Option<Option<ResourceSpecID>>, resource_inventoried_as: Option<Option<ResourceID>>, resource_quantity: Option<Option<Measure>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateIntents)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::IntentUpdate)?;
     if company.is_deleted() {

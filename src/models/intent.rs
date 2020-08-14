@@ -11,13 +11,13 @@
 use crate::{
     costs::Costs,
     models::{
-        agreement::AgreementID,
         lib::agent::AgentID,
         process::ProcessID,
         resource::ResourceID,
         resource_spec::ResourceSpecID,
     }
 };
+use url::Url;
 use vf_rs::vf;
 
 basis_model! {
@@ -30,7 +30,7 @@ basis_model! {
     pub struct Intent {
         id: <<IntentID>>,
         /// Our inner VF intent type
-        inner: vf::Intent<AgreementID, AgentID, ProcessID, AgentID, (), ResourceSpecID, ResourceID>,
+        inner: vf::Intent<Url, AgentID, ProcessID, AgentID, (), ResourceSpecID, ResourceID>,
         /// If this event is an input/output of a process or resource, move some
         /// fixed amount of costs between the two objects.
         move_costs: Option<Costs>,

@@ -40,6 +40,7 @@ use om2::{Measure, NumericUnion, Unit};
 use rust_decimal::prelude::*;
 use serde::{Serialize, Deserialize};
 use thiserror::Error;
+use url::Url;
 use vf_rs::vf::{self, Action, InputOutput, ResourceEffect};
 
 /// An error type for when event processing goes awry.
@@ -141,7 +142,7 @@ basis_model! {
     pub struct Event {
         id: <<EventID>>,
         /// The event's core VF type
-        inner: vf::EconomicEvent<AgreementID, AgentID, ProcessID, AgentID, AgreementID, (), ResourceSpecID, ResourceID, EventID>,
+        inner: vf::EconomicEvent<Url, AgentID, ProcessID, AgentID, AgreementID, (), ResourceSpecID, ResourceID, EventID>,
         /// If this event is an input/output of a process or resource, move some
         /// fixed amount of costs between the two objects.
         move_costs: Option<Costs>,

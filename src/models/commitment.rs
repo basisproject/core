@@ -20,6 +20,7 @@ use crate::{
         resource_spec::ResourceSpecID,
     }
 };
+use url::Url;
 use vf_rs::vf;
 
 basis_model! {
@@ -32,7 +33,7 @@ basis_model! {
     pub struct Commitment {
         id: <<CommitmentID>>,
         /// The commitments's core VF type
-        inner: vf::Commitment<AgreementID, AgreementID, AgentID, (), ProcessID, AgentID, (), ResourceSpecID, ResourceID>,
+        inner: vf::Commitment<Url, AgreementID, AgentID, (), ProcessID, AgentID, (), ResourceSpecID, ResourceID>,
         /// The amount of costs committed to be moved. One could think of this
         /// somewhat like a negotiated price in the current system.
         move_costs: Option<Costs>,

@@ -57,7 +57,7 @@ pub fn work(caller: &User, member: &CompanyMember, company: &Company, id: EventI
     };
     let process_id = process.id().clone();
     let member_id = worker.id().clone();
-    let agreement_id = worker.agreement_id().clone();
+    let agreement = worker.agreement().clone();
 
     let state = EventProcessState::builder()
         .input_of(process)
@@ -69,7 +69,7 @@ pub fn work(caller: &User, member: &CompanyMember, company: &Company, id: EventI
         .inner(
             vf::EconomicEvent::builder()
                 .action(vf::Action::Work)
-                .agreed_in(agreement_id)
+                .agreed_in(agreement)
                 .effort_quantity(Some(effort))
                 .has_beginning(Some(begin))
                 .has_end(Some(end))
@@ -126,7 +126,7 @@ mod tests {
         assert_eq!(mods.len(), 2);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         assert_eq!(event.id(), &id);
-        assert_eq!(event.inner().agreed_in(), member.agreement_id());
+        assert_eq!(event.inner().agreed_in(), member.agreement());
         assert_eq!(event.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(event.inner().has_end(), &Some(now2.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
@@ -171,7 +171,7 @@ mod tests {
         assert_eq!(mods.len(), 2);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         assert_eq!(event.id(), &id);
-        assert_eq!(event.inner().agreed_in(), member2.agreement_id());
+        assert_eq!(event.inner().agreed_in(), member2.agreement());
         assert_eq!(event.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(event.inner().has_end(), &Some(now2.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));

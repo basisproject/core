@@ -12,7 +12,6 @@ use crate::{
     error::{Error, Result},
     models::{
         account::AccountID,
-        agreement::AgreementID,
         company::{CompanyID, Permission},
         lib::agent::AgentID,
         occupation::OccupationID,
@@ -24,6 +23,7 @@ use om2::{Measure, Unit, NumericUnion};
 use rust_decimal::prelude::*;
 use serde::{Serialize, Deserialize};
 use std::convert::TryInto;
+use url::Url;
 use vf_rs::vf;
 
 /// How often we pay workers.
@@ -112,7 +112,7 @@ basis_model! {
         /// defined for the member to perform labor.
         compensation: Option<Compensation>,
         /// Agreement under which this membership takes place
-        agreement_id: Option<AgreementID>,
+        agreement: Option<Url>,
     }
     CompanyMemberBuilder
 }
