@@ -36,7 +36,7 @@
 //! are the main interface for interacting with Basis.
 //!
 //! [freeassoc]: https://en.wikipedia.org/wiki/Free_association_(Marxism_and_anarchism)
-//! [basis]: https://basisproject.gitlab.io/public/
+//! [basis]: https://basisproject.net/
 //! [transactions]: transactions/
 
 pub mod error;
