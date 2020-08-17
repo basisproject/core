@@ -55,6 +55,10 @@ pub enum Permission {
 
     /// Can create a commitment
     CommitmentCreate,
+    /// Can delete a commitment
+    CommitmentDelete,
+    /// Can update a commitment
+    CommitmentUpdate,
 
     /// Can delete the company
     CompanyDelete,
