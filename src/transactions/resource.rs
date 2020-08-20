@@ -22,7 +22,7 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: Reso
     caller.access_check(Permission::CompanyUpdateResources)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceCreate)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     let model = Resource::builder()
         .id(id)
@@ -54,7 +54,7 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
     caller.access_check(Permission::CompanyUpdateResources)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceUpdate)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     if lot.is_some() {
         subject.inner_mut().set_lot(lot);
@@ -86,7 +86,7 @@ pub fn delete(caller: &User, member: &CompanyMember, company: &Company, mut subj
     caller.access_check(Permission::CompanyUpdateResources)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceDelete)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     if !subject.costs().is_zero() {
         Err(Error::CannotEraseCosts)?;
@@ -154,7 +154,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
         let res = create(&user, &member, &company2, id.clone(), spec.id().clone(), Some(lot.clone()), Some("widget batch".into()), None, vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()], Some("niceee".into()), Some(Unit::Hour), true, &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
     }
 
     #[test]
@@ -202,7 +202,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now2.clone()));
         let res = update(&user, &member, &company2, resource.clone(), None, Some("better widgets".into()), Some("444-computers-and-equipment".into()), None, None, Some(Unit::WattHour), Some(false), &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
     }
 
     #[test]
@@ -250,7 +250,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now2.clone()));
         let res = delete(&user, &member, &company2, resource.clone(), &now2);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
     }
 }
 

@@ -26,10 +26,10 @@ pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, co
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::Transfer)?;
     if company_from.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     if company_to.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     let measure = {
         let unit = resource_from.get_unit().ok_or(Error::ResourceMeasureMissing)?;
@@ -88,10 +88,10 @@ pub fn transfer_all_rights<T: Into<NumericUnion>>(caller: &User, member: &Compan
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::Transfer)?;
     if company_from.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     if company_to.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     let measure = {
         let unit = resource_from.get_unit().ok_or(Error::ResourceMeasureMissing)?;
@@ -150,10 +150,10 @@ pub fn transfer_custody<T: Into<NumericUnion>>(caller: &User, member: &CompanyMe
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::Transfer)?;
     if company_from.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     if company_to.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     let measure = {
         let unit = resource_from.get_unit().ok_or(Error::ResourceMeasureMissing)?;
@@ -327,7 +327,7 @@ mod tests {
         let mut company_2 = company.clone();
         company_2.set_deleted(Some(now.clone()));
         let res = transfer(&user, &member, &company_2, &company2, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't transfer into a resource you don't own
         let mut resource_to3 = resource_to.clone();
@@ -451,7 +451,7 @@ mod tests {
         let mut company_2 = company.clone();
         company_2.set_deleted(Some(now.clone()));
         let res = transfer_all_rights(&user, &member, &company_2, &company2, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't transfer into a resource you don't own
         let mut resource_to3 = resource_to.clone();
@@ -569,7 +569,7 @@ mod tests {
         let mut company_2 = company.clone();
         company_2.set_deleted(Some(now.clone()));
         let res = transfer_custody(&user, &member, &company_2, &company2, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't override a resource you don't own
         let mut resource_to3 = resource_to.clone();

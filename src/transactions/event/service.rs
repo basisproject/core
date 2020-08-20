@@ -25,10 +25,10 @@ pub fn deliver_service(caller: &User, member: &CompanyMember, company_from: &Com
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::DeliverService)?;
     if company_from.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     if company_to.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
 
     let process_from_id = process_from.id().clone();
@@ -147,12 +147,12 @@ mod tests {
         let mut company_from2 = company_from.clone();
         company_from2.set_deleted(Some(now.clone()));
         let res = deliver_service(&user, &member, &company_from2, &company_to, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         let mut company_to2 = company_from.clone();
         company_to2.set_deleted(Some(now.clone()));
         let res = deliver_service(&user, &member, &company_from, &company_to2, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't move costs from a process you don't own
         let mut process_from3 = process_from.clone();

@@ -22,7 +22,7 @@ pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &
     caller.access_check(Permission::CompanyUpdateProcesses)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessCreate)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     let model = Process::builder()
         .id(id)
@@ -53,7 +53,7 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
     caller.access_check(Permission::CompanyUpdateProcesses)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessUpdate)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     if let Some(name) = name {
         subject.inner_mut().set_name(name);
@@ -88,7 +88,7 @@ pub fn delete(caller: &User, member: &CompanyMember, company: &Company, mut subj
     caller.access_check(Permission::CompanyUpdateProcesses)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessDelete)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     if !subject.costs().is_zero() {
         Err(Error::CannotEraseCosts)?;
@@ -153,7 +153,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
         let res = create(&user, &member, &company2, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
     }
 
     #[test]
@@ -199,7 +199,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now2.clone()));
         let res = update(&user, &member, &company2, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.id().clone().into()]), Some(false), &now2);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
     }
 
     #[test]
@@ -245,7 +245,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now2.clone()));
         let res = delete(&user, &member, &company2, process.clone(), &now2);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
     }
 }
 

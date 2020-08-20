@@ -31,7 +31,7 @@ pub fn dropoff(caller: &User, member: &CompanyMember, company: &Company, id: Eve
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Dropoff)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
 
     let process_id = process.id().clone();
@@ -81,7 +81,7 @@ pub fn pickup(caller: &User, member: &CompanyMember, company: &Company, id: Even
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Pickup)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
 
     let process_id = process.id().clone();
@@ -206,7 +206,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
         let res = dropoff(&user, &member, &company2, id.clone(), process.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't dropoff from a process you don't own
         let mut process3 = process.clone();
@@ -269,7 +269,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
         let res = pickup(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't consume into a process you don't own
         let mut process3 = process.clone();

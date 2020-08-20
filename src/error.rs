@@ -23,9 +23,6 @@ pub enum Error {
     /// commitment doesn't match the action being performed.
     #[error("commitment is invalid")]
     CommitmentInvalid,
-    /// When we try to perform an operation on a deleted company
-    #[error("operation on deleted company")]
-    CompanyIsDeleted,
     /// An error while processing an event.
     #[error("event error {0:?}")]
     Event(#[from] EventError),
@@ -56,6 +53,10 @@ pub enum Error {
     /// as a conversion error when adding two that have different types).
     #[error("error operating on NumericUnion: {0}")]
     NumericUnionOpError(String),
+    /// When we try to update an object that has been deleted (or an object
+    /// attached to the deleted object).
+    #[error("object {0} is deleted")]
+    ObjectIsDeleted(String),
     /// When we try to modify an object that is now in a read-only state.
     #[error("object {0} is read-only")]
     ObjectIsReadOnly(String),

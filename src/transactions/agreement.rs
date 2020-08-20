@@ -23,7 +23,7 @@ pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &
     caller.access_check(Permission::CompanyUpdateAgreements)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::AgreementCreate)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     let model = Agreement::builder()
         .id(id)
@@ -50,7 +50,7 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
     caller.access_check(Permission::CompanyUpdateAgreements)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::AgreementUpdate)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     if *subject.finalized() {
         Err(Error::ObjectIsReadOnly("agreement".into()))?;
@@ -76,7 +76,7 @@ pub fn finalize(caller: &User, member: &CompanyMember, company: &Company, mut su
     caller.access_check(Permission::CompanyUpdateAgreements)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::AgreementUpdate)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     if *subject.finalized() {
         Err(Error::ObjectIsReadOnly("agreement".into()))?;

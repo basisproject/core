@@ -43,7 +43,7 @@ pub fn work(caller: &User, member: &CompanyMember, company: &Company, id: EventI
         member.access_check(caller.id(), company.id(), CompanyPermission::WorkAdmin)?;
     }
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
 
     let effort = {
@@ -157,7 +157,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now2.clone()));
         let res = work(&user, &member, &company2, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // test worker != member
         let mut worker2 = worker.clone();
@@ -202,7 +202,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now2.clone()));
         let res = work(&user, &member2, &company2, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't work into a process you don't own
         let mut process3 = process.clone();

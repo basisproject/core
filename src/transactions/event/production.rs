@@ -34,7 +34,7 @@ pub fn cite(caller: &User, member: &CompanyMember, company: &Company, id: EventI
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Cite)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
 
     let process_id = process.id().clone();
@@ -84,7 +84,7 @@ pub fn consume<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, com
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Consume)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
 
     let measure = {
@@ -140,7 +140,7 @@ pub fn produce<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, com
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Produce)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
 
     let measure = {
@@ -209,7 +209,7 @@ pub fn useeee(caller: &User, member: &CompanyMember, company: &Company, id: Even
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Use)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
 
     let process_id = process.id().clone();
@@ -332,7 +332,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
         let res = cite(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't consume into a process you don't own
         let mut process3 = process.clone();
@@ -416,7 +416,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
         let res = consume(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't consume into a process you don't own
         let mut process3 = process.clone();
@@ -501,7 +501,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
         let res = produce(&user, &member, &company2, id.clone(), process.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't produce from a process you don't own
         let mut process3 = process.clone();
@@ -585,7 +585,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
         let res = useeee(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't useeee into a process you don't own
         let mut process3 = process.clone();

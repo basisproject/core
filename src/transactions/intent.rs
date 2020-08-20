@@ -31,7 +31,7 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: Inte
     caller.access_check(Permission::CompanyUpdateIntents)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::IntentCreate)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     let company_agent_id: AgentID = company.id().clone().into();
     if provider.is_none() && receiver.is_none() {
@@ -86,7 +86,7 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
     caller.access_check(Permission::CompanyUpdateIntents)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::IntentUpdate)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     let company_agent_id: AgentID = company.id().clone().into();
     if provider == Some(None) && receiver == Some(None) {
@@ -179,7 +179,7 @@ pub fn delete(caller: &User, member: &CompanyMember, company: &Company, mut subj
     caller.access_check(Permission::CompanyUpdateIntents)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::IntentDelete)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
@@ -254,7 +254,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
         let res = create(&user, &member, &company2, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         let mut company3 = company.clone();
         company3.set_id(CompanyID::new("bill's company"));
@@ -324,7 +324,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
         let res = update(&user, &member, &company2, intent1.clone(), Some(Some(costs2.clone())), None, None, Some(None), None, None, None, None, None, None, None, Some(vec![]), Some(Some("buy widget".into())), None, None, None, None, None, None, Some(false), &now2);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         let mut company3 = company.clone();
         company3.set_id(CompanyID::new("bill's company"));
@@ -395,7 +395,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now2.clone()));
         let res = delete(&user, &member, &company2, intent1.clone(), &now2);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
     }
 }
 

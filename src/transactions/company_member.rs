@@ -24,7 +24,7 @@ pub fn create(caller: &User, member: &CompanyMember, id: CompanyMemberID, user: 
         Err(Error::UserIsDeleted)?;
     }
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     let model = CompanyMember::builder()
         .id(id)
@@ -145,7 +145,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
         let res = create(&user, &existing_member, id.clone(), new_user.clone(), company2.clone(), occupation_id.clone(), vec![], Some(agreement.clone()), true, &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         let mut new_user2 = new_user.clone();
         new_user2.set_deleted(Some(now.clone()));

@@ -31,7 +31,7 @@ pub fn accept<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, comp
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Accept)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
 
     let measure = {
@@ -84,7 +84,7 @@ pub fn modify<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, comp
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Modify)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
 
     let measure = {
@@ -200,7 +200,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
         let res = accept(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), 3, &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't accept into a process you don't own
         let mut process3 = process.clone();
@@ -283,7 +283,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
         let res = modify(&user, &member, &company2, id.clone(), process.clone(), resource.clone(), process.costs().clone(), 12, &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't modify from a process you don't own
         let mut process3 = process.clone();

@@ -18,7 +18,7 @@ pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &
     caller.access_check(Permission::CompanyUpdateProcessSpecs)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessSpecCreate)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     let model = ProcessSpec::builder()
         .id(id)
@@ -43,7 +43,7 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
     caller.access_check(Permission::CompanyUpdateProcessSpecs)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessSpecUpdate)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     if let Some(name) = name {
         subject.inner_mut().set_name(name);
@@ -63,7 +63,7 @@ pub fn delete(caller: &User, member: &CompanyMember, company: &Company, mut subj
     caller.access_check(Permission::CompanyUpdateProcessSpecs)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessSpecDelete)?;
     if company.is_deleted() {
-        Err(Error::CompanyIsDeleted)?;
+        Err(Error::ObjectIsDeleted("company".into()))?;
     }
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
@@ -118,7 +118,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
         let res = create(&user, &member, &company2, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
     }
 
     #[test]
@@ -157,7 +157,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now2.clone()));
         let res = update(&user, &member, &company2, recspec.clone(), Some("best widget".into()), None, Some(false), &now2);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
     }
 
     #[test]
@@ -195,7 +195,7 @@ mod tests {
         let mut company2 = company.clone();
         company2.set_deleted(Some(now2.clone()));
         let res = delete(&user, &member, &company2, recspec.clone(), &now2);
-        assert_eq!(res, Err(Error::CompanyIsDeleted));
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
     }
 }
 
