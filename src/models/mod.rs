@@ -235,6 +235,7 @@ pub(crate) mod testutils {
         access::Role,
         costs::Costs,
         models::{
+            agreement::{Agreement, AgreementID},
             commitment::{Commitment, CommitmentID},
             company::{Company, CompanyID, CompanyType, Permission as CompanyPermission},
             company_member::{CompanyMember, CompanyMemberID},
@@ -249,6 +250,23 @@ pub(crate) mod testutils {
     use om2::Measure;
     use rust_decimal_macros::*;
     use vf_rs::vf;
+
+    pub fn make_agreement<T: Into<String>>(id: &AgreementID, name: T, note: T, now: &DateTime<Utc>) -> Agreement {
+        Agreement::builder()
+            .id(id.clone())
+            .inner(
+                vf::Agreement::builder()
+                    .created(now.clone())
+                    .name(Some(name.into()))
+                    .note(Some(note.into()))
+                    .build().unwrap()
+            )
+            .finalized(false)
+            .active(true)
+            .created(now.clone())
+            .updated(now.clone())
+            .build().unwrap()
+    }
 
     pub fn make_commitment(action: vf::Action, company_id: &CompanyID, company_to: &CompanyID, input_of: Option<&ProcessID>, output_of: Option<&ProcessID>, resource: Option<&ResourceID>, quantity: Option<Measure>, now: &DateTime<Utc>) -> Commitment {
         Commitment::builder()

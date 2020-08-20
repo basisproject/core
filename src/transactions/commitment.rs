@@ -11,7 +11,7 @@ use crate::{
     models::{
         Op,
         Modifications,
-        agreement::AgreementID,
+        agreement::Agreement,
         commitment::{Commitment, CommitmentID},
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
@@ -28,11 +28,14 @@ use url::Url;
 use vf_rs::{vf, geo::SpatialThing};
 
 /// Create a new commitment
-pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: CommitmentID, move_costs: Costs, action: OrderAction, agreed_in: Option<Url>, at_location: Option<SpatialThing>, clause_of: Option<AgreementID>, created: Option<DateTime<Utc>>, due: Option<DateTime<Utc>>, effort_quantity: Option<Measure>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, has_point_in_time: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, input_of: Option<ProcessID>, name: Option<String>, note: Option<String>, output_of: Option<ProcessID>, provider: AgentID, receiver: AgentID, resource_conforms_to: Option<ResourceSpecID>, resource_inventoried_as: Option<ResourceID>, resource_quantity: Option<Measure>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create(caller: &User, member: &CompanyMember, company: &Company, agreement: &Agreement, id: CommitmentID, move_costs: Costs, action: OrderAction, agreed_in: Option<Url>, at_location: Option<SpatialThing>, created: Option<DateTime<Utc>>, due: Option<DateTime<Utc>>, effort_quantity: Option<Measure>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, has_point_in_time: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, input_of: Option<ProcessID>, name: Option<String>, note: Option<String>, output_of: Option<ProcessID>, provider: AgentID, receiver: AgentID, resource_conforms_to: Option<ResourceSpecID>, resource_inventoried_as: Option<ResourceID>, resource_quantity: Option<Measure>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateCommitments)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::CommitmentCreate)?;
     if company.is_deleted() {
         Err(Error::ObjectIsDeleted("company".into()))?;
+    }
+    if agreement.is_finalized() {
+        Err(Error::ObjectIsReadOnly("agreement".into()))?;
     }
     let company_agent_id: AgentID = company.id().clone().into();
     if company_agent_id != provider && company_agent_id != receiver {
@@ -51,7 +54,7 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: Comm
                 .action(event_action)
                 .agreed_in(agreed_in)
                 .at_location(at_location)
-                .clause_of(clause_of)
+                .clause_of(Some(agreement.id().clone()))
                 .created(created)
                 .due(due)
                 .effort_quantity(effort_quantity)
@@ -82,11 +85,14 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: Comm
 }
 
 /// Update a commitment
-pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: Commitment, move_costs: Option<Costs>, action: Option<OrderAction>, agreed_in: Option<Option<Url>>, at_location: Option<Option<SpatialThing>>, clause_of: Option<Option<AgreementID>>, created: Option<Option<DateTime<Utc>>>, due: Option<Option<DateTime<Utc>>>, effort_quantity: Option<Option<Measure>>, finished: Option<Option<bool>>, has_beginning: Option<Option<DateTime<Utc>>>, has_end: Option<Option<DateTime<Utc>>>, has_point_in_time: Option<Option<DateTime<Utc>>>, in_scope_of: Option<Vec<AgentID>>, input_of: Option<Option<ProcessID>>, name: Option<Option<String>>, note: Option<Option<String>>, output_of: Option<Option<ProcessID>>, resource_conforms_to: Option<Option<ResourceSpecID>>, resource_inventoried_as: Option<Option<ResourceID>>, resource_quantity: Option<Option<Measure>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(caller: &User, member: &CompanyMember, company: &Company, agreement: &Agreement, mut subject: Commitment, move_costs: Option<Costs>, action: Option<OrderAction>, agreed_in: Option<Option<Url>>, at_location: Option<Option<SpatialThing>>, created: Option<Option<DateTime<Utc>>>, due: Option<Option<DateTime<Utc>>>, effort_quantity: Option<Option<Measure>>, finished: Option<Option<bool>>, has_beginning: Option<Option<DateTime<Utc>>>, has_end: Option<Option<DateTime<Utc>>>, has_point_in_time: Option<Option<DateTime<Utc>>>, in_scope_of: Option<Vec<AgentID>>, input_of: Option<Option<ProcessID>>, name: Option<Option<String>>, note: Option<Option<String>>, output_of: Option<Option<ProcessID>>, resource_conforms_to: Option<Option<ResourceSpecID>>, resource_inventoried_as: Option<Option<ResourceID>>, resource_quantity: Option<Option<Measure>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateCommitments)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::CommitmentUpdate)?;
     if company.is_deleted() {
         Err(Error::ObjectIsDeleted("company".into()))?;
+    }
+    if agreement.is_finalized() {
+        Err(Error::ObjectIsReadOnly("agreement".into()))?;
     }
     let event_action = action.map(|x| {
         match x {
@@ -107,9 +113,6 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
     }
     if let Some(at_location) = at_location {
         subject.inner_mut().set_at_location(at_location);
-    }
-    if let Some(clause_of) = clause_of {
-        subject.inner_mut().set_clause_of(clause_of);
     }
     if let Some(created) = created {
         subject.inner_mut().set_created(created);
@@ -164,11 +167,14 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
 }
 
 /// Delete a commitment
-pub fn delete(caller: &User, member: &CompanyMember, company: &Company, mut subject: Commitment, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(caller: &User, member: &CompanyMember, company: &Company, agreement: &Agreement, mut subject: Commitment, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateCommitments)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::CommitmentDelete)?;
     if company.is_deleted() {
         Err(Error::ObjectIsDeleted("company".into()))?;
+    }
+    if agreement.is_finalized() {
+        Err(Error::ObjectIsReadOnly("agreement".into()))?;
     }
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
@@ -179,10 +185,11 @@ mod tests {
     use super::*;
     use crate::{
         models::{
+            agreement::AgreementID,
             company::{CompanyID, CompanyType},
             company_member::CompanyMemberID,
             occupation::OccupationID,
-            testutils::{make_user, make_commitment, make_company, make_member, make_resource},
+            testutils::{make_agreement, make_user, make_company, make_member, make_resource},
             user::UserID,
         },
         util,
@@ -194,7 +201,7 @@ mod tests {
     fn can_create() {
         let now = util::time::now();
         let id = CommitmentID::create();
-        let agreement_id = AgreementID::create();
+        let agreement = make_agreement(&AgreementID::create(), "order 111222", "UwU big order of widgetzzz", &now);
         let company_from = make_company(&CompanyID::create(), CompanyType::Private, "bridget's widgets", &now);
         let company_to = make_company(&CompanyID::create(), CompanyType::Private, "larry's chairs", &now);
         let user = make_user(&UserID::create(), None, &now);
@@ -205,7 +212,7 @@ mod tests {
             .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
             .build().unwrap();
 
-        let mods = create(&user, &member, &company_to, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(agreement_id.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.id().clone().into(), company_to.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now).unwrap().into_vec();
+        let mods = create(&user, &member, &company_to, &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.id().clone().into(), company_to.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let commitment = mods[0].clone().expect_op::<Commitment>(Op::Create).unwrap();
@@ -238,32 +245,37 @@ mod tests {
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![CompanyPermission::ProcessDelete]);
-        let res = create(&user, &member2, &company_to, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(agreement_id.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.id().clone().into(), company_to.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
+        let res = create(&user, &member2, &company_to, &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.id().clone().into(), company_to.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut user2 = user.clone();
         user2.set_roles(vec![]);
-        let res = create(&user2, &member, &company_to, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(agreement_id.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.id().clone().into(), company_to.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
+        let res = create(&user2, &member, &company_to, &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.id().clone().into(), company_to.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company_to2 = company_to.clone();
         company_to2.set_deleted(Some(now.clone()));
-        let res = create(&user, &member, &company_to2, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(agreement_id.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.id().clone().into(), company_to.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
+        let res = create(&user, &member, &company_to2, &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.id().clone().into(), company_to.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         let mut company3 = company_to.clone();
         let mut company4 = company_to.clone();
         company3.set_id(CompanyID::new("bill's zingers, get your premium zings here. got a friend who constantly pranks you? turn the tables and zing that doofus in front of everyone!!"));
         company4.set_id(CompanyID::new("jill's zingers, get the best zings here. turn that lame party into a laugh fest with some classic zingers. don't buy at bill's, he sucks."));
-        let res = create(&user, &member, &company_to, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(agreement_id.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company3.id().clone().into(), company4.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
+        let res = create(&user, &member, &company_to, &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company3.id().clone().into(), company4.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut agreement2 = agreement.clone();
+        agreement2.set_finalized(true);
+        let res = create(&user, &member, &company_to, &agreement2, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.id().clone().into(), company_to.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
+        assert_eq!(res, Err(Error::ObjectIsReadOnly("agreement".into())));
     }
 
     #[test]
     fn can_update() {
         let now = util::time::now();
         let id = CommitmentID::create();
-        let agreement_id = AgreementID::create();
+        let agreement = make_agreement(&AgreementID::create(), "order 111222", "UwU big order of widgetzzz", &now);
         let company_from = make_company(&CompanyID::create(), CompanyType::Private, "bridget's widgets", &now);
         let company_to = make_company(&CompanyID::create(), CompanyType::Private, "larry's chairs", &now);
         let user = make_user(&UserID::create(), None, &now);
@@ -276,10 +288,10 @@ mod tests {
             .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
             .build().unwrap();
 
-        let mods = create(&user, &member, &company_to, id.clone(), costs1.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(agreement_id.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.id().clone().into(), company_to.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now).unwrap().into_vec();
+        let mods = create(&user, &member, &company_to, &agreement, id.clone(), costs1.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.id().clone().into(), company_to.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now).unwrap().into_vec();
         let commitment1 = mods[0].clone().expect_op::<Commitment>(Op::Create).unwrap();
         let now2 = util::time::now();
-        let mods = update(&user, &member, &company_to, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.id().clone().into()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2).unwrap().into_vec();
+        let mods = update(&user, &member, &company_to, &agreement, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.id().clone().into()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2).unwrap().into_vec();
         let commitment2 = mods[0].clone().expect_op::<Commitment>(Op::Update).unwrap();
 
         assert_eq!(commitment2.id(), commitment1.id());
@@ -312,30 +324,45 @@ mod tests {
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![CompanyPermission::ProcessDelete]);
-        let res = update(&user, &member2, &company_to, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.id().clone().into()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2);
+        let res = update(&user, &member2, &company_to, &agreement, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.id().clone().into()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut user2 = user.clone();
         user2.set_roles(vec![]);
-        let res = update(&user2, &member, &company_to, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.id().clone().into()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2);
+        let res = update(&user2, &member, &company_to, &agreement, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.id().clone().into()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company_to2 = company_to.clone();
         company_to2.set_deleted(Some(now.clone()));
-        let res = update(&user, &member, &company_to2, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.id().clone().into()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2);
+        let res = update(&user, &member, &company_to2, &agreement, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.id().clone().into()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+
+        let mut agreement2 = agreement.clone();
+        agreement2.set_finalized(true);
+        let res = update(&user, &member, &company_to, &agreement2, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.id().clone().into()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2);
+        assert_eq!(res, Err(Error::ObjectIsReadOnly("agreement".into())));
     }
 
     #[test]
     fn can_delete() {
         let now = util::time::now();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let id = CommitmentID::create();
+        let agreement = make_agreement(&AgreementID::create(), "order 111222", "UwU big order of widgetzzz", &now);
+        let company_from = make_company(&CompanyID::create(), CompanyType::Private, "bridget's widgets", &now);
+        let company_to = make_company(&CompanyID::create(), CompanyType::Private, "larry's chairs", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentDelete], &now);
-        let commitment1 = make_commitment(vf::Action::Transfer, &company.id(), &CompanyID::new("freddy's"), None, None, Some(&ResourceID::new("widget123")), Some(Measure::new(dec!(32), Unit::One)), &now);
+        let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate, CompanyPermission::CommitmentDelete], &now);
+        let resource = make_resource(&ResourceID::new("widget1"), company_from.id(), &Measure::new(dec!(30), Unit::One), &Costs::new_with_labor("widgetmaker", dec!(50)), &now);
+        let costs1 = Costs::new_with_labor("widgetmaker", 42);
+        let loc = SpatialThing::builder()
+            .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
+            .build().unwrap();
+
+        let mods = create(&user, &member, &company_to, &agreement, id.clone(), costs1.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.id().clone().into(), company_to.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now).unwrap().into_vec();
+        let commitment1 = mods[0].clone().expect_op::<Commitment>(Op::Create).unwrap();
 
         let now2 = util::time::now();
-        let mods = delete(&user, &member, &company, commitment1.clone(), &now2).unwrap().into_vec();
+        let mods = delete(&user, &member, &company_to, &agreement, commitment1.clone(), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let commitment2 = mods[0].clone().expect_op::<Commitment>(Op::Delete).unwrap();
@@ -369,18 +396,23 @@ mod tests {
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![CompanyPermission::ProcessDelete]);
-        let res = delete(&user, &member2, &company, commitment1.clone(), &now2);
+        let res = delete(&user, &member2, &company_to, &agreement, commitment1.clone(), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut user2 = user.clone();
         user2.set_roles(vec![]);
-        let res = delete(&user2, &member, &company, commitment1.clone(), &now2);
+        let res = delete(&user2, &member, &company_to, &agreement, commitment1.clone(), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now2.clone()));
-        let res = delete(&user, &member, &company2, commitment1.clone(), &now2);
+        let mut company_to2 = company_to.clone();
+        company_to2.set_deleted(Some(now2.clone()));
+        let res = delete(&user, &member, &company_to2, &agreement, commitment1.clone(), &now2);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+
+        let mut agreement2 = agreement.clone();
+        agreement2.set_finalized(true);
+        let res = delete(&user, &member, &company_to, &agreement2, commitment1.clone(), &now2);
+        assert_eq!(res, Err(Error::ObjectIsReadOnly("agreement".into())));
     }
 }
 
