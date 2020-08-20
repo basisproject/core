@@ -1,3 +1,8 @@
+//! A commitment is a promise to deliver on some future economic event.
+//!
+//! Commitments are effectively line items in a larger order (see `agreement`)
+//! such as a line on a receipt or one item in an online shopping cart.
+
 use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
@@ -76,6 +81,7 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: Comm
     Ok(Modifications::new_single(Op::Create, model))
 }
 
+/// Update a commitment
 pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: Commitment, move_costs: Option<Costs>, action: Option<OrderAction>, agreed_in: Option<Option<Url>>, at_location: Option<Option<SpatialThing>>, clause_of: Option<Option<AgreementID>>, created: Option<Option<DateTime<Utc>>>, due: Option<Option<DateTime<Utc>>>, effort_quantity: Option<Option<Measure>>, finished: Option<Option<bool>>, has_beginning: Option<Option<DateTime<Utc>>>, has_end: Option<Option<DateTime<Utc>>>, has_point_in_time: Option<Option<DateTime<Utc>>>, in_scope_of: Option<Vec<AgentID>>, input_of: Option<Option<ProcessID>>, name: Option<Option<String>>, note: Option<Option<String>>, output_of: Option<Option<ProcessID>>, resource_conforms_to: Option<Option<ResourceSpecID>>, resource_inventoried_as: Option<Option<ResourceID>>, resource_quantity: Option<Option<Measure>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateCommitments)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::CommitmentUpdate)?;
