@@ -21,3 +21,12 @@ basis_model! {
     AgreementBuilder
 }
 
+impl Agreement {
+    /// Determines if our agreement has been finalized
+    pub fn is_finalized(&self) -> bool {
+        // for now, just read the bit. later on, we might have a more in-depth
+        // check.
+        *self.finalized()
+    }
+}
+

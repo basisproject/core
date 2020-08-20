@@ -52,7 +52,7 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
     if company.is_deleted() {
         Err(Error::ObjectIsDeleted("company".into()))?;
     }
-    if *subject.finalized() {
+    if subject.is_finalized() {
         Err(Error::ObjectIsReadOnly("agreement".into()))?;
     }
     if let Some(created) = created {
@@ -78,7 +78,7 @@ pub fn finalize(caller: &User, member: &CompanyMember, company: &Company, mut su
     if company.is_deleted() {
         Err(Error::ObjectIsDeleted("company".into()))?;
     }
-    if *subject.finalized() {
+    if subject.is_finalized() {
         Err(Error::ObjectIsReadOnly("agreement".into()))?;
     }
     subject.set_finalized(true);
