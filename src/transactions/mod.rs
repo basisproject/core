@@ -24,7 +24,7 @@ pub enum OrderAction {
 }
 
 //pub mod account;
-//pub mod agreement;
+pub mod agreement;
 pub mod commitment;
 pub mod company;
 pub mod company_member;

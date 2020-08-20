@@ -50,6 +50,11 @@ pub enum Permission {
     /// Can accept a resource (for repair)
     Accept,
 
+    /// Can create agreements (orders)
+    AgreementCreate,
+    /// Can update agreements (orders)
+    AgreementUpdate,
+
     /// Can cite a resource
     Cite,
 

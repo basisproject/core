@@ -1,5 +1,6 @@
-//! Agreements represent a legal commitment between two parties and may or may
-//! not be involved in a set of commitments and/or events.
+//! Agreements respresent a larger transaction between two agents. Think of an
+//! agreement like an order, and that order can be made up of multiple
+//! deliverables, modeled as `Commitment`s and `EconomicEvent`s.
 
 use vf_rs::vf;
 basis_model! {
@@ -12,7 +13,10 @@ basis_model! {
     /// [vfagreement]: https://valueflo.ws/introduction/exchanges.html#agreements
     pub struct Agreement {
         id: <<AgreementID>>,
+        /// The inner vf Agreement object
         inner: vf::Agreement,
+        /// Whether this agreement has been approved by all parties
+        finalized: bool,
     }
     AgreementBuilder
 }
