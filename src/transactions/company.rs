@@ -1,3 +1,11 @@
+//! A company is a generic container that groups people, other companies, and
+//! resources together.
+//!
+//! Companies are often places where economic activity takes place (such as
+//! production), but can also group members and resources together in cases like
+//! a housing company where the members are in control of the housing resources
+//! the company is in stewardship of.
+
 use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
