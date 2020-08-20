@@ -52,6 +52,8 @@ pub enum Permission {
 
     /// Can create agreements (orders)
     AgreementCreate,
+    /// Can finalize agreements (orders)
+    AgreementFinalize,
     /// Can update agreements (orders)
     AgreementUpdate,
 
