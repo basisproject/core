@@ -56,6 +56,9 @@ pub enum Error {
     /// as a conversion error when adding two that have different types).
     #[error("error operating on NumericUnion: {0}")]
     NumericUnionOpError(String),
+    /// When we try to modify an object that is now in a read-only state.
+    #[error("object {0} is read-only")]
+    ObjectIsReadOnly(String),
     /// When we ask a `Modification` for a model but the `Op` we give it doesn't
     /// match expectation.
     #[error("Op does not match expectation")]
