@@ -253,8 +253,8 @@ impl Event {
     /// result of processing this event.
     ///
     /// Note that this method *assumes the event is legitimate* and doesn't do
-    /// any kind of checking as to whether or not the event should exist. That
-    /// should happen when the event is created.
+    /// any kind of permissions checking. That should happen when the event is
+    /// created (in the transaction layer).
     pub fn process(&self, state: EventProcessState, now: &DateTime<Utc>) -> Result<Modifications> {
         // some low-hanging fruit error checking. basically make sure that if we
         // pass in a process/resource that it's id matches the one we have in
