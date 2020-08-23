@@ -1,5 +1,9 @@
 //! The transfer transactions are geared towards passing ownership, custody, or
 //! both from one agent to another.
+//!
+//! If you're looking for internal transfers, see the [accounting transactions.][1]
+//!
+//! [1]: ../accounting/index.html
 
 use chrono::{DateTime, Utc};
 use crate::{
@@ -9,6 +13,7 @@ use crate::{
     models::{
         Op,
         Modifications,
+        agreement::Agreement,
         event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
@@ -18,11 +23,12 @@ use crate::{
     transactions::event::ResourceMover,
 };
 use om2::{Measure, NumericUnion};
+use url::Url;
 use vf_rs::vf;
 
 /// Transfer a resource (custody and ownership) from one company to another,
 /// moving a set of costs with it.
-pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company_from: &Company, company_to: &Company, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, move_measure: T, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::Transfer)?;
     if company_from.is_deleted() {
@@ -57,8 +63,11 @@ pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, co
         .inner(
             vf::EconomicEvent::builder()
                 .action(vf::Action::Transfer)
+                .agreed_in(agreed_in)
                 .has_point_in_time(now.clone())
+                .note(note)
                 .provider(company_from.id().clone())
+                .realization_of(Some(agreement.id().clone()))
                 .receiver(company_to.id().clone())
                 .resource_inventoried_as(Some(resource_id))
                 .resource_quantity(Some(measure))
