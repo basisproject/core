@@ -10,6 +10,7 @@ use crate::{
     models::{
         Op,
         Modifications,
+        lib::agent::AgentID,
         agreement::{Agreement, AgreementID},
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
@@ -19,7 +20,7 @@ use crate::{
 use vf_rs::vf;
 
 /// Create a new agreement/order
-pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &Company, id: AgreementID, name: T, note: T, created: Option<DateTime<Utc>>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &Company, id: AgreementID, participants: Vec<AgentID>, name: T, note: T, created: Option<DateTime<Utc>>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateAgreements)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::AgreementCreate)?;
     if company.is_deleted() {
@@ -35,6 +36,7 @@ pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &
                 .build()
                 .map_err(|e| Error::BuilderFailed(e))?
         )
+        .participants(participants)
         .finalized(false)
         .active(active)
         .created(now.clone())
@@ -46,14 +48,20 @@ pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &
 
 /// Update an agreement (mainly just name/note, everything else is commitment/
 /// event management).
-pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: Agreement, name: Option<String>, note: Option<String>, created: Option<Option<DateTime<Utc>>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: Agreement, participants: Option<Vec<AgentID>>, finalized: Option<bool>, name: Option<String>, note: Option<String>, created: Option<Option<DateTime<Utc>>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateAgreements)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::AgreementUpdate)?;
     if company.is_deleted() {
         Err(Error::ObjectIsDeleted("company".into()))?;
     }
-    if subject.is_finalized() {
+    if subject.is_finalized() && finalized != Some(false) {
         Err(Error::ObjectIsReadOnly("agreement".into()))?;
+    }
+    if let Some(participants) = participants {
+        subject.set_participants(participants);
+    }
+    if let Some(finalized) = finalized {
+        subject.set_finalized(finalized);
     }
     if let Some(created) = created {
         subject.inner_mut().set_created(created);
@@ -67,21 +75,6 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
     if let Some(active) = active {
         subject.set_active(active);
     }
-    subject.set_updated(now.clone());
-    Ok(Modifications::new_single(Op::Update, subject))
-}
-
-/// Finalize an agreement
-pub fn finalize(caller: &User, member: &CompanyMember, company: &Company, mut subject: Agreement, now: &DateTime<Utc>) -> Result<Modifications> {
-    caller.access_check(Permission::CompanyUpdateAgreements)?;
-    member.access_check(caller.id(), company.id(), CompanyPermission::AgreementFinalize)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
-    }
-    if subject.is_finalized() {
-        Err(Error::ObjectIsReadOnly("agreement".into()))?;
-    }
-    subject.set_finalized(true);
     subject.set_updated(now.clone());
     Ok(Modifications::new_single(Op::Update, subject))
 }
@@ -104,11 +97,13 @@ mod tests {
     fn can_create() {
         let now = util::time::now();
         let id = AgreementID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company_to = make_company(&CompanyID::create(), CompanyType::Private, "sam's widgets", &now);
+        let company_from = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate], &now);
+        let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate], &now);
+        let participants = vec![company_to.id().clone().into(), company_from.id().clone().into()];
 
-        let mods = create(&user, &member, &company, id.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
+        let mods = create(&user, &member, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let agreement = mods[0].clone().expect_op::<Agreement>(Op::Create).unwrap();
@@ -116,6 +111,7 @@ mod tests {
         assert_eq!(agreement.inner().created(), &Some(now.clone()));
         assert_eq!(agreement.inner().name(), &Some("order 1234141".into()));
         assert_eq!(agreement.inner().note(), &Some("hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.".into()));
+        assert_eq!(agreement.participants(), &participants);
         assert_eq!(agreement.finalized(), &false);
         assert_eq!(agreement.is_finalized(), false);
         assert_eq!(agreement.active(), &true);
@@ -125,17 +121,17 @@ mod tests {
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![CompanyPermission::AgreementUpdate]);
-        let res = create(&user, &member2, &company, id.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now);
+        let res = create(&user, &member2, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut user2 = user.clone();
         user2.set_roles(vec![]);
-        let res = create(&user2, &member, &company, id.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now);
+        let res = create(&user2, &member, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
+        let mut company2 = company_to.clone();
         company2.set_deleted(Some(now.clone()));
-        let res = create(&user, &member, &company2, id.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now);
+        let res = create(&user, &member, &company2, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
     }
 
@@ -143,69 +139,24 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = AgreementID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company_to = make_company(&CompanyID::create(), CompanyType::Private, "sam's widgets", &now);
+        let company_from = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate, CompanyPermission::AgreementUpdate], &now);
+        let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate, CompanyPermission::AgreementUpdate], &now);
+        let participants = vec![company_to.id().clone().into(), company_from.id().clone().into()];
 
-        let mods = create(&user, &member, &company, id.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
+        let mods = create(&user, &member, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
         let agreement1 = mods[0].clone().expect_op::<Agreement>(Op::Create).unwrap();
         let now2 = util::time::now();
-        let mods = update(&user, &member, &company, agreement1.clone(), Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2).unwrap().into_vec();
+        let mods = update(&user, &member, &company_to, agreement1.clone(), Some(vec![company_from.id().clone().into()]), Some(true), Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2).unwrap().into_vec();
         let agreement2 = mods[0].clone().expect_op::<Agreement>(Op::Update).unwrap();
 
         assert_eq!(agreement2.id(), agreement1.id());
         assert_eq!(agreement2.inner().created(), agreement1.inner().created());
         assert_eq!(agreement2.inner().name(), &Some("order 1111222".into()));
         assert_eq!(agreement2.inner().note(), &Some("jerry's long-winded order".into()));
-        assert_eq!(agreement2.finalized(), agreement1.finalized());
-        assert_eq!(agreement2.is_finalized(), agreement1.is_finalized());
-        assert_eq!(agreement2.active(), agreement1.active());
-        assert_eq!(agreement2.created(), agreement1.created());
-        assert_eq!(agreement2.updated(), &now2);
-        assert_eq!(agreement2.deleted(), &None);
-
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![CompanyPermission::AgreementCreate]);
-        let res = update(&user, &member2, &company, agreement1.clone(), Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = update(&user2, &member, &company, agreement1.clone(), Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now2.clone()));
-        let res = update(&user, &member, &company2, agreement1.clone(), Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
-
-        let mut agreement3 = agreement2.clone();
-        agreement3.set_finalized(true);
-        let res = update(&user, &member, &company, agreement3.clone(), Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2);
-        assert_eq!(res, Err(Error::ObjectIsReadOnly("agreement".into())));
-    }
-
-    #[test]
-    fn can_finalize() {
-        let now = util::time::now();
-        let id = AgreementID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate, CompanyPermission::AgreementFinalize], &now);
-
-        let mods = create(&user, &member, &company, id.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
-        let agreement1 = mods[0].clone().expect_op::<Agreement>(Op::Create).unwrap();
-        let now2 = util::time::now();
-        let mods = finalize(&user, &member, &company, agreement1.clone(), &now2).unwrap().into_vec();
-        let agreement2 = mods[0].clone().expect_op::<Agreement>(Op::Update).unwrap();
-
-        assert_eq!(agreement2.id(), agreement1.id());
-        assert_eq!(agreement2.inner().created(), agreement1.inner().created());
-        assert_eq!(agreement2.inner().name(), &Some("order 1234141".into()));
-        assert_eq!(agreement2.inner().note(), &Some("hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.".into()));
-        assert_eq!(agreement1.finalized(), &false);
+        assert_eq!(agreement2.participants(), &vec![company_from.id().clone().into()]);
         assert_eq!(agreement2.finalized(), &true);
-        assert_eq!(agreement1.is_finalized(), false);
         assert_eq!(agreement2.is_finalized(), true);
         assert_eq!(agreement2.active(), agreement1.active());
         assert_eq!(agreement2.created(), agreement1.created());
@@ -214,23 +165,29 @@ mod tests {
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![CompanyPermission::AgreementCreate]);
-        let res = finalize(&user, &member2, &company, agreement1.clone(), &now2);
+        let res = update(&user, &member2, &company_to, agreement1.clone(), None, None, Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut user2 = user.clone();
         user2.set_roles(vec![]);
-        let res = finalize(&user2, &member, &company, agreement1.clone(), &now2);
+        let res = update(&user2, &member, &company_to, agreement1.clone(), None, None, Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now2.clone()));
-        let res = finalize(&user, &member, &company2, agreement1.clone(), &now2);
+        let mut company_to2 = company_to.clone();
+        company_to2.set_deleted(Some(now2.clone()));
+        let res = update(&user, &member, &company_to2, agreement1.clone(), None, None, Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
-        let mut agreement3 = agreement1.clone();
+        let mut agreement3 = agreement2.clone();
         agreement3.set_finalized(true);
-        let res = finalize(&user, &member, &company, agreement3.clone(), &now2);
+        let res = update(&user, &member, &company_to, agreement3.clone(), None, None, Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2);
         assert_eq!(res, Err(Error::ObjectIsReadOnly("agreement".into())));
+
+        let res = update(&user, &member, &company_to, agreement2.clone(), Some(vec![]), None, None, None, None, None, &now2);
+        assert_eq!(res, Err(Error::ObjectIsReadOnly("agreement".into())));
+
+        let mods = update(&user, &member, &company_to, agreement2.clone(), None, Some(false), None, None, None, None, &now2).unwrap().into_vec();
+        assert_eq!(mods.len(), 1);
     }
 }
 

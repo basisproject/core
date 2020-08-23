@@ -239,6 +239,7 @@ pub(crate) mod testutils {
             commitment::{Commitment, CommitmentID},
             company::{Company, CompanyID, CompanyType, Permission as CompanyPermission},
             company_member::{CompanyMember, CompanyMemberID},
+            lib::agent::AgentID,
             occupation::OccupationID,
             process::{Process, ProcessID},
             process_spec::{ProcessSpec, ProcessSpecID},
@@ -251,7 +252,7 @@ pub(crate) mod testutils {
     use rust_decimal_macros::*;
     use vf_rs::vf;
 
-    pub fn make_agreement<T: Into<String>>(id: &AgreementID, name: T, note: T, now: &DateTime<Utc>) -> Agreement {
+    pub fn make_agreement<T: Into<String>>(id: &AgreementID, participants: &Vec<AgentID>, name: T, note: T, now: &DateTime<Utc>) -> Agreement {
         Agreement::builder()
             .id(id.clone())
             .inner(
@@ -261,6 +262,7 @@ pub(crate) mod testutils {
                     .note(Some(note.into()))
                     .build().unwrap()
             )
+            .participants(participants.clone())
             .finalized(false)
             .active(true)
             .created(now.clone())
@@ -268,7 +270,7 @@ pub(crate) mod testutils {
             .build().unwrap()
     }
 
-    pub fn make_commitment(action: vf::Action, company_id: &CompanyID, company_to: &CompanyID, input_of: Option<&ProcessID>, output_of: Option<&ProcessID>, resource: Option<&ResourceID>, quantity: Option<Measure>, now: &DateTime<Utc>) -> Commitment {
+    pub fn make_commitment(action: vf::Action, company_from: &CompanyID, company_to: &CompanyID, input_of: Option<&ProcessID>, output_of: Option<&ProcessID>, resource: Option<&ResourceID>, quantity: Option<Measure>, now: &DateTime<Utc>) -> Commitment {
         Commitment::builder()
             .id(CommitmentID::create())
             .inner(
@@ -277,7 +279,7 @@ pub(crate) mod testutils {
                     .has_point_in_time(now.clone())
                     .input_of(input_of.map(|x| x.clone()))
                     .output_of(output_of.map(|x| x.clone()))
-                    .provider(company_id.clone())
+                    .provider(company_from.clone())
                     .receiver(company_to.clone())
                     .resource_inventoried_as(resource.map(|x| x.clone()))
                     .resource_quantity(quantity)
