@@ -1,7 +1,10 @@
 //! A commitment is a promise to deliver on some future economic event.
 //!
 //! Commitments are effectively line items in a larger order (see `agreement`)
-//! such as a line on a receipt or one item in an online shopping cart.
+//! such as a line on a receipt or one item in an online shopping cart. They are
+//! restricted to a few types of actions [defined in OrderAction][1].
+//!
+//! [1]: ../enum.OrderAction.html
 
 use chrono::{DateTime, Utc};
 use crate::{
