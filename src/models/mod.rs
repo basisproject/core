@@ -263,7 +263,6 @@ pub(crate) mod testutils {
                     .build().unwrap()
             )
             .participants(participants.clone())
-            .finalized(false)
             .active(true)
             .created(now.clone())
             .updated(now.clone())

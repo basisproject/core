@@ -37,9 +37,6 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, agreemen
     if company.is_deleted() {
         Err(Error::ObjectIsDeleted("company".into()))?;
     }
-    if agreement.is_finalized() {
-        Err(Error::ObjectIsReadOnly("agreement".into()))?;
-    }
     let company_agent_id: AgentID = company.id().clone().into();
     if company_agent_id != provider && company_agent_id != receiver {
         // can't create a commitment for a company you aren't a member of DUUUHHH
@@ -93,9 +90,6 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, agreemen
     member.access_check(caller.id(), company.id(), CompanyPermission::CommitmentUpdate)?;
     if company.is_deleted() {
         Err(Error::ObjectIsDeleted("company".into()))?;
-    }
-    if agreement.is_finalized() {
-        Err(Error::ObjectIsReadOnly("agreement".into()))?;
     }
     let event_action = action.map(|x| {
         match x {
@@ -175,9 +169,6 @@ pub fn delete(caller: &User, member: &CompanyMember, company: &Company, agreemen
     member.access_check(caller.id(), company.id(), CompanyPermission::CommitmentDelete)?;
     if company.is_deleted() {
         Err(Error::ObjectIsDeleted("company".into()))?;
-    }
-    if agreement.is_finalized() {
-        Err(Error::ObjectIsReadOnly("agreement".into()))?;
     }
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
@@ -267,11 +258,6 @@ mod tests {
         company4.set_id(CompanyID::new("jill's zingers, get the best zings here. turn that lame party into a laugh fest with some classic zingers. don't buy at bill's, he sucks."));
         let res = create(&user, &member, &company_to, &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company3.id().clone().into(), company4.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut agreement2 = agreement.clone();
-        agreement2.set_finalized(true);
-        let res = create(&user, &member, &company_to, &agreement2, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.id().clone().into(), company_to.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
-        assert_eq!(res, Err(Error::ObjectIsReadOnly("agreement".into())));
     }
 
     #[test]
@@ -339,11 +325,6 @@ mod tests {
         company_to2.set_deleted(Some(now.clone()));
         let res = update(&user, &member, &company_to2, &agreement, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.id().clone().into()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
-
-        let mut agreement2 = agreement.clone();
-        agreement2.set_finalized(true);
-        let res = update(&user, &member, &company_to, &agreement2, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.id().clone().into()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2);
-        assert_eq!(res, Err(Error::ObjectIsReadOnly("agreement".into())));
     }
 
     #[test]
@@ -411,11 +392,6 @@ mod tests {
         company_to2.set_deleted(Some(now2.clone()));
         let res = delete(&user, &member, &company_to2, &agreement, commitment1.clone(), &now2);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
-
-        let mut agreement2 = agreement.clone();
-        agreement2.set_finalized(true);
-        let res = delete(&user, &member, &company_to, &agreement2, commitment1.clone(), &now2);
-        assert_eq!(res, Err(Error::ObjectIsReadOnly("agreement".into())));
     }
 }
 

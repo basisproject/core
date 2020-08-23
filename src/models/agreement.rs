@@ -26,8 +26,6 @@ basis_model! {
         /// Note that this might also allow the storage layer to have a list of
         /// signatures needed in order to materially change the agreement.
         participants: Vec<AgentID>,
-        /// Whether this agreement has been approved by all parties
-        finalized: bool,
     }
     AgreementBuilder
 }
@@ -36,13 +34,6 @@ impl Agreement {
     /// Determines if the given agent is a participant in this agreement.
     pub fn has_participant(&self, agent_id: &AgentID) -> bool {
         self.participants().contains(agent_id)
-    }
-
-    /// Determines if our agreement has been finalized
-    pub fn is_finalized(&self) -> bool {
-        // for now, just read the bit. later on, we might have a more in-depth
-        // check.
-        *self.finalized()
     }
 }
 
