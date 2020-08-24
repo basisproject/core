@@ -42,6 +42,10 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, agreemen
         // can't create a commitment for a company you aren't a member of DUUUHHH
         Err(Error::InsufficientPrivileges)?;
     }
+    if !agreement.has_participant(&provider) || !agreement.has_participant(&receiver) {
+        // can't create a commitment for an agreement you are not party to
+        Err(Error::InsufficientPrivileges)?;
+    }
     let event_action = match action {
         OrderAction::DeliverService => vf::Action::DeliverService,
         OrderAction::Transfer => vf::Action::Transfer,
@@ -257,6 +261,11 @@ mod tests {
         company3.set_id(CompanyID::new("bill's zingers, get your premium zings here. got a friend who constantly pranks you? turn the tables and zing that doofus in front of everyone!!"));
         company4.set_id(CompanyID::new("jill's zingers, get the best zings here. turn that lame party into a laugh fest with some classic zingers. don't buy at bill's, he sucks."));
         let res = create(&user, &member, &company_to, &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company3.id().clone().into(), company4.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut agreement2 = agreement.clone();
+        agreement2.set_participants(vec![]);
+        let res = create(&user, &member, &company_to, &agreement2, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.id().clone().into(), company_to.id().clone().into(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
