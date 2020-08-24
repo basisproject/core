@@ -131,8 +131,8 @@ mod tests {
         assert_eq!(event.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(event.inner().has_end(), &Some(now2.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
-        assert_eq!(event.inner().provider().clone(), worker.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), worker.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor(occupation_id.clone(), dec!(78.4))));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now2);
@@ -176,8 +176,8 @@ mod tests {
         assert_eq!(event.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(event.inner().has_end(), &Some(now2.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
-        assert_eq!(event.inner().provider().clone(), worker2.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), worker2.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor(occupation_id.clone(), dec!(78.4))));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now2);

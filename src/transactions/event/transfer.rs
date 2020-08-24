@@ -264,19 +264,19 @@ mod tests {
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(157) - dec!(23));
         assert_eq!(resource2.id(), resource.id());
-        assert_eq!(resource2.inner().primary_accountable(), &Some(company.id().clone().into()));
+        assert_eq!(resource2.inner().primary_accountable(), &Some(company.agent_id()));
         assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
         assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
-        assert_eq!(resource2.in_custody_of(), &company.id().clone().into());
+        assert_eq!(resource2.in_custody_of(), &company.agent_id());
         assert_eq!(resource2.costs(), &costs2);
 
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(23) + dec!(2));
         assert_eq!(resource_to2.id(), resource_to.id());
-        assert_eq!(resource_to2.inner().primary_accountable(), &Some(company2.id().clone().into()));
+        assert_eq!(resource_to2.inner().primary_accountable(), &Some(company2.agent_id()));
         assert_eq!(resource_to2.inner().accounting_quantity(), &Some(Measure::new(dec!(8) + dec!(3), Unit::One)));
         assert_eq!(resource_to2.inner().onhand_quantity(), &Some(Measure::new(dec!(8) + dec!(3), Unit::One)));
-        assert_eq!(resource_to2.in_custody_of(), &company2.id().clone().into());
+        assert_eq!(resource_to2.in_custody_of(), &company2.agent_id());
         assert_eq!(resource_to2.costs(), &costs2);
 
         // test ResourceMover::Create()
@@ -290,8 +290,8 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &None);
-        assert_eq!(event.inner().provider().clone(), company.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company2.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), company.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company2.agent_id());
         assert_eq!(event.inner().resource_quantity(), &Some(Measure::new(8, Unit::One)));
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
         assert_eq!(event.active(), &true);
@@ -301,19 +301,19 @@ mod tests {
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(157) - dec!(23));
         assert_eq!(resource3.id(), resource.id());
-        assert_eq!(resource3.inner().primary_accountable(), &Some(company.id().clone().into()));
+        assert_eq!(resource3.inner().primary_accountable(), &Some(company.agent_id()));
         assert_eq!(resource3.inner().accounting_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
         assert_eq!(resource3.inner().onhand_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
-        assert_eq!(resource3.in_custody_of(), &company.id().clone().into());
+        assert_eq!(resource3.in_custody_of(), &company.agent_id());
         assert_eq!(resource3.costs(), &costs2);
 
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(23));
         assert_eq!(resource_created.id(), resource_to.id());
-        assert_eq!(resource_created.inner().primary_accountable(), &Some(company2.id().clone().into()));
+        assert_eq!(resource_created.inner().primary_accountable(), &Some(company2.agent_id()));
         assert_eq!(resource_created.inner().accounting_quantity(), &Some(Measure::new(dec!(8), Unit::One)));
         assert_eq!(resource_created.inner().onhand_quantity(), &Some(Measure::new(dec!(8), Unit::One)));
-        assert_eq!(resource_created.in_custody_of(), &company2.id().clone().into());
+        assert_eq!(resource_created.in_custody_of(), &company2.agent_id());
         assert_eq!(resource_created.costs(), &costs2);
 
         let user2 = make_user(&UserID::create(), Some(vec![]), &now);
@@ -377,8 +377,8 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &None);
-        assert_eq!(event.inner().provider().clone(), company.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company2.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), company.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company2.agent_id());
         assert_eq!(event.inner().resource_quantity(), &Some(Measure::new(8, Unit::One)));
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
         assert_eq!(event.active(), &true);
@@ -388,19 +388,19 @@ mod tests {
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(157) - dec!(23));
         assert_eq!(resource2.id(), resource.id());
-        assert_eq!(resource2.inner().primary_accountable(), &Some(company.id().clone().into()));
+        assert_eq!(resource2.inner().primary_accountable(), &Some(company.agent_id()));
         assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
         assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
-        assert_eq!(resource2.in_custody_of(), &company.id().clone().into());
+        assert_eq!(resource2.in_custody_of(), &company.agent_id());
         assert_eq!(resource2.costs(), &costs2);
 
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(23) + dec!(2));
         assert_eq!(resource_to2.id(), resource_to.id());
-        assert_eq!(resource_to2.inner().primary_accountable(), &Some(company2.id().clone().into()));
+        assert_eq!(resource_to2.inner().primary_accountable(), &Some(company2.agent_id()));
         assert_eq!(resource_to2.inner().accounting_quantity(), &Some(Measure::new(dec!(8) + dec!(3), Unit::One)));
         assert_eq!(resource_to2.inner().onhand_quantity(), &Some(Measure::new(dec!(3), Unit::One)));
-        assert_eq!(resource_to2.in_custody_of(), &company2.id().clone().into());
+        assert_eq!(resource_to2.in_custody_of(), &company2.agent_id());
         assert_eq!(resource_to2.costs(), &costs2);
 
         // test ResourceMover::Create()
@@ -414,8 +414,8 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &None);
-        assert_eq!(event.inner().provider().clone(), company.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company2.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), company.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company2.agent_id());
         assert_eq!(event.inner().resource_quantity(), &Some(Measure::new(8, Unit::One)));
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
         assert_eq!(event.active(), &true);
@@ -425,19 +425,19 @@ mod tests {
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(157) - dec!(23));
         assert_eq!(resource3.id(), resource.id());
-        assert_eq!(resource3.inner().primary_accountable(), &Some(company.id().clone().into()));
+        assert_eq!(resource3.inner().primary_accountable(), &Some(company.agent_id()));
         assert_eq!(resource3.inner().accounting_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
         assert_eq!(resource3.inner().onhand_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
-        assert_eq!(resource3.in_custody_of(), &company.id().clone().into());
+        assert_eq!(resource3.in_custody_of(), &company.agent_id());
         assert_eq!(resource3.costs(), &costs2);
 
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(23));
         assert_eq!(resource_created.id(), resource_to.id());
-        assert_eq!(resource_created.inner().primary_accountable(), &Some(company2.id().clone().into()));
+        assert_eq!(resource_created.inner().primary_accountable(), &Some(company2.agent_id()));
         assert_eq!(resource_created.inner().accounting_quantity(), &Some(Measure::new(dec!(8), Unit::One)));
         assert_eq!(resource_created.inner().onhand_quantity(), &Some(Measure::new(dec!(0), Unit::One)));
-        assert_eq!(resource_created.in_custody_of(), &company.id().clone().into());
+        assert_eq!(resource_created.in_custody_of(), &company.agent_id());
         assert_eq!(resource_created.costs(), &costs2);
 
         let user2 = make_user(&UserID::create(), Some(vec![]), &now);
@@ -495,8 +495,8 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &None);
-        assert_eq!(event.inner().provider().clone(), company.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company2.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), company.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company2.agent_id());
         assert_eq!(event.inner().resource_quantity(), &Some(Measure::new(8, Unit::One)));
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
         assert_eq!(event.active(), &true);
@@ -506,19 +506,19 @@ mod tests {
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(157) - dec!(23));
         assert_eq!(resource2.id(), resource.id());
-        assert_eq!(resource2.inner().primary_accountable(), &Some(company.id().clone().into()));
+        assert_eq!(resource2.inner().primary_accountable(), &Some(company.agent_id()));
         assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
         assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
-        assert_eq!(resource2.in_custody_of(), &company.id().clone().into());
+        assert_eq!(resource2.in_custody_of(), &company.agent_id());
         assert_eq!(resource2.costs(), &costs2);
 
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(23) + dec!(2));
         assert_eq!(resource_to2.id(), resource_to.id());
-        assert_eq!(resource_to2.inner().primary_accountable(), &Some(company2.id().clone().into()));
+        assert_eq!(resource_to2.inner().primary_accountable(), &Some(company2.agent_id()));
         assert_eq!(resource_to2.inner().accounting_quantity(), &Some(Measure::new(dec!(3), Unit::One)));
         assert_eq!(resource_to2.inner().onhand_quantity(), &Some(Measure::new(dec!(8) + dec!(3), Unit::One)));
-        assert_eq!(resource_to2.in_custody_of(), &company2.id().clone().into());
+        assert_eq!(resource_to2.in_custody_of(), &company2.agent_id());
         assert_eq!(resource_to2.costs(), &costs2);
 
         // test ResourceMover::Create()
@@ -532,8 +532,8 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &None);
-        assert_eq!(event.inner().provider().clone(), company.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company2.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), company.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company2.agent_id());
         assert_eq!(event.inner().resource_quantity(), &Some(Measure::new(8, Unit::One)));
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
         assert_eq!(event.active(), &true);
@@ -543,19 +543,19 @@ mod tests {
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(157) - dec!(23));
         assert_eq!(resource3.id(), resource.id());
-        assert_eq!(resource3.inner().primary_accountable(), &Some(company.id().clone().into()));
+        assert_eq!(resource3.inner().primary_accountable(), &Some(company.agent_id()));
         assert_eq!(resource3.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
         assert_eq!(resource3.inner().onhand_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
-        assert_eq!(resource3.in_custody_of(), &company.id().clone().into());
+        assert_eq!(resource3.in_custody_of(), &company.agent_id());
         assert_eq!(resource3.costs(), &costs2);
 
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(23));
         assert_eq!(resource_created.id(), resource_to.id());
-        assert_eq!(resource_created.inner().primary_accountable(), &Some(company.id().clone().into()));
+        assert_eq!(resource_created.inner().primary_accountable(), &Some(company.agent_id()));
         assert_eq!(resource_created.inner().accounting_quantity(), &Some(Measure::new(dec!(0), Unit::One)));
         assert_eq!(resource_created.inner().onhand_quantity(), &Some(Measure::new(dec!(8), Unit::One)));
-        assert_eq!(resource_created.in_custody_of(), &company2.id().clone().into());
+        assert_eq!(resource_created.in_custody_of(), &company2.agent_id());
         assert_eq!(resource_created.costs(), &costs2);
 
         let user2 = make_user(&UserID::create(), Some(vec![]), &now);
