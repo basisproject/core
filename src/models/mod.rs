@@ -236,7 +236,6 @@ pub(crate) mod testutils {
         costs::Costs,
         models::{
             agreement::{Agreement, AgreementID},
-            commitment::{Commitment, CommitmentID},
             company::{Company, CompanyID, CompanyType, Permission as CompanyPermission},
             company_member::{CompanyMember, CompanyMemberID},
             lib::agent::AgentID,
@@ -249,7 +248,6 @@ pub(crate) mod testutils {
         },
     };
     use om2::Measure;
-    use rust_decimal_macros::*;
     use vf_rs::vf;
 
     pub fn make_agreement<T: Into<String>>(id: &AgreementID, participants: &Vec<AgentID>, name: T, note: T, now: &DateTime<Utc>) -> Agreement {
@@ -264,27 +262,6 @@ pub(crate) mod testutils {
             )
             .participants(participants.clone())
             .active(true)
-            .created(now.clone())
-            .updated(now.clone())
-            .build().unwrap()
-    }
-
-    pub fn make_commitment(action: vf::Action, company_from: &CompanyID, company_to: &CompanyID, input_of: Option<&ProcessID>, output_of: Option<&ProcessID>, resource: Option<&ResourceID>, quantity: Option<Measure>, now: &DateTime<Utc>) -> Commitment {
-        Commitment::builder()
-            .id(CommitmentID::create())
-            .inner(
-                vf::Commitment::builder()
-                    .action(action)
-                    .has_point_in_time(now.clone())
-                    .input_of(input_of.map(|x| x.clone()))
-                    .output_of(output_of.map(|x| x.clone()))
-                    .provider(company_from.clone())
-                    .receiver(company_to.clone())
-                    .resource_inventoried_as(resource.map(|x| x.clone()))
-                    .resource_quantity(quantity)
-                    .build().unwrap()
-            )
-            .move_costs(Costs::new_with_labor("machinist", dec!(27.0)))
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap()
