@@ -28,7 +28,7 @@ use crate::{
 
         agreement::AgreementID,
         company_member::CompanyMember,
-        lib::agent::AgentID,
+        lib::agent::{Agent, AgentID},
         process::{Process, ProcessID},
         resource::{Resource, ResourceID},
         resource_spec::ResourceSpecID,
@@ -272,7 +272,7 @@ impl Event {
             Err(EventError::MismatchedResourceToID)?;
         }
         if let Some(provider) = state.provider.as_ref() {
-            if self.inner().provider() != &provider.id().clone().into() {
+            if self.inner().provider() != &provider.agent_id() {
                 Err(EventError::MismatchedProviderID)?;
             }
         }
@@ -1610,7 +1610,7 @@ mod tests {
         costs.track_labor("CEO", 69);   // should be tracked, our member is CEO
         costs.track_labor("machinist", 42);    // should not be tracked
         event.set_move_costs(Some(costs));
-        event.inner_mut().set_provider(state.provider.as_ref().unwrap().id().clone().into());
+        event.inner_mut().set_provider(state.provider.as_ref().unwrap().agent_id());
         event.inner_mut().set_effort_quantity(Some(Measure::new(dec!(0), Unit::Hour)));
         fuzz_state(event.clone(), state.clone(), &now);
 
@@ -1641,7 +1641,7 @@ mod tests {
 
         let mut event = make_event(vf::Action::Work, &company_id, &company_id, &state, &now);
         event.set_move_costs(Some(Costs::new()));
-        event.inner_mut().set_provider(state.provider.as_ref().unwrap().id().clone().into());
+        event.inner_mut().set_provider(state.provider.as_ref().unwrap().agent_id());
         event.inner_mut().set_effort_quantity(Some(Measure::new(dec!(5.4), Unit::Hour)));
         fuzz_state(event.clone(), state.clone(), &now);
 
@@ -1675,7 +1675,7 @@ mod tests {
         costs.track_labor("CEO", 69);   // should be tracked, our member is CEO
         costs.track_labor("gerrymandering", 42);    // should not be tracked
         event.set_move_costs(Some(costs));
-        event.inner_mut().set_provider(state.provider.as_ref().unwrap().id().clone().into());
+        event.inner_mut().set_provider(state.provider.as_ref().unwrap().agent_id());
         event.inner_mut().set_effort_quantity(Some(Measure::new(NumericUnion::Integer(12), Unit::Hour)));
         fuzz_state(event.clone(), state.clone(), &now);
 

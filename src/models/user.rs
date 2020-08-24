@@ -7,6 +7,9 @@
 
 use crate::{
     access::{Permission, Role},
+    models::{
+        lib::agent::{Agent, AgentID},
+    },
     error::{Error, Result},
 };
 
@@ -45,6 +48,12 @@ impl User {
             Err(Error::InsufficientPrivileges)?;
         }
         Ok(())
+    }
+}
+
+impl Agent for User {
+    fn agent_id(&self) -> AgentID {
+        self.id().clone().into()
     }
 }
 

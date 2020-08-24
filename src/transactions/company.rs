@@ -93,6 +93,7 @@ mod tests {
         access::Role,
         models::{
             Op,
+            lib::agent::Agent,
             user::UserID,
             testutils::make_user,
         },
@@ -123,7 +124,7 @@ mod tests {
         assert_eq!(company.created(), &now);
         assert_eq!(company.updated(), &now);
         assert_eq!(founder.id(), &founder_id);
-        assert_eq!(founder.inner().subject(), &user.id().clone().into());
+        assert_eq!(founder.inner().subject(), &user.agent_id());
         assert_eq!(founder.inner().object(), &id.clone().into());
         assert_eq!(founder.inner().relationship(), &occupation_id);
         assert_eq!(founder.permissions(), &vec![CompanyPermission::All]);

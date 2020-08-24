@@ -8,6 +8,7 @@ use crate::{
         Modifications,
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
+        lib::agent::Agent,
         resource::{Resource, ResourceID},
         resource_spec::ResourceSpecID,
         user::User,
@@ -33,7 +34,7 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: Reso
                 .lot(lot)
                 .name(name)
                 .note(note)
-                .primary_accountable(Some(company.id().clone().into()))
+                .primary_accountable(Some(company.agent_id()))
                 .tracking_identifier(tracking_id)
                 .unit_of_effort(unit_of_effort)
                 .build()
@@ -130,11 +131,11 @@ mod tests {
         assert_eq!(resource.inner().name(), &Some("widget batch".into()));
         assert_eq!(resource.inner().lot(), &Some(lot.clone()));
         assert_eq!(resource.inner().classified_as(), &vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()]);
-        assert_eq!(resource.inner().primary_accountable(), &Some(company.id().clone().into()));
+        assert_eq!(resource.inner().primary_accountable(), &Some(company.agent_id()));
         assert_eq!(resource.inner().tracking_identifier(), &None);
         assert_eq!(resource.inner().note(), &Some("niceee".into()));
         assert_eq!(resource.inner().unit_of_effort(), &Some(Unit::Hour));
-        assert_eq!(resource.in_custody_of(), &company.id().clone().into());
+        assert_eq!(resource.in_custody_of(), &company.agent_id());
         assert!(resource.costs().is_zero());
         assert_eq!(resource.active(), &true);
         assert_eq!(resource.created(), &now);
@@ -184,11 +185,11 @@ mod tests {
         assert_eq!(resource2.inner().name(), &Some("better widgets".into()));
         assert_eq!(resource2.inner().lot(), &Some(lot.clone()));
         assert_eq!(resource2.inner().classified_as(), &vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()]);
-        assert_eq!(resource2.inner().primary_accountable(), &Some(company.id().clone().into()));
+        assert_eq!(resource2.inner().primary_accountable(), &Some(company.agent_id()));
         assert_eq!(resource2.inner().tracking_identifier(), &Some("444-computers-and-equipment".into()));
         assert_eq!(resource2.inner().note(), &Some("niceee".into()));
         assert_eq!(resource2.inner().unit_of_effort(), &Some(Unit::WattHour));
-        assert_eq!(resource2.in_custody_of(), &company.id().clone().into());
+        assert_eq!(resource2.in_custody_of(), &company.agent_id());
         assert_eq!(resource2.active(), &false);
         assert_eq!(resource2.created(), &now);
         assert_eq!(resource2.updated(), &now);
@@ -232,11 +233,11 @@ mod tests {
         assert_eq!(resource2.inner().name(), &Some("widget batch".into()));
         assert_eq!(resource2.inner().lot(), &Some(lot.clone()));
         assert_eq!(resource2.inner().classified_as(), &vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()]);
-        assert_eq!(resource2.inner().primary_accountable(), &Some(company.id().clone().into()));
+        assert_eq!(resource2.inner().primary_accountable(), &Some(company.agent_id()));
         assert_eq!(resource2.inner().tracking_identifier(), &None);
         assert_eq!(resource2.inner().note(), &Some("niceee".into()));
         assert_eq!(resource2.inner().unit_of_effort(), &Some(Unit::Hour));
-        assert_eq!(resource2.in_custody_of(), &company.id().clone().into());
+        assert_eq!(resource2.in_custody_of(), &company.agent_id());
         assert_eq!(resource2.active(), &true);
         assert_eq!(resource2.created(), &now);
         assert_eq!(resource2.updated(), &now);
