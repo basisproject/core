@@ -37,6 +37,10 @@ pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, co
     if company_to.is_deleted() {
         Err(Error::ObjectIsDeleted("company".into()))?;
     }
+    if !agreement.has_participant(&company_from.id().clone().into()) || !agreement.has_participant(&company_from.id().clone().into()) {
+        // can't create an event for an agreement you are not party to
+        Err(Error::InsufficientPrivileges)?;
+    }
     let measure = {
         let unit = resource_from.get_unit().ok_or(Error::ResourceMeasureMissing)?;
         Measure::new(move_measure, unit)
