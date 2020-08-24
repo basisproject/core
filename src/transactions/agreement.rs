@@ -77,6 +77,7 @@ mod tests {
     use super::*;
     use crate::{
         models::{
+            lib::agent::Agent,
             company::{CompanyID, CompanyType},
             company_member::CompanyMemberID,
             occupation::OccupationID,
@@ -94,7 +95,7 @@ mod tests {
         let company_from = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate], &now);
-        let participants = vec![company_to.id().clone().into(), company_from.id().clone().into()];
+        let participants = vec![company_to.agent_id(), company_from.agent_id()];
 
         let mods = create(&user, &member, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
@@ -134,19 +135,19 @@ mod tests {
         let company_from = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate, CompanyPermission::AgreementUpdate], &now);
-        let participants = vec![company_to.id().clone().into(), company_from.id().clone().into()];
+        let participants = vec![company_to.agent_id(), company_from.agent_id()];
 
         let mods = create(&user, &member, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
         let agreement1 = mods[0].clone().expect_op::<Agreement>(Op::Create).unwrap();
         let now2 = util::time::now();
-        let mods = update(&user, &member, &company_to, agreement1.clone(), Some(vec![company_from.id().clone().into()]), Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2).unwrap().into_vec();
+        let mods = update(&user, &member, &company_to, agreement1.clone(), Some(vec![company_from.agent_id()]), Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2).unwrap().into_vec();
         let agreement2 = mods[0].clone().expect_op::<Agreement>(Op::Update).unwrap();
 
         assert_eq!(agreement2.id(), agreement1.id());
         assert_eq!(agreement2.inner().created(), agreement1.inner().created());
         assert_eq!(agreement2.inner().name(), &Some("order 1111222".into()));
         assert_eq!(agreement2.inner().note(), &Some("jerry's long-winded order".into()));
-        assert_eq!(agreement2.participants(), &vec![company_from.id().clone().into()]);
+        assert_eq!(agreement2.participants(), &vec![company_from.agent_id()]);
         assert_eq!(agreement2.active(), agreement1.active());
         assert_eq!(agreement2.created(), agreement1.created());
         assert_eq!(agreement2.updated(), &now2);

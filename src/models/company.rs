@@ -14,7 +14,7 @@
 use crate::{
     costs::Costs,
     models::{
-        lib::agent::AgentID,
+        lib::agent::{Agent, AgentID},
         process::Process,
         resource::Resource,
     },
@@ -204,6 +204,12 @@ impl Company {
             })
             .fold(Costs::new(), |acc, x| acc + x.costs().clone());
         process_costs + resource_costs
+    }
+}
+
+impl Agent for Company {
+    fn agent_id(&self) -> AgentID {
+        self.id().clone().into()
     }
 }
 

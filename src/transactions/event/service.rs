@@ -77,6 +77,7 @@ mod tests {
             company::{CompanyID, CompanyType},
             company_member::CompanyMemberID,
             event::{EventID, EventError},
+            lib::agent::Agent,
             occupation::OccupationID,
             process::{Process, ProcessID},
             testutils::{make_user, make_company, make_member, make_process},
@@ -115,8 +116,8 @@ mod tests {
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &Some(process_to.id().clone()));
         assert_eq!(event.inner().output_of(), &Some(process_from.id().clone()));
-        assert_eq!(event.inner().provider().clone(), company_from.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company_to.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), company_from.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company_to.agent_id());
         assert_eq!(event.inner().resource_quantity(), &None);
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("lawyer", 100)));
         assert_eq!(event.active(), &true);

@@ -214,6 +214,7 @@ mod tests {
             company::{CompanyID, CompanyType},
             company_member::CompanyMemberID,
             event::{EventID, EventError},
+            lib::agent::Agent,
             occupation::OccupationID,
             resource::ResourceID,
             testutils::{make_user, make_company, make_member, make_resource},
@@ -252,8 +253,8 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &None);
-        assert_eq!(event.inner().provider().clone(), company.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company2.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), company.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company2.agent_id());
         assert_eq!(event.inner().resource_quantity(), &Some(Measure::new(8, Unit::One)));
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
         assert_eq!(event.active(), &true);

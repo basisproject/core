@@ -9,6 +9,13 @@ use crate::{
 use serde::{Serialize, Deserialize};
 use std::convert::TryFrom;
 
+/// A trait that holds common agent functionality, generally applied to models
+/// with ID types implemented in `AgentID`.
+pub trait Agent {
+    /// Convert the model's ID to and AgentID.
+    fn agent_id(&self) -> AgentID;
+}
+
 /// VF (correctly) assumes different types of actors in the economic network
 /// that have "agency" so here we define the objects that have agency within the
 /// Basis system. This lets us use a more generic `AgentID` object that fulfills
