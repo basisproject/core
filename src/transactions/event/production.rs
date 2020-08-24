@@ -258,6 +258,7 @@ mod tests {
             company::{CompanyID, CompanyType},
             company_member::CompanyMemberID,
             event::{EventError, EventID},
+            lib::agent::Agent,
             occupation::OccupationID,
             process::ProcessID,
             resource::ResourceID,
@@ -298,8 +299,8 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
-        assert_eq!(event.inner().provider().clone(), company.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), company.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
@@ -382,8 +383,8 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
-        assert_eq!(event.inner().provider().clone(), company.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), company.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
@@ -467,8 +468,8 @@ mod tests {
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &None);
         assert_eq!(event.inner().output_of(), &Some(process.id().clone()));
-        assert_eq!(event.inner().provider().clone(), company.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), company.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
@@ -551,8 +552,8 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
-        assert_eq!(event.inner().provider().clone(), company.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), company.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", dec!(0.3))));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);

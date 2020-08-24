@@ -137,6 +137,7 @@ mod tests {
             company::{CompanyID, CompanyType},
             company_member::CompanyMemberID,
             event::{EventError, EventID},
+            lib::agent::Agent,
             occupation::OccupationID,
             process::ProcessID,
             resource::ResourceID,
@@ -173,8 +174,8 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
-        assert_eq!(event.inner().provider().clone(), company.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), company.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.inner().resource_quantity(), &Some(Measure::new(3, Unit::One)));
         assert_eq!(event.move_costs(), &Some(Costs::new()));
         assert_eq!(event.active(), &true);
@@ -182,8 +183,8 @@ mod tests {
         assert_eq!(event.updated(), &now);
 
         assert_eq!(resource2.id(), resource.id());
-        assert_eq!(resource2.inner().primary_accountable(), &Some(company.id().clone().into()));
-        assert_eq!(resource2.in_custody_of(), &company.id().clone().into());
+        assert_eq!(resource2.inner().primary_accountable(), &Some(company.agent_id()));
+        assert_eq!(resource2.in_custody_of(), &company.agent_id());
         assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
         assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(12), Unit::One)));
         assert_eq!(resource2.costs(), &Costs::new_with_resource("steel", 157));
@@ -249,8 +250,8 @@ mod tests {
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &None);
         assert_eq!(event.inner().output_of(), &Some(process.id().clone()));
-        assert_eq!(event.inner().provider().clone(), company.id().clone().into());
-        assert_eq!(event.inner().receiver().clone(), company.id().clone().into());
+        assert_eq!(event.inner().provider().clone(), company.agent_id());
+        assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.move_costs(), &Some(process.costs().clone()));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
@@ -265,8 +266,8 @@ mod tests {
         costs2.track_labor(occupation_id.clone(), dec!(102.3));
         costs2.track_resource("steel", 157);
         assert_eq!(resource2.id(), resource.id());
-        assert_eq!(resource2.inner().primary_accountable(), &Some(company.id().clone().into()));
-        assert_eq!(resource2.in_custody_of(), &company.id().clone().into());
+        assert_eq!(resource2.inner().primary_accountable(), &Some(company.agent_id()));
+        assert_eq!(resource2.in_custody_of(), &company.agent_id());
         assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(3), Unit::One)));
         assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
         assert_eq!(resource2.costs(), &costs2);

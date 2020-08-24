@@ -104,6 +104,7 @@ mod tests {
         models::{
             company::{CompanyID, CompanyType},
             company_member::CompanyMemberID,
+            lib::agent::Agent,
             occupation::OccupationID,
             process_spec::ProcessSpecID,
             testutils::{make_user, make_company, make_member, make_process_spec},
@@ -167,12 +168,12 @@ mod tests {
         let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
         let process = mods[0].clone().expect_op::<Process>(Op::Create).unwrap();
 
-        let res = update(&user, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now.clone()), Some(vec![company.id().clone().into()]), Some(false), &now);
+        let res = update(&user, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now.clone()), Some(vec![company.agent_id()]), Some(false), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         member.set_permissions(vec![CompanyPermission::ProcessUpdate]);
         let now2 = util::time::now();
-        let mods = update(&user, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.id().clone().into()]), Some(false), &now2).unwrap().into_vec();
+        let mods = update(&user, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.agent_id()]), Some(false), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let process2 = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -181,7 +182,7 @@ mod tests {
         assert_eq!(process2.inner().classified_as(), &vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()]);
         assert_eq!(process2.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(process2.inner().has_end(), &Some(now2.clone()));
-        assert_eq!(process2.inner().in_scope_of(), &vec![company.id().clone().into()]);
+        assert_eq!(process2.inner().in_scope_of(), &vec![company.agent_id()]);
         assert_eq!(process2.inner().name(), "Make a GaZeLLe fReeStYlE");
         assert_eq!(process2.inner().note(), &Some("tony making me build five of these stupid things".into()));
         assert_eq!(process2.company_id(), company.id());
@@ -193,12 +194,12 @@ mod tests {
 
         let mut user2 = user.clone();
         user2.set_roles(vec![]);
-        let res = update(&user2, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.id().clone().into()]), Some(false), &now2);
+        let res = update(&user2, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.agent_id()]), Some(false), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company2 = company.clone();
         company2.set_deleted(Some(now2.clone()));
-        let res = update(&user, &member, &company2, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.id().clone().into()]), Some(false), &now2);
+        let res = update(&user, &member, &company2, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.agent_id()]), Some(false), &now2);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
     }
 

@@ -99,6 +99,7 @@ mod tests {
         models::{
             account::AccountID,
             company::{CompanyID, CompanyType},
+            lib::agent::Agent,
             user::UserID,
             testutils::{make_user, make_company, make_member},
         },
@@ -122,8 +123,8 @@ mod tests {
         assert_eq!(mods.len(), 1);
         let member = mods[0].clone().expect_op::<CompanyMember>(Op::Create).unwrap();
         assert_eq!(member.id(), &id);
-        assert_eq!(member.inner().subject(), &new_user.id().clone().into());
-        assert_eq!(member.inner().object(), &company.id().clone().into());
+        assert_eq!(member.inner().subject(), &new_user.agent_id());
+        assert_eq!(member.inner().object(), &company.agent_id());
         assert_eq!(member.inner().relationship(), &occupation_id);
         assert_eq!(member.permissions().len(), 0);
         assert_eq!(member.agreement(), &Some(agreement.clone()));

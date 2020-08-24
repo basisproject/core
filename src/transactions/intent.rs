@@ -14,7 +14,7 @@ use crate::{
         Modifications,
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
-        lib::agent::AgentID,
+        lib::agent::{Agent, AgentID},
         intent::{Intent, IntentID},
         resource::ResourceID,
         resource_spec::ResourceSpecID,
@@ -33,7 +33,7 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: Inte
     if company.is_deleted() {
         Err(Error::ObjectIsDeleted("company".into()))?;
     }
-    let company_agent_id: AgentID = company.id().clone().into();
+    let company_agent_id = company.agent_id();
     if provider.is_none() && receiver.is_none() {
         // an intent must have a provider or receiver
         Err(Error::MissingFields(vec!["provider".into(), "receiver".into()]))?;
@@ -88,7 +88,7 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
     if company.is_deleted() {
         Err(Error::ObjectIsDeleted("company".into()))?;
     }
-    let company_agent_id: AgentID = company.id().clone().into();
+    let company_agent_id = company.agent_id();
     if provider == Some(None) && receiver == Some(None) {
         // an intent must have a provider or receiver
         Err(Error::MissingFields(vec!["provider".into(), "receiver".into()]))?;
@@ -212,7 +212,7 @@ mod tests {
             .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
             .build().unwrap();
 
-        let mods = create(&user, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
+        let mods = create(&user, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let intent = mods[0].clone().expect_op::<Intent>(Op::Create).unwrap();
@@ -228,10 +228,10 @@ mod tests {
         assert_eq!(intent.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(intent.inner().has_end(), &None);
         assert_eq!(intent.inner().has_point_in_time(), &None);
-        assert_eq!(intent.inner().in_scope_of(), &vec![company.id().clone().into()]);
+        assert_eq!(intent.inner().in_scope_of(), &vec![company.agent_id()]);
         assert_eq!(intent.inner().name(), &Some("buy my widget".into()));
         assert_eq!(intent.inner().note(), &Some("gee willickers i hope someone buys my widget".into()));
-        assert_eq!(intent.inner().provider(), &Some(company.id().clone().into()));
+        assert_eq!(intent.inner().provider(), &Some(company.agent_id()));
         assert_eq!(intent.inner().receiver(), &None);
         assert_eq!(intent.inner().resource_conforms_to(), &None);
         assert_eq!(intent.inner().resource_inventoried_as(), &Some(ResourceID::new("widget1")));
@@ -243,27 +243,27 @@ mod tests {
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![CompanyPermission::ProcessDelete]);
-        let res = create(&user, &member2, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
+        let res = create(&user, &member2, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut user2 = user.clone();
         user2.set_roles(vec![]);
-        let res = create(&user2, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
+        let res = create(&user2, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
-        let res = create(&user, &member, &company2, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
+        let res = create(&user, &member, &company2, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         let mut company3 = company.clone();
         company3.set_id(CompanyID::new("bill's company"));
-        let res = create(&user, &member, &company3, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
+        let res = create(&user, &member, &company3, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
-        let res = create(&user, &member, &company3, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), None, Some(company.id().clone().into()), None, Some(ResourceID::new("widget1")), None, true, &now);
+        let res = create(&user, &member, &company3, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), None, Some(company.agent_id()), None, Some(ResourceID::new("widget1")), None, true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let res = create(&user, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), None, None, None, Some(ResourceID::new("widget1")), None, true, &now);
+        let res = create(&user, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), None, None, None, Some(ResourceID::new("widget1")), None, true, &now);
         assert_eq!(res, Err(Error::MissingFields(vec!["provider".into(), "receiver".into()])));
     }
 
@@ -280,7 +280,7 @@ mod tests {
             .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
             .build().unwrap();
 
-        let mods = create(&user, &member, &company, id.clone(), Some(costs1.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
+        let mods = create(&user, &member, &company, id.clone(), Some(costs1.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
         let intent1 = mods[0].clone().expect_op::<Intent>(Op::Create).unwrap();
         let now2 = util::time::now();
         let mods = update(&user, &member, &company, intent1.clone(), Some(Some(costs2.clone())), None, None, Some(None), None, None, None, None, None, None, None, Some(vec![]), Some(Some("buy widget".into())), None, None, None, None, None, None, Some(false), &now2).unwrap().into_vec();
@@ -349,7 +349,7 @@ mod tests {
             .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
             .build().unwrap();
 
-        let mods = create(&user, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.id().clone().into()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.id().clone().into()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
+        let mods = create(&user, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
         let intent1 = mods[0].clone().expect_op::<Intent>(Op::Create).unwrap();
 
         let now2 = util::time::now();

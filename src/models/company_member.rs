@@ -13,7 +13,7 @@ use crate::{
     models::{
         account::AccountID,
         company::{CompanyID, Permission},
-        lib::agent::AgentID,
+        lib::agent::{Agent, AgentID},
         occupation::OccupationID,
         user::UserID,
     },
@@ -145,6 +145,12 @@ impl CompanyMember {
     /// Grab this member's CompanyID, converted from AgentID
     pub fn company_id(&self) -> Result<CompanyID> {
         self.inner().object().clone().try_into()
+    }
+}
+
+impl Agent for CompanyMember {
+    fn agent_id(&self) -> AgentID {
+        self.id().clone().into()
     }
 }
 

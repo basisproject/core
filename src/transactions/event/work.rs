@@ -102,6 +102,7 @@ mod tests {
             company::{CompanyID, CompanyType},
             company_member::CompanyMemberID,
             event::{Event, EventID, EventError},
+            lib::agent::Agent,
             occupation::OccupationID,
             process::ProcessID,
             testutils::{make_user, make_company, make_member, make_process},
