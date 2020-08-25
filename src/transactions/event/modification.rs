@@ -27,7 +27,7 @@ use vf_rs::vf;
 ///
 /// Effectively, you `accept` a resource into a repair process, and the output
 /// of that process would be `modify`.
-pub fn accept<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, resource_measure: T, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn accept<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Accept)?;
     if company.is_deleted() {
@@ -53,6 +53,7 @@ pub fn accept<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, comp
                 .action(vf::Action::Accept)
                 .has_point_in_time(now.clone())
                 .input_of(Some(process_id))
+                .note(note)
                 .provider(company.id().clone())
                 .receiver(company.id().clone())
                 .resource_inventoried_as(Some(resource_id))
@@ -80,7 +81,7 @@ pub fn accept<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, comp
 ///
 /// Effectively, you `accept` a resource into a repair process, and the output
 /// of that process would be `modify`.
-pub fn modify<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, resource_measure: T, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn modify<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Modify)?;
     if company.is_deleted() {
@@ -105,6 +106,7 @@ pub fn modify<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, comp
             vf::EconomicEvent::builder()
                 .action(vf::Action::Modify)
                 .has_point_in_time(now.clone())
+                .note(note)
                 .output_of(Some(process_id))
                 .provider(company.id().clone())
                 .receiver(company.id().clone())
@@ -160,12 +162,12 @@ mod tests {
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_resource("steel", 157), &now);
         let process = make_process(&ProcessID::create(), company.id(), "make widgets", &Costs::new(), &now);
 
-        let res = accept(&user, &member, &company, id.clone(), resource.clone(), process.clone(), 3, &now);
+        let res = accept(&user, &member, &company, id.clone(), resource.clone(), process.clone(), 3, Some("memo lol".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member = member.clone();
         member.set_permissions(vec![CompanyPermission::Accept]);
-        let mods = accept(&user, &member, &company, id.clone(), resource.clone(), process.clone(), 3, &now).unwrap().into_vec();
+        let mods = accept(&user, &member, &company, id.clone(), resource.clone(), process.clone(), 3, Some("memo lol".into()), &now).unwrap().into_vec();
         assert_eq!(mods.len(), 2);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         let resource2 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
@@ -174,6 +176,7 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
+        assert_eq!(event.inner().note(), &Some("memo lol".into()));
         assert_eq!(event.inner().provider().clone(), company.agent_id());
         assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.inner().resource_quantity(), &Some(Measure::new(3, Unit::One)));
@@ -190,35 +193,35 @@ mod tests {
         assert_eq!(resource2.costs(), &Costs::new_with_resource("steel", 157));
 
         let user2 = make_user(&UserID::create(), Some(vec![]), &now);
-        let res = accept(&user2, &member, &company, id.clone(), resource.clone(), process.clone(), 3, &now);
+        let res = accept(&user2, &member, &company, id.clone(), resource.clone(), process.clone(), 3, Some("memo lol".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![]);
-        let res = accept(&user, &member2, &company, id.clone(), resource.clone(), process.clone(), 3, &now);
+        let res = accept(&user, &member2, &company, id.clone(), resource.clone(), process.clone(), 3, Some("memo lol".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
-        let res = accept(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), 3, &now);
+        let res = accept(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), 3, Some("memo lol".into()), &now);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't accept into a process you don't own
         let mut process3 = process.clone();
         process3.set_company_id(CompanyID::new("zing"));
-        let res = accept(&user, &member, &company, id.clone(), resource.clone(), process3.clone(), 3, &now);
+        let res = accept(&user, &member, &company, id.clone(), resource.clone(), process3.clone(), 3, Some("memo lol".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         // a company that doesn't own a resource *can* accept it
         let mut resource3 = resource.clone();
         resource3.inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
-        let res = accept(&user, &member, &company, id.clone(), resource3.clone(), process.clone(), 3, &now);
+        let res = accept(&user, &member, &company, id.clone(), resource3.clone(), process.clone(), 3, Some("memo lol".into()), &now);
         assert!(res.is_ok());
 
         // a company that doesn't have possession of a resource can't accept it
         let mut resource4 = resource.clone();
         resource4.set_in_custody_of(CompanyID::new("ziggy").into());
-        let res = accept(&user, &member, &company, id.clone(), resource4.clone(), process.clone(), 3, &now);
+        let res = accept(&user, &member, &company, id.clone(), resource4.clone(), process.clone(), 3, Some("memo lol".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 
@@ -234,12 +237,12 @@ mod tests {
         let costs = Costs::new_with_labor(occupation_id.clone(), dec!(102.3));
         let process = make_process(&ProcessID::create(), company.id(), "repair car", &costs, &now);
 
-        let res = modify(&user, &member, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), 12, &now);
+        let res = modify(&user, &member, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), 12, Some("memo lol".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member = member.clone();
         member.set_permissions(vec![CompanyPermission::Modify]);
-        let mods = modify(&user, &member, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), 12, &now).unwrap().into_vec();
+        let mods = modify(&user, &member, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), 12, Some("memo lol".into()), &now).unwrap().into_vec();
         assert_eq!(mods.len(), 3);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         let process2 = mods[1].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -249,6 +252,7 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &None);
+        assert_eq!(event.inner().note(), &Some("memo lol".into()));
         assert_eq!(event.inner().output_of(), &Some(process.id().clone()));
         assert_eq!(event.inner().provider().clone(), company.agent_id());
         assert_eq!(event.inner().receiver().clone(), company.agent_id());
@@ -273,35 +277,35 @@ mod tests {
         assert_eq!(resource2.costs(), &costs2);
 
         let user2 = make_user(&UserID::create(), Some(vec![]), &now);
-        let res = modify(&user2, &member, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), 12, &now);
+        let res = modify(&user2, &member, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), 12, Some("memo lol".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![]);
-        let res = modify(&user, &member2, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), 12, &now);
+        let res = modify(&user, &member2, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), 12, Some("memo lol".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
-        let res = modify(&user, &member, &company2, id.clone(), process.clone(), resource.clone(), process.costs().clone(), 12, &now);
+        let res = modify(&user, &member, &company2, id.clone(), process.clone(), resource.clone(), process.costs().clone(), 12, Some("memo lol".into()), &now);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't modify from a process you don't own
         let mut process3 = process.clone();
         process3.set_company_id(CompanyID::new("zing"));
-        let res = modify(&user, &member, &company, id.clone(), process3.clone(), resource.clone(), process.costs().clone(), 12, &now);
+        let res = modify(&user, &member, &company, id.clone(), process3.clone(), resource.clone(), process.costs().clone(), 12, Some("memo lol".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         // a company that doesn't own a resource can't modify it
         let mut resource3 = resource.clone();
         resource3.inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
-        let res = modify(&user, &member, &company, id.clone(), process.clone(), resource3.clone(), process.costs().clone(), 12, &now);
+        let res = modify(&user, &member, &company, id.clone(), process.clone(), resource3.clone(), process.costs().clone(), 12, Some("memo lol".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
 
         // a company that doesn't have posession of a resource can't modify it
         let mut resource4 = resource.clone();
         resource4.set_in_custody_of(CompanyID::new("ziggy").into());
-        let res = modify(&user, &member, &company, id.clone(), process.clone(), resource4.clone(), process.costs().clone(), 12, &now);
+        let res = modify(&user, &member, &company, id.clone(), process.clone(), resource4.clone(), process.costs().clone(), 12, Some("memo lol".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 }

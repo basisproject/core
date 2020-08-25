@@ -27,7 +27,7 @@ use vf_rs::{vf, geo::SpatialThing};
 /// created.
 ///
 /// This operates on a whole resource.
-pub fn dropoff(caller: &User, member: &CompanyMember, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, new_location: Option<SpatialThing>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn dropoff(caller: &User, member: &CompanyMember, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Dropoff)?;
     if company.is_deleted() {
@@ -49,6 +49,7 @@ pub fn dropoff(caller: &User, member: &CompanyMember, company: &Company, id: Eve
                 .action(vf::Action::Dropoff)
                 .at_location(new_location)
                 .has_point_in_time(now.clone())
+                .note(note)
                 .output_of(Some(process_id))
                 .provider(company.id().clone())
                 .receiver(company.id().clone())
@@ -77,7 +78,7 @@ pub fn dropoff(caller: &User, member: &CompanyMember, company: &Company, id: Eve
 /// `transfer-custody` event).
 ///
 /// This operates on a whole resource.
-pub fn pickup(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn pickup(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Pickup)?;
     if company.is_deleted() {
@@ -99,6 +100,7 @@ pub fn pickup(caller: &User, member: &CompanyMember, company: &Company, id: Even
                 .action(vf::Action::Pickup)
                 .has_point_in_time(now.clone())
                 .input_of(Some(process_id))
+                .note(note)
                 .provider(company.id().clone())
                 .receiver(company.id().clone())
                 .resource_inventoried_as(Some(resource_id))
@@ -156,12 +158,12 @@ mod tests {
             .mappable_address(Some("1212 Uranus lane, DERRSOYBOY, KY, 33133".into()))
             .build().unwrap();
 
-        let res = dropoff(&user, &member, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), &now);
+        let res = dropoff(&user, &member, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member = member.clone();
         member.set_permissions(vec![CompanyPermission::Dropoff]);
-        let mods = dropoff(&user, &member, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), &now).unwrap().into_vec();
+        let mods = dropoff(&user, &member, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), Some("memo".into()), &now).unwrap().into_vec();
         assert_eq!(mods.len(), 3);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         let process2 = mods[1].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -191,39 +193,40 @@ mod tests {
         assert_eq!(resource2.inner().primary_accountable(), &Some(company.agent_id()));
         assert_eq!(resource2.in_custody_of(), &company.agent_id());
         assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
+        assert_eq!(event.inner().note(), &Some("memo".into()));
         assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
         assert_eq!(resource2.inner().current_location(), &Some(loc.clone()));
         assert_eq!(resource2.costs(), &costs2);
 
         let user2 = make_user(&UserID::create(), Some(vec![]), &now);
-        let res = dropoff(&user2, &member, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), &now);
+        let res = dropoff(&user2, &member, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![]);
-        let res = dropoff(&user, &member2, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), &now);
+        let res = dropoff(&user, &member2, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
-        let res = dropoff(&user, &member, &company2, id.clone(), process.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), &now);
+        let res = dropoff(&user, &member, &company2, id.clone(), process.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't dropoff from a process you don't own
         let mut process3 = process.clone();
         process3.set_company_id(CompanyID::new("zing"));
-        let res = dropoff(&user, &member, &company, id.clone(), process3.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), &now);
+        let res = dropoff(&user, &member, &company, id.clone(), process3.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         let mut resource3 = resource.clone();
         resource3.inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
-        let res = dropoff(&user, &member, &company, id.clone(), process.clone(), resource3.clone(), process.costs().clone(), Some(loc.clone()), &now);
+        let res = dropoff(&user, &member, &company, id.clone(), process.clone(), resource3.clone(), process.costs().clone(), Some(loc.clone()), Some("memo".into()), &now);
         assert!(res.is_ok());
 
         // a company that doesn't have posession of a resource can't drop it off
         let mut resource4 = resource.clone();
         resource4.set_in_custody_of(CompanyID::new("ziggy").into());
-        let res = dropoff(&user, &member, &company, id.clone(), process.clone(), resource4.clone(), process.costs().clone(), Some(loc.clone()), &now);
+        let res = dropoff(&user, &member, &company, id.clone(), process.clone(), resource4.clone(), process.costs().clone(), Some(loc.clone()), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 
@@ -238,12 +241,12 @@ mod tests {
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let process = make_process(&ProcessID::create(), company.id(), "make widgets", &Costs::new(), &now);
 
-        let res = pickup(&user, &member, &company, id.clone(), resource.clone(), process.clone(), &now);
+        let res = pickup(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member = member.clone();
         member.set_permissions(vec![CompanyPermission::Pickup]);
-        let mods = pickup(&user, &member, &company, id.clone(), resource.clone(), process.clone(), &now).unwrap().into_vec();
+        let mods = pickup(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Some("memo".into()), &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
 
@@ -251,6 +254,7 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
+        assert_eq!(event.inner().note(), &Some("memo".into()));
         assert_eq!(event.inner().provider().clone(), company.agent_id());
         assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.move_costs(), &Some(Costs::new()));
@@ -259,34 +263,34 @@ mod tests {
         assert_eq!(event.updated(), &now);
 
         let user2 = make_user(&UserID::create(), Some(vec![]), &now);
-        let res = pickup(&user2, &member, &company, id.clone(), resource.clone(), process.clone(), &now);
+        let res = pickup(&user2, &member, &company, id.clone(), resource.clone(), process.clone(), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![]);
-        let res = pickup(&user, &member2, &company, id.clone(), resource.clone(), process.clone(), &now);
+        let res = pickup(&user, &member2, &company, id.clone(), resource.clone(), process.clone(), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
-        let res = pickup(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), &now);
+        let res = pickup(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't consume into a process you don't own
         let mut process3 = process.clone();
         process3.set_company_id(CompanyID::new("zing"));
-        let res = pickup(&user, &member, &company, id.clone(), resource.clone(), process3.clone(), &now);
+        let res = pickup(&user, &member, &company, id.clone(), resource.clone(), process3.clone(), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         let mut resource3 = resource.clone();
         resource3.inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
-        let res = pickup(&user, &member, &company, id.clone(), resource3.clone(), process.clone(), &now);
+        let res = pickup(&user, &member, &company, id.clone(), resource3.clone(), process.clone(), Some("memo".into()), &now);
         assert!(res.is_ok());
 
         // a company that doesn't have posession of a resource can't pick it up
         let mut resource4 = resource.clone();
         resource4.set_in_custody_of(CompanyID::new("ziggy").into());
-        let res = pickup(&user, &member, &company, id.clone(), resource4.clone(), process.clone(), &now);
+        let res = pickup(&user, &member, &company, id.clone(), resource4.clone(), process.clone(), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 }
