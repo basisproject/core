@@ -30,7 +30,7 @@ use vf_rs::vf;
 /// Note that the resource *can* have a cost, and those costs can be moved by
 /// citing. For instance, if it took a year of research to derive a formula,
 /// the costs of that research would be imbued in the formula.
-pub fn cite(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn cite(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Cite)?;
     if company.is_deleted() {
@@ -52,6 +52,7 @@ pub fn cite(caller: &User, member: &CompanyMember, company: &Company, id: EventI
                 .action(vf::Action::Cite)
                 .has_point_in_time(now.clone())
                 .input_of(Some(process_id))
+                .note(note)
                 .provider(company.id().clone())
                 .receiver(company.id().clone())
                 .resource_inventoried_as(Some(resource_id))
@@ -80,7 +81,7 @@ pub fn cite(caller: &User, member: &CompanyMember, company: &Company, id: EventI
 /// If you make widgets out of steel, then steel is the resource, and the
 /// process would be the fabrication that "consumes" steel (with the output,
 /// ie `produce`, of a widget).
-pub fn consume<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, move_measure: T, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn consume<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, move_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Consume)?;
     if company.is_deleted() {
@@ -107,6 +108,7 @@ pub fn consume<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, com
                 .action(vf::Action::Consume)
                 .has_point_in_time(now.clone())
                 .input_of(Some(process_id))
+                .note(note)
                 .provider(company.id().clone())
                 .receiver(company.id().clone())
                 .resource_inventoried_as(Some(resource_id))
@@ -136,7 +138,7 @@ pub fn consume<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, com
 ///
 /// For instance, a process might `consume` steel and have a `work` input and
 /// then `produce` a widget.
-pub fn produce<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, produce_measure: T, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn produce<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, produce_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Produce)?;
     if company.is_deleted() {
@@ -162,6 +164,7 @@ pub fn produce<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, com
             vf::EconomicEvent::builder()
                 .action(vf::Action::Produce)
                 .has_point_in_time(now.clone())
+                .note(note)
                 .output_of(Some(process_id))
                 .provider(company.id().clone())
                 .receiver(company.id().clone())
@@ -205,7 +208,7 @@ pub fn produce<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, com
 /// If you're trying to express some resource being "used up" (for instance
 /// screws being used to build a chair) then you'll probably want `consume`
 /// instead of `use`.
-pub fn useeee(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, effort_quantity: Option<Measure>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn useeee(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, effort_quantity: Option<Measure>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Use)?;
     if company.is_deleted() {
@@ -228,6 +231,7 @@ pub fn useeee(caller: &User, member: &CompanyMember, company: &Company, id: Even
                 .effort_quantity(effort_quantity)
                 .has_point_in_time(now.clone())
                 .input_of(Some(process_id))
+                .note(note)
                 .provider(company.id().clone())
                 .receiver(company.id().clone())
                 .resource_inventoried_as(Some(resource_id))
@@ -284,12 +288,12 @@ mod tests {
         costs.track_labor("homemaker", dec!(13.6));
         let process = make_process(&ProcessID::create(), company.id(), "make widgets", &costs, &now);
 
-        let res = cite(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23),  &now);
+        let res = cite(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member = member.clone();
         member.set_permissions(vec![CompanyPermission::Cite]);
-        let mods = cite(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), &now).unwrap().into_vec();
+        let mods = cite(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), Some("memo".into()), &now).unwrap().into_vec();
         assert_eq!(mods.len(), 3);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         let process2 = mods[1].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -299,6 +303,7 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
+        assert_eq!(event.inner().note(), &Some("memo".into()));
         assert_eq!(event.inner().provider().clone(), company.agent_id());
         assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
@@ -322,35 +327,35 @@ mod tests {
         assert_eq!(resource2.costs(), &costs3);
 
         let user2 = make_user(&UserID::create(), Some(vec![]), &now);
-        let res = cite(&user2, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), &now);
+        let res = cite(&user2, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![]);
-        let res = cite(&user, &member2, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), &now);
+        let res = cite(&user, &member2, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
-        let res = cite(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), &now);
+        let res = cite(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't consume into a process you don't own
         let mut process3 = process.clone();
         process3.set_company_id(CompanyID::new("zing"));
-        let res = cite(&user, &member, &company, id.clone(), resource.clone(), process3.clone(), Costs::new_with_labor("homemaker", 23), &now);
+        let res = cite(&user, &member, &company, id.clone(), resource.clone(), process3.clone(), Costs::new_with_labor("homemaker", 23), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         // a company that doesn't own a resource can't consume it
         let mut resource3 = resource.clone();
         resource3.inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
-        let res = cite(&user, &member, &company, id.clone(), resource3.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), &now);
+        let res = cite(&user, &member, &company, id.clone(), resource3.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
 
         // a company that doesn't have posession of a resource can't consume it
         let mut resource4 = resource.clone();
         resource4.set_in_custody_of(CompanyID::new("ziggy").into());
-        let res = cite(&user, &member, &company, id.clone(), resource4.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), &now);
+        let res = cite(&user, &member, &company, id.clone(), resource4.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 
@@ -368,12 +373,12 @@ mod tests {
         costs.track_labor("homemaker", dec!(13.6));
         let process = make_process(&ProcessID::create(), company.id(), "make widgets", &costs, &now);
 
-        let res = consume(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        let res = consume(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member = member.clone();
         member.set_permissions(vec![CompanyPermission::Consume]);
-        let mods = consume(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, &now).unwrap().into_vec();
+        let mods = consume(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now).unwrap().into_vec();
         assert_eq!(mods.len(), 3);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         let process2 = mods[1].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -383,6 +388,7 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
+        assert_eq!(event.inner().note(), &Some("memo".into()));
         assert_eq!(event.inner().provider().clone(), company.agent_id());
         assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
@@ -406,35 +412,35 @@ mod tests {
         assert_eq!(resource2.costs(), &costs3);
 
         let user2 = make_user(&UserID::create(), Some(vec![]), &now);
-        let res = consume(&user2, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        let res = consume(&user2, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![]);
-        let res = consume(&user, &member2, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        let res = consume(&user, &member2, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
-        let res = consume(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        let res = consume(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't consume into a process you don't own
         let mut process3 = process.clone();
         process3.set_company_id(CompanyID::new("zing"));
-        let res = consume(&user, &member, &company, id.clone(), resource.clone(), process3.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        let res = consume(&user, &member, &company, id.clone(), resource.clone(), process3.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         // a company that doesn't own a resource can't consume it
         let mut resource3 = resource.clone();
         resource3.inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
-        let res = consume(&user, &member, &company, id.clone(), resource3.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        let res = consume(&user, &member, &company, id.clone(), resource3.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
 
         // a company that doesn't have posession of a resource can't consume it
         let mut resource4 = resource.clone();
         resource4.set_in_custody_of(CompanyID::new("ziggy").into());
-        let res = consume(&user, &member, &company, id.clone(), resource4.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        let res = consume(&user, &member, &company, id.clone(), resource4.clone(), process.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 
@@ -452,12 +458,12 @@ mod tests {
         costs.track_labor("homemaker", dec!(89.3));
         let process = make_process(&ProcessID::create(), company.id(), "make widgets", &costs, &now);
 
-        let res = produce(&user, &member, &company, id.clone(), process.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        let res = produce(&user, &member, &company, id.clone(), process.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member = member.clone();
         member.set_permissions(vec![CompanyPermission::Produce]);
-        let mods = produce(&user, &member, &company, id.clone(), process.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, &now).unwrap().into_vec();
+        let mods = produce(&user, &member, &company, id.clone(), process.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now).unwrap().into_vec();
         assert_eq!(mods.len(), 3);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         let process2 = mods[1].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -467,6 +473,7 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &None);
+        assert_eq!(event.inner().note(), &Some("memo".into()));
         assert_eq!(event.inner().output_of(), &Some(process.id().clone()));
         assert_eq!(event.inner().provider().clone(), company.agent_id());
         assert_eq!(event.inner().receiver().clone(), company.agent_id());
@@ -491,35 +498,35 @@ mod tests {
         assert_eq!(resource2.costs(), &costs3);
 
         let user2 = make_user(&UserID::create(), Some(vec![]), &now);
-        let res = produce(&user2, &member, &company, id.clone(), process.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        let res = produce(&user2, &member, &company, id.clone(), process.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![]);
-        let res = produce(&user, &member2, &company, id.clone(), process.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        let res = produce(&user, &member2, &company, id.clone(), process.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
-        let res = produce(&user, &member, &company2, id.clone(), process.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        let res = produce(&user, &member, &company2, id.clone(), process.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't produce from a process you don't own
         let mut process3 = process.clone();
         process3.set_company_id(CompanyID::new("zing"));
-        let res = produce(&user, &member, &company, id.clone(), process3.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        let res = produce(&user, &member, &company, id.clone(), process3.clone(), resource.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         // a company that doesn't own a resource can't consume it
         let mut resource3 = resource.clone();
         resource3.inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
-        let res = produce(&user, &member, &company, id.clone(), process.clone(), resource3.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        let res = produce(&user, &member, &company, id.clone(), process.clone(), resource3.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
 
         // a company that doesn't have posession of a resource can't consume it
         let mut resource4 = resource.clone();
         resource4.set_in_custody_of(CompanyID::new("ziggy").into());
-        let res = produce(&user, &member, &company, id.clone(), process.clone(), resource4.clone(), Costs::new_with_labor("homemaker", 23), 8, &now);
+        let res = produce(&user, &member, &company, id.clone(), process.clone(), resource4.clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 
@@ -537,12 +544,12 @@ mod tests {
         costs.track_labor("homemaker", dec!(13.6));
         let process = make_process(&ProcessID::create(), company.id(), "make widgets", &costs, &now);
 
-        let res = useeee(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), &now);
+        let res = useeee(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member = member.clone();
         member.set_permissions(vec![CompanyPermission::Use]);
-        let mods = useeee(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), &now).unwrap().into_vec();
+        let mods = useeee(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), Some("memo".into()), &now).unwrap().into_vec();
         assert_eq!(mods.len(), 3);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         let process2 = mods[1].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -552,6 +559,7 @@ mod tests {
         assert_eq!(event.inner().agreed_in(), &None);
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
+        assert_eq!(event.inner().note(), &Some("memo".into()));
         assert_eq!(event.inner().provider().clone(), company.agent_id());
         assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", dec!(0.3))));
@@ -575,35 +583,35 @@ mod tests {
         assert_eq!(resource2.costs(), &costs3);
 
         let user2 = make_user(&UserID::create(), Some(vec![]), &now);
-        let res = useeee(&user2, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), &now);
+        let res = useeee(&user2, &member, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![]);
-        let res = useeee(&user, &member2, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), &now);
+        let res = useeee(&user, &member2, &company, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company2 = company.clone();
         company2.set_deleted(Some(now.clone()));
-        let res = useeee(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), &now);
+        let res = useeee(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't useeee into a process you don't own
         let mut process3 = process.clone();
         process3.set_company_id(CompanyID::new("zing"));
-        let res = useeee(&user, &member, &company, id.clone(), resource.clone(), process3.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), &now);
+        let res = useeee(&user, &member, &company, id.clone(), resource.clone(), process3.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         // a company that doesn't own a resource can't use it
         let mut resource3 = resource.clone();
         resource3.inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
-        let res = useeee(&user, &member, &company, id.clone(), resource3.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), &now);
+        let res = useeee(&user, &member, &company, id.clone(), resource3.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
 
         // a company that doesn't have posession of a resource can't use it
         let mut resource4 = resource.clone();
         resource4.set_in_custody_of(CompanyID::new("ziggy").into());
-        let res = useeee(&user, &member, &company, id.clone(), resource4.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), &now);
+        let res = useeee(&user, &member, &company, id.clone(), resource4.clone(), process.clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 }

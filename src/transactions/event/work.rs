@@ -33,7 +33,7 @@ use vf_rs::vf;
 ///
 /// Note that this creates a full work event with a defined start and end. This
 /// function cannot create pending work events.
-pub fn work(caller: &User, member: &CompanyMember, company: &Company, id: EventID, worker: CompanyMember, process: Process, wage_cost: Option<Decimal>, begin: DateTime<Utc>, end: DateTime<Utc>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn work(caller: &User, member: &CompanyMember, company: &Company, id: EventID, worker: CompanyMember, process: Process, wage_cost: Option<Decimal>, begin: DateTime<Utc>, end: DateTime<Utc>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     // if we're recording our own work event, we can just check the regular
     // `Work` permission, otherwise we need admin privs
@@ -74,6 +74,7 @@ pub fn work(caller: &User, member: &CompanyMember, company: &Company, id: EventI
                 .has_beginning(Some(begin))
                 .has_end(Some(end))
                 .input_of(Some(process_id))
+                .note(note)
                 .provider(member_id)
                 .receiver(company.id().clone())
                 .build()
@@ -123,7 +124,7 @@ mod tests {
         let worker = member.clone();
         let process = make_process(&ProcessID::create(), company.id(), "make widgets", &Costs::new_with_labor(occupation_id.clone(), dec!(177.5)), &now);
 
-        let mods = work(&user, &member, &company, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2).unwrap().into_vec();
+        let mods = work(&user, &member, &company, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 2);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         assert_eq!(event.id(), &id);
@@ -131,6 +132,7 @@ mod tests {
         assert_eq!(event.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(event.inner().has_end(), &Some(now2.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
+        assert_eq!(event.inner().note(), &Some("just doing some work".into()));
         assert_eq!(event.inner().provider().clone(), worker.agent_id());
         assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor(occupation_id.clone(), dec!(78.4))));
@@ -147,28 +149,28 @@ mod tests {
         assert_eq!(process2.costs(), &costs2);
 
         let user2 = make_user(&UserID::create(), Some(vec![]), &now);
-        let res = work(&user2, &member, &company, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
+        let res = work(&user2, &member, &company, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![]);
-        let res = work(&user, &member2, &company, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
+        let res = work(&user, &member2, &company, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company2 = company.clone();
         company2.set_deleted(Some(now2.clone()));
-        let res = work(&user, &member, &company2, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
+        let res = work(&user, &member, &company2, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // test worker != member
         let mut worker2 = worker.clone();
         worker2.set_id(CompanyMemberID::create());
-        let res = work(&user, &member, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
+        let res = work(&user, &member, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member2 = member.clone();
         member2.set_permissions(vec![CompanyPermission::WorkAdmin]);
-        let mods = work(&user, &member2, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2).unwrap().into_vec();
+        let mods = work(&user, &member2, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), None, &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 2);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         assert_eq!(event.id(), &id);
@@ -176,6 +178,7 @@ mod tests {
         assert_eq!(event.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(event.inner().has_end(), &Some(now2.clone()));
         assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
+        assert_eq!(event.inner().note(), &None);
         assert_eq!(event.inner().provider().clone(), worker2.agent_id());
         assert_eq!(event.inner().receiver().clone(), company.agent_id());
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor(occupation_id.clone(), dec!(78.4))));
@@ -192,23 +195,23 @@ mod tests {
         assert_eq!(process2.costs(), &costs2);
 
         let user2 = make_user(&UserID::create(), Some(vec![]), &now);
-        let res = work(&user2, &member2, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
+        let res = work(&user2, &member2, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut member3 = member2.clone();
         member3.set_permissions(vec![]);
-        let res = work(&user, &member3, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
+        let res = work(&user, &member3, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut company2 = company.clone();
         company2.set_deleted(Some(now2.clone()));
-        let res = work(&user, &member2, &company2, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
+        let res = work(&user, &member2, &company2, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
 
         // can't work into a process you don't own
         let mut process3 = process.clone();
         process3.set_company_id(CompanyID::new("zing"));
-        let res = work(&user, &member2, &company, id.clone(), worker2.clone(), process3.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), &now2);
+        let res = work(&user, &member2, &company, id.clone(), worker2.clone(), process3.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
     }
 }
