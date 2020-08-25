@@ -5,6 +5,10 @@
 //! production), but can also group members and resources together in cases like
 //! a housing company where the members are in control of the housing resources
 //! the company is in stewardship of.
+//!
+//! See the [company model.][1]
+//!
+//! [1]: ../../models/company/index.html
 
 use chrono::{DateTime, Utc};
 use crate::{

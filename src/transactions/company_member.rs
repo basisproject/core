@@ -1,4 +1,9 @@
-//! The interface for interacting with `CompanyMember` objects.
+//! Membership is a link between a user and a company, which comes with certain
+//! privileges (such as company ownership).
+//!
+//! See the [company member model.][1]
+//!
+//! [1]: ../../models/company_member/index.html
 
 use chrono::{DateTime, Utc};
 use crate::{

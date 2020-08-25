@@ -3,6 +3,10 @@
 //!
 //! For instance, if you made a widget and you want someone to purchase it, you
 //! would create and publish an intent to `transfer` that widget.
+//!
+//! See the [intent model.][1]
+//!
+//! [1]: ../../models/intent/index.html
 
 use chrono::{DateTime, Utc};
 use crate::{

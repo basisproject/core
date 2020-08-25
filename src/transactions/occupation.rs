@@ -1,3 +1,10 @@
+//! An occupation is effectively a job title that we want to track in the labor
+//! cost tracking.
+//!
+//! See the [occupation model.][1]
+//!
+//! [1]: ../../models/occupation/index.html
+
 use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,

@@ -1,3 +1,9 @@
+//! A user represents a person with membership in the system.
+//!
+//! See the [user model][1].
+//!
+//! [1]: ../../models/user/index.html
+
 use chrono::{DateTime, Utc};
 use crate::{
     access::{self, Permission, Role},

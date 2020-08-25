@@ -1,3 +1,15 @@
+//! A resource is a tangible asset. It can represent a chair, a house, a forest,
+//! a widget, a barrel of crude oil, etc.
+//!
+//! Resources are instances of a [resource_spec][1]. If the resource
+//! specification is a product description on an online shop, the resource is
+//! the actual delivered good that you receive when you order it.
+//!
+//! See the [resource model.][2]
+//!
+//! [1]: ../resource_spec/index.html
+//! [2]: ../../models/resource/index.html
+
 use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,

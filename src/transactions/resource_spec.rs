@@ -1,3 +1,15 @@
+//! A resource specification is a general description of a tangible asset.
+//!
+//! Every [resource][1] is an instance of a resource specification. For
+//! instance, a *resource specification* might be a product listing page for a
+//! "Haworth Zody" chair, and the *resource* is the cheap knock-off counterfeit
+//! that Amazon ships to you when you order it.
+//!
+//! See the [resource spec model.][2]
+//!
+//! [1]: ../resource/index.html
+//! [2]: ../../models/resource_spec/index.html
+
 use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,

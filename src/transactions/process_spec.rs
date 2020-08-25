@@ -1,3 +1,14 @@
+//! A process specification is a blueprint for a process. Each process is an
+//! *instance* of a process specification.
+//!
+//! For instance, if you make five widgets today, you might have five processes
+//! for each widget, but one process specification called "build widgets" that
+//! those five processes reference.
+//!
+//! See the [process spec model.][1]
+//!
+//! [1]: ../../models/process_spec/index.html
+
 use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,

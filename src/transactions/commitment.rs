@@ -4,7 +4,10 @@
 //! such as a line on a receipt or one item in an online shopping cart. They are
 //! restricted to a few types of actions [defined in OrderAction][1].
 //!
+//! See the [commitment model.][2]
+//!
 //! [1]: ../enum.OrderAction.html
+//! [2]: ../../models/commitment/index.html
 
 use chrono::{DateTime, Utc};
 use crate::{

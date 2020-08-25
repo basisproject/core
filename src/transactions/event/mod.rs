@@ -1,4 +1,8 @@
 //! Events are what move costs/resources through the system.
+//!
+//! See the [event model.][1]
+//!
+//! [1]: ../../models/event/index.html
 
 use crate::{
     models::{

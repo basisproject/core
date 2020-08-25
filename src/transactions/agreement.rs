@@ -2,6 +2,10 @@
 //! agents.
 //!
 //! In other words, an agreement is basically an order.
+//!
+//! See the [agreement model.][1]
+//!
+//! [1]: ../../models/agreement/index.html
 
 use chrono::{DateTime, Utc};
 use crate::{
@@ -19,7 +23,12 @@ use crate::{
 };
 use vf_rs::vf;
 
-/// Create a new agreement/order
+/// Create a new agreement/order.
+///
+/// When updating data connected to an agreement, only agents that are in the
+/// agreement's `participants` list will be allowed to complete updates. This
+/// makes it so only those involved in the agreement can modify it or any of its
+/// data in any way.
 pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &Company, id: AgreementID, participants: Vec<AgentID>, name: T, note: T, created: Option<DateTime<Utc>>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateAgreements)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::AgreementCreate)?;
@@ -45,8 +54,7 @@ pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &
     Ok(Modifications::new_single(Op::Create, model))
 }
 
-/// Update an agreement (mainly just name/note, everything else is commitment/
-/// event management).
+/// Update an agreement, including the participant list.
 pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: Agreement, participants: Option<Vec<AgentID>>, name: Option<String>, note: Option<String>, created: Option<Option<DateTime<Utc>>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateAgreements)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::AgreementUpdate)?;

@@ -1,3 +1,22 @@
+//! Processes are the means by which resources are created/transformed and labor
+//! is applied to these transformations.
+//!
+//! For instance a process might be making widgets, milling wood, driving a
+//! truck, etc. Processes aggregate costs into containers within a company. They
+//! can be as detailed or as general as desired. For instance you might have one
+//! big process for "run the company and make the things we make" which all
+//! costs flow into and out of, or you might have multiple processes for each
+//! part of the company's operations.
+//!
+//! Processes are somewhat time-defined and generally have a beginning and an
+//! end. This is not always the case, but generally is. For a more general
+//! process "type" see the [process_spec][1] transactions.
+//!
+//! See the [process model.][2]
+//!
+//! [1]: ../process_spec/index.html
+//! [2]: ../../models/process/index.html
+
 use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
