@@ -9,14 +9,13 @@
 //!
 //! 1. People should be free to determine and fulfill their own needs (bottom-up
 //! organization)
-//! 1. Companies started within this network operate without profit
-//! 1. Productive instruments are shared and managed by members
+//! 1. Companies within this network operate without profit
+//! 1. Productive instruments and property are shared and managed by members
 //!
 //! Effectively, this is a codebase designed to support [the free association
-//! of producers][freeassoc],
-//! a system of production sought after by Marxists and Anarchists in which
-//! people are free to engage in production without the shackles of currency,
-//! profits, or top-down planning structures.
+//! of producers][freeassoc], a system of production sought after by Marxists
+//! and Anarchists in which people are free to engage in production without
+//! coercion.
 //!
 //! While this ideal is a long ways away, it is nonetheless worth striving for.
 //! We also recognize that there will be inevitable transitional periods between

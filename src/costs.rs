@@ -51,10 +51,10 @@
 //! tracking system, the pencil would show the iron/steel content of that axe,
 //! albeit a small amount. Now, maybe the truck that ships the pencil uses tires
 //! from a company that processes rubber. Maybe that company uses pencils in
-//! their daily activities. Uh oh, an infinite circular reference.
+//! their daily activities. Uh oh, a near-infinite circular reference.
 //!
 //! Costs cannot be effectively "walked" because the graph is too vast and in
-//! some cases, recursively infinite. Instead what we do is aggregate the costs
+//! some cases, painfully recursively. Instead what we do is aggregate the costs
 //! at the output of each economic node (company-product pair). When another
 //! company orders that product, those costs are added to theirs and move
 //! through until *they* have an output, to which costs are attributed.
