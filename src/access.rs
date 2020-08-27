@@ -40,6 +40,10 @@ pub enum Permission {
     CompanyUpdateProcesses,
     CompanyUpdateProcessSpecs,
 
+    CurrencyCreate,
+    CurrencyDelete,
+    CurrencyUpdate,
+
     EventCreate,
     EventUpdate,
 
@@ -93,7 +97,11 @@ impl Role {
                 ]
             }
             Role::Bank => {
-                vec![]
+                vec![
+                    Permission::CurrencyCreate,
+                    Permission::CurrencyUpdate,
+                    Permission::CurrencyDelete,
+                ]
             },
             Role::User => {
                 vec![
