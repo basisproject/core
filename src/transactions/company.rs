@@ -109,7 +109,7 @@ mod tests {
         let founder_id = CompanyMemberID::create();
         let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
         let now = util::time::now();
-        let user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
+        let user = make_user(&UserID::create(), Some(vec![Role::User]), &now);
         // just makin' some widgets, huh? that's cool. hey, I made a widget once,
         // it was actually pretty fun. hey if you're free later maybe we could
         // make some widgets togethe...oh, you're busy? oh ok, that's cool, no
@@ -141,7 +141,7 @@ mod tests {
         let founder_id = CompanyMemberID::create();
         let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
         let now = util::time::now();
-        let mut user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
+        let mut user = make_user(&UserID::create(), Some(vec![Role::User]), &now);
         let mods = create(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
         let founder = mods[1].clone().expect_op::<CompanyMember>(Op::Create).unwrap();
@@ -172,7 +172,7 @@ mod tests {
         let founder_id = CompanyMemberID::create();
         let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
         let now = util::time::now();
-        let mut user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
+        let mut user = make_user(&UserID::create(), Some(vec![Role::User]), &now);
         let mods = create(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
         let founder = mods[1].clone().expect_op::<CompanyMember>(Op::Create).unwrap();
