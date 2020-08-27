@@ -31,7 +31,6 @@ pub enum Permission {
     CompanyAdminDelete,
     CompanyAdminUpdate,
     CompanyCreate,
-    CompanySetType,
     CompanyUpdateAgreements,
     CompanyUpdateCommitments,
     CompanyUpdateIntents,
@@ -44,17 +43,12 @@ pub enum Permission {
     EventCreate,
     EventUpdate,
 
-    RegionCreate,
-    RegionDelete,
-    RegionUpdate,
-
     UserAdminCreate,
     UserAdminUpdate,
     UserCreate,
     UserDelete,
     UserSetRoles,
     UserUpdate,
-
 
     ResourceSpecCreate,
     ResourceSpecDelete,
@@ -99,9 +93,7 @@ impl Role {
                 ]
             }
             Role::Bank => {
-                vec![
-                    Permission::CompanySetType,
-                ]
+                vec![]
             },
             Role::User => {
                 vec![
@@ -182,7 +174,6 @@ pub mod tests {
         assert!(super_admin.can(&Permission::CompanyCreate));
         assert!(super_admin.can(&Permission::CompanyAdminUpdate));
         assert!(super_admin.can(&Permission::CompanyAdminDelete));
-        assert!(super_admin.can(&Permission::CompanySetType));
 
         let comp_admin = Role::CompanyAdmin;
         assert!(!comp_admin.can(&Permission::UserCreate));
@@ -192,7 +183,6 @@ pub mod tests {
         assert!(!comp_admin.can(&Permission::CompanyCreate));
         assert!(comp_admin.can(&Permission::CompanyAdminUpdate));
         assert!(comp_admin.can(&Permission::CompanyAdminDelete));
-        assert!(!comp_admin.can(&Permission::CompanySetType));
     }
 }
 
