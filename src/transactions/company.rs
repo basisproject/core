@@ -17,7 +17,7 @@ use crate::{
     models::{
         Op,
         Modifications,
-        company::{Company, CompanyID, CompanyType, Permission as CompanyPermission},
+        company::{Company, CompanyID, Permission as CompanyPermission},
         company_member::{CompanyMember, CompanyMemberID},
         occupation::OccupationID,
         user::User,
@@ -27,10 +27,9 @@ use vf_rs::vf;
 
 /// Creates a new private company
 pub fn create_private<T: Into<String>>(caller: &User, id: CompanyID, company_name: T, company_email: T, company_active: bool, founder_id: CompanyMemberID, founder_occupation_id: OccupationID, founder_active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
-    caller.access_check(Permission::CompanyCreatePrivate)?;
+    caller.access_check(Permission::CompanyCreate)?;
     let company = Company::builder()
         .id(id.clone())
-        .ty(CompanyType::Private)
         .inner(
             vf::Agent::builder()
                 .name(company_name)
@@ -121,7 +120,6 @@ mod tests {
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
         let founder = mods[1].clone().expect_op::<CompanyMember>(Op::Create).unwrap();
         assert_eq!(company.id(), &id);
-        assert_eq!(company.ty(), &CompanyType::Private);
         assert_eq!(company.inner().name(), "jerry's widgets");
         assert_eq!(company.email(), "jerry@widgets.expert");
         assert_eq!(company.active(), &true);

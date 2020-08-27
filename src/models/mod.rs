@@ -236,7 +236,7 @@ pub(crate) mod testutils {
         costs::Costs,
         models::{
             agreement::{Agreement, AgreementID},
-            company::{Company, CompanyID, CompanyType, Permission as CompanyPermission},
+            company::{Company, CompanyID, Permission as CompanyPermission},
             company_member::{CompanyMember, CompanyMemberID},
             lib::agent::AgentID,
             occupation::OccupationID,
@@ -267,10 +267,9 @@ pub(crate) mod testutils {
             .build().unwrap()
     }
 
-    pub fn make_company<T: Into<String>>(id: &CompanyID, ty: CompanyType, name: T, now: &DateTime<Utc>) -> Company {
+    pub fn make_company<T: Into<String>>(id: &CompanyID, name: T, now: &DateTime<Utc>) -> Company {
         Company::builder()
             .id(id.clone())
-            .ty(ty)
             .inner(vf::Agent::builder().name(name).build().unwrap())
             .email("jerry@widgets.biz")
             .active(true)

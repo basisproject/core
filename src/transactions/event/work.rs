@@ -100,7 +100,7 @@ mod tests {
     use super::*;
     use crate::{
         models::{
-            company::{CompanyID, CompanyType},
+            company::CompanyID,
             company_member::CompanyMemberID,
             event::{Event, EventID, EventError},
             lib::agent::Agent,
@@ -117,7 +117,7 @@ mod tests {
         let now: DateTime<Utc> = "2018-06-06T00:00:00Z".parse().unwrap();
         let now2: DateTime<Utc> = "2018-06-06T06:52:00Z".parse().unwrap();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
         let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![CompanyPermission::Work], &now);

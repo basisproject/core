@@ -113,7 +113,7 @@ mod tests {
     use super::*;
     use crate::{
         models::{
-            company::{CompanyID, CompanyType},
+            company::CompanyID,
             company_member::CompanyMemberID,
             occupation::OccupationID,
             resource_spec::ResourceSpecID,
@@ -127,7 +127,7 @@ mod tests {
     fn can_create() {
         let now = util::time::now();
         let id = ResourceID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
         let spec = make_resource_spec(&ResourceSpecID::create(), company.id(), "widgets, baby", &now);
@@ -174,7 +174,7 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = ResourceID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
         let spec = make_resource_spec(&ResourceSpecID::create(), company.id(), "widgets, baby", &now);
@@ -222,7 +222,7 @@ mod tests {
     fn can_delete() {
         let now = util::time::now();
         let id = ResourceID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
         let spec = make_resource_spec(&ResourceSpecID::create(), company.id(), "widgets, baby", &now);

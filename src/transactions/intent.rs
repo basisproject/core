@@ -194,7 +194,7 @@ mod tests {
     use super::*;
     use crate::{
         models::{
-            company::{CompanyID, CompanyType},
+            company::CompanyID,
             company_member::CompanyMemberID,
             occupation::OccupationID,
             testutils::{make_user, make_company, make_member},
@@ -208,7 +208,7 @@ mod tests {
     fn can_create() {
         let now = util::time::now();
         let id = IntentID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate], &now);
         let costs = Costs::new_with_labor("widgetmaker", 42);
@@ -275,7 +275,7 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = IntentID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate, CompanyPermission::IntentUpdate], &now);
         let costs1 = Costs::new_with_labor("widgetmaker", 42);
@@ -345,7 +345,7 @@ mod tests {
     fn can_delete() {
         let now = util::time::now();
         let id = IntentID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate, CompanyPermission::IntentDelete], &now);
         let costs = Costs::new_with_labor("widgetmaker", 42);

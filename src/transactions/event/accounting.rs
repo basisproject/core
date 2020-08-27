@@ -238,7 +238,7 @@ mod tests {
     use crate::{
         models::{
             lib::agent::Agent,
-            company::{CompanyID, CompanyType},
+            company::CompanyID,
             company_member::CompanyMemberID,
             event::{EventID, EventError},
             occupation::OccupationID,
@@ -256,7 +256,7 @@ mod tests {
     fn can_lower() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
         let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
@@ -322,7 +322,7 @@ mod tests {
     fn can_move_costs() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's planks", &now);
+        let company = make_company(&CompanyID::create(), "jerry's planks", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("lawyer");
         let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
@@ -398,7 +398,7 @@ mod tests {
     fn can_move_resource() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's planks", &now);
+        let company = make_company(&CompanyID::create(), "jerry's planks", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
         let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
@@ -529,7 +529,7 @@ mod tests {
     fn can_raise() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
         let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);

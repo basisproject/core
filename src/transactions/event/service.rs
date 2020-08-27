@@ -85,7 +85,7 @@ mod tests {
     use crate::{
         models::{
             agreement::AgreementID,
-            company::{CompanyID, CompanyType},
+            company::CompanyID,
             company_member::CompanyMemberID,
             event::{EventID, EventError},
             lib::agent::Agent,
@@ -102,8 +102,8 @@ mod tests {
     fn can_deliver_service() {
         let now = util::time::now();
         let id = EventID::create();
-        let company_from = make_company(&CompanyID::create(), CompanyType::Private, "jerry's planks", &now);
-        let company_to = make_company(&CompanyID::create(), CompanyType::Private, "jinkey's skateboards", &now);
+        let company_from = make_company(&CompanyID::create(), "jerry's planks", &now);
+        let company_to = make_company(&CompanyID::create(), "jinkey's skateboards", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 1234", "gotta make some planks", &now);
         let agreed_in: Url = "https://legalzoom.com/my-dad-is-suing-your-dad-the-agreement".parse().unwrap();
         let user = make_user(&UserID::create(), None, &now);

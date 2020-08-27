@@ -86,7 +86,7 @@ mod tests {
     use crate::{
         models::{
             lib::agent::Agent,
-            company::{CompanyID, CompanyType},
+            company::CompanyID,
             company_member::CompanyMemberID,
             occupation::OccupationID,
             testutils::{make_user, make_company, make_member},
@@ -99,8 +99,8 @@ mod tests {
     fn can_create() {
         let now = util::time::now();
         let id = AgreementID::create();
-        let company_to = make_company(&CompanyID::create(), CompanyType::Private, "sam's widgets", &now);
-        let company_from = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company_to = make_company(&CompanyID::create(), "sam's widgets", &now);
+        let company_from = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate], &now);
         let participants = vec![company_to.agent_id(), company_from.agent_id()];
@@ -139,8 +139,8 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = AgreementID::create();
-        let company_to = make_company(&CompanyID::create(), CompanyType::Private, "sam's widgets", &now);
-        let company_from = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company_to = make_company(&CompanyID::create(), "sam's widgets", &now);
+        let company_from = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate, CompanyPermission::AgreementUpdate], &now);
         let participants = vec![company_to.agent_id(), company_from.agent_id()];

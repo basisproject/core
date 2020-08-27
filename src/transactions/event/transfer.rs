@@ -240,7 +240,7 @@ mod tests {
     use crate::{
         models::{
             agreement::AgreementID,
-            company::{CompanyID, CompanyType},
+            company::CompanyID,
             company_member::CompanyMemberID,
             event::{EventID, EventError},
             lib::agent::Agent,
@@ -258,8 +258,8 @@ mod tests {
     fn can_transfer() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's planks", &now);
-        let company2 = make_company(&CompanyID::create(), CompanyType::Private, "jinkey's skateboards", &now);
+        let company = make_company(&CompanyID::create(), "jerry's planks", &now);
+        let company2 = make_company(&CompanyID::create(), "jinkey's skateboards", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company.agent_id(), company2.agent_id()], "order 1234", "gotta get some planks", &now);
         let agreed_in: Url = "https://legalzoom.com/standard-boilerplate-hereto-notwithstanding-each-of-them-damage-to-the-hood-ornament-alone".parse().unwrap();
         let user = make_user(&UserID::create(), None, &now);
@@ -393,8 +393,8 @@ mod tests {
     fn can_transfer_all_rights() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's planks", &now);
-        let company2 = make_company(&CompanyID::create(), CompanyType::Private, "jinkey's skateboards", &now);
+        let company = make_company(&CompanyID::create(), "jerry's planks", &now);
+        let company2 = make_company(&CompanyID::create(), "jinkey's skateboards", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company.agent_id(), company2.agent_id()], "order 1234", "gotta get some planks", &now);
         let agreed_in: Url = "https://legalzoom.com/is-it-too-much-to-ask-for-todays-pedestrian-to-wear-at-least-one-piece-of-reflective-clothing".parse().unwrap();
         let user = make_user(&UserID::create(), None, &now);
@@ -521,8 +521,8 @@ mod tests {
     fn can_transfer_custody() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's planks", &now);
-        let company2 = make_company(&CompanyID::create(), CompanyType::Private, "jinkey's skateboards", &now);
+        let company = make_company(&CompanyID::create(), "jerry's planks", &now);
+        let company2 = make_company(&CompanyID::create(), "jinkey's skateboards", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company.agent_id(), company2.agent_id()], "order 1234", "gotta get some planks", &now);
         let agreed_in: Url = "https://legaldoom.com/trade-secrets-trade-secrets".parse().unwrap();
         let user = make_user(&UserID::create(), None, &now);

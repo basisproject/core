@@ -22,23 +22,6 @@ use crate::{
 use serde::{Serialize, Deserialize};
 use vf_rs::vf;
 
-/// Describes different company types. Different types behave differently within
-/// the system, and this is where we differentiate the behaviors.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum CompanyType {
-    /// For worker-owned companies that operate within the Basis network. Note
-    /// that syndicates can span multiple regions (for instance, a company that
-    /// has workers from several neighboring regions, or a company with many
-    /// remote workers).
-    ///
-    /// Example: A local, worker-owned widget factory
-    Syndicate,
-    /// For (capitalist pig) companies that exist outside of the Basis system.
-    ///
-    /// Example: Amazon
-    Private,
-}
-
 /// A permission gives a CompanyMember the ability to perform certain actions
 /// within the context of a company they have a relationship (a set of roles)
 /// with. 
@@ -175,8 +158,6 @@ basis_model! {
         /// The Agent object for this company, stores its name, image, location,
         /// etc.
         inner: vf::Agent,
-        /// What type of company
-        ty: CompanyType,
         /// Primary email address
         email: String,
     }
@@ -230,7 +211,7 @@ mod tests {
     #[test]
     fn totals_costs() {
         let company_id = CompanyID::create();
-        let company = make_company(&company_id, CompanyType::Syndicate, "jerry's delicious widgets", &util::time::now());
+        let company = make_company(&company_id, "jerry's delicious widgets", &util::time::now());
 
         let now = util::time::now();
         let process1 = make_process(&ProcessID::create(), &company_id, "make widgets", &Costs::new_with_labor("lumberjack", dec!(16.9)), &now);

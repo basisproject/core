@@ -187,7 +187,7 @@ mod tests {
     use crate::{
         models::{
             agreement::AgreementID,
-            company::{CompanyID, CompanyType},
+            company::CompanyID,
             company_member::CompanyMemberID,
             occupation::OccupationID,
             testutils::{make_agreement, make_user, make_company, make_member, make_resource},
@@ -202,8 +202,8 @@ mod tests {
     fn can_create() {
         let now = util::time::now();
         let id = CommitmentID::create();
-        let company_from = make_company(&CompanyID::create(), CompanyType::Private, "bridget's widgets", &now);
-        let company_to = make_company(&CompanyID::create(), CompanyType::Private, "larry's chairs", &now);
+        let company_from = make_company(&CompanyID::create(), "bridget's widgets", &now);
+        let company_to = make_company(&CompanyID::create(), "larry's chairs", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 111222", "UwU big order of widgetzzz", &now);
         let user = make_user(&UserID::create(), None, &now);
         let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate], &now);
@@ -276,8 +276,8 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = CommitmentID::create();
-        let company_from = make_company(&CompanyID::create(), CompanyType::Private, "bridget's widgets", &now);
-        let company_to = make_company(&CompanyID::create(), CompanyType::Private, "larry's chairs", &now);
+        let company_from = make_company(&CompanyID::create(), "bridget's widgets", &now);
+        let company_to = make_company(&CompanyID::create(), "larry's chairs", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 111222", "UwU big order of widgetzzz", &now);
         let user = make_user(&UserID::create(), None, &now);
         let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate, CompanyPermission::CommitmentUpdate], &now);
@@ -343,8 +343,8 @@ mod tests {
     fn can_delete() {
         let now = util::time::now();
         let id = CommitmentID::create();
-        let company_from = make_company(&CompanyID::create(), CompanyType::Private, "bridget's widgets", &now);
-        let company_to = make_company(&CompanyID::create(), CompanyType::Private, "larry's dairies (outdoor outdoor. shutup parker. thank you parker, shutup. thank you.)", &now);
+        let company_from = make_company(&CompanyID::create(), "bridget's widgets", &now);
+        let company_to = make_company(&CompanyID::create(), "larry's dairies (outdoor outdoor. shutup parker. thank you parker, shutup. thank you.)", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 111222", "UwU big order of widgetzzz", &now);
         let user = make_user(&UserID::create(), None, &now);
         let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate, CompanyPermission::CommitmentDelete], &now);

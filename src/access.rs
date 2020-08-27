@@ -30,7 +30,7 @@ pub enum Permission {
 
     CompanyAdminDelete,
     CompanyAdminUpdate,
-    CompanyCreatePrivate,
+    CompanyCreate,
     CompanySetType,
     CompanyUpdateAgreements,
     CompanyUpdateCommitments,
@@ -107,7 +107,7 @@ impl Role {
                 vec![
                     Permission::UserUpdate,
                     Permission::UserDelete,
-                    Permission::CompanyCreatePrivate,
+                    Permission::CompanyCreate,
                     Permission::CompanyUpdateAgreements,
                     Permission::CompanyUpdateCommitments,
                     Permission::CompanyUpdateIntents,
@@ -179,7 +179,7 @@ pub mod tests {
         assert!(super_admin.can(&Permission::UserUpdate));
         assert!(super_admin.can(&Permission::UserAdminUpdate));
         assert!(super_admin.can(&Permission::UserDelete));
-        assert!(super_admin.can(&Permission::CompanyCreatePrivate));
+        assert!(super_admin.can(&Permission::CompanyCreate));
         assert!(super_admin.can(&Permission::CompanyAdminUpdate));
         assert!(super_admin.can(&Permission::CompanyAdminDelete));
         assert!(super_admin.can(&Permission::CompanySetType));
@@ -189,7 +189,7 @@ pub mod tests {
         assert!(!comp_admin.can(&Permission::UserUpdate));
         assert!(!comp_admin.can(&Permission::UserAdminUpdate));
         assert!(!comp_admin.can(&Permission::UserDelete));
-        assert!(!comp_admin.can(&Permission::CompanyCreatePrivate));
+        assert!(!comp_admin.can(&Permission::CompanyCreate));
         assert!(comp_admin.can(&Permission::CompanyAdminUpdate));
         assert!(comp_admin.can(&Permission::CompanyAdminDelete));
         assert!(!comp_admin.can(&Permission::CompanySetType));

@@ -103,7 +103,7 @@ mod tests {
     use crate::{
         models::{
             account::AccountID,
-            company::{CompanyID, CompanyType},
+            company::CompanyID,
             lib::agent::Agent,
             user::UserID,
             testutils::{make_user, make_company, make_member},
@@ -117,7 +117,7 @@ mod tests {
     fn can_create() {
         let now = util::time::now();
         let id = CompanyMemberID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let occupation_id = OccupationID::create();
         let agreement: Url = "https://mydoc.com/work_agreement_1".parse().unwrap();
         let user = make_user(&UserID::create(), None, &now);
@@ -163,7 +163,7 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = CompanyMemberID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let occupation_id = OccupationID::create();
         let agreement: Url = "https://mydoc.com/work_agreement_1".parse().unwrap();
         let user = make_user(&UserID::create(), None, &now);
@@ -204,7 +204,7 @@ mod tests {
     fn can_set_permissions() {
         let now = util::time::now();
         let id = CompanyMemberID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let occupation_id = OccupationID::create();
         let user = make_user(&UserID::create(), None, &now);
         let new_user = make_user(&UserID::create(), None, &now);
@@ -237,7 +237,7 @@ mod tests {
     fn can_set_compensation() {
         let now = util::time::now();
         let id = CompanyMemberID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let occupation_id = OccupationID::create();
         let user = make_user(&UserID::create(), None, &now);
         let new_user = make_user(&UserID::create(), None, &now);
@@ -271,7 +271,7 @@ mod tests {
     fn can_delete() {
         let now = util::time::now();
         let id = CompanyMemberID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let occupation_id = OccupationID::create();
         let user = make_user(&UserID::create(), None, &now);
         let new_user = make_user(&UserID::create(), None, &now);
