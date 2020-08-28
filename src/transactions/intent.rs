@@ -20,7 +20,7 @@ use crate::{
         member::Member,
         lib::{
             agent::{Agent, AgentID},
-            basis_model::Deletable,
+            basis_model::{ActiveState, Deletable},
         },
         intent::{Intent, IntentID},
         resource::ResourceID,
@@ -37,8 +37,8 @@ use vf_rs::{vf, geo::SpatialThing};
 pub fn create(caller: &User, member: &Member, company: &Company, id: IntentID, move_costs: Option<Costs>, action: OrderAction, agreed_in: Option<Url>, at_location: Option<SpatialThing>, available_quantity: Option<Measure>, due: Option<DateTime<Utc>>, effort_quantity: Option<Measure>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, has_point_in_time: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, name: Option<String>, note: Option<String>, provider: Option<AgentID>, receiver: Option<AgentID>, resource_conforms_to: Option<ResourceSpecID>, resource_inventoried_as: Option<ResourceID>, resource_quantity: Option<Measure>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateIntents)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::IntentCreate)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     let company_agent_id = company.agent_id();
     if provider.is_none() && receiver.is_none() {
@@ -92,8 +92,8 @@ pub fn create(caller: &User, member: &Member, company: &Company, id: IntentID, m
 pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Intent, move_costs: Option<Option<Costs>>, action: Option<OrderAction>, agreed_in: Option<Option<Url>>, at_location: Option<Option<SpatialThing>>, available_quantity: Option<Option<Measure>>, due: Option<Option<DateTime<Utc>>>, effort_quantity: Option<Option<Measure>>, finished: Option<Option<bool>>, has_beginning: Option<Option<DateTime<Utc>>>, has_end: Option<Option<DateTime<Utc>>>, has_point_in_time: Option<Option<DateTime<Utc>>>, in_scope_of: Option<Vec<AgentID>>, name: Option<Option<String>>, note: Option<Option<String>>, provider: Option<Option<AgentID>>, receiver: Option<Option<AgentID>>, resource_conforms_to: Option<Option<ResourceSpecID>>, resource_inventoried_as: Option<Option<ResourceID>>, resource_quantity: Option<Option<Measure>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateIntents)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::IntentUpdate)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     let company_agent_id = company.agent_id();
     if provider == Some(None) && receiver == Some(None) {
@@ -185,8 +185,11 @@ pub fn update(caller: &User, member: &Member, company: &Company, mut subject: In
 pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: Intent, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateIntents)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::IntentDelete)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
+    }
+    if subject.is_deleted() {
+        Err(Error::ObjectIsDeleted("intent".into()))?;
     }
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
@@ -200,7 +203,7 @@ mod tests {
             company::CompanyID,
             member::MemberID,
             occupation::OccupationID,
-            testutils::{make_user, make_company, make_member_worker},
+            testutils::{deleted_company_tester, make_user, make_company, make_member_worker},
             user::UserID,
         },
         util,
@@ -258,10 +261,9 @@ mod tests {
         let res = create(&user2, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now.clone()));
-        let res = create(&user, &member, &company2, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company: Company| {
+            create(&user, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now)
+        });
 
         let mut company3 = company.clone();
         company3.set_id(CompanyID::new("bill's company"));
@@ -328,10 +330,9 @@ mod tests {
         let res = update(&user2, &member, &company, intent1.clone(), Some(Some(costs2.clone())), None, None, Some(None), None, None, None, None, None, None, None, Some(vec![]), Some(Some("buy widget".into())), None, None, None, None, None, None, Some(false), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now.clone()));
-        let res = update(&user, &member, &company2, intent1.clone(), Some(Some(costs2.clone())), None, None, Some(None), None, None, None, None, None, None, None, Some(vec![]), Some(Some("buy widget".into())), None, None, None, None, None, None, Some(false), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now2, |company: Company| {
+            update(&user, &member, &company, intent1.clone(), Some(Some(costs2.clone())), None, None, Some(None), None, None, None, None, None, None, None, Some(vec![]), Some(Some("buy widget".into())), None, None, None, None, None, None, Some(false), &now2)
+        });
 
         let mut company3 = company.clone();
         company3.set_id(CompanyID::new("bill's company"));
@@ -399,10 +400,9 @@ mod tests {
         let res = delete(&user2, &member, &company, intent1.clone(), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now2.clone()));
-        let res = delete(&user, &member, &company2, intent1.clone(), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now2, |company: Company| {
+            delete(&user, &member, &company, intent1.clone(), &now2)
+        });
     }
 }
 

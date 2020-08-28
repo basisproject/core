@@ -15,7 +15,7 @@ use crate::{
         event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
         member::Member,
-        lib::basis_model::Deletable,
+        lib::basis_model::ActiveState,
         process::Process,
         resource::Resource,
         user::User,
@@ -31,8 +31,8 @@ use vf_rs::{vf, geo::SpatialThing};
 pub fn dropoff(caller: &User, member: &Member, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Dropoff)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
 
     let process_id = process.id().clone();
@@ -82,8 +82,8 @@ pub fn dropoff(caller: &User, member: &Member, company: &Company, id: EventID, p
 pub fn pickup(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, process: Process, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Pickup)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
 
     let process_id = process.id().clone();
@@ -136,7 +136,7 @@ mod tests {
             occupation::OccupationID,
             process::ProcessID,
             resource::ResourceID,
-            testutils::{make_user, make_company, make_member_worker, make_process, make_resource},
+            testutils::{deleted_company_tester, make_user, make_company, make_member_worker, make_process, make_resource},
             user::UserID,
         },
         util,
@@ -208,10 +208,9 @@ mod tests {
         let res = dropoff(&user, &member2, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now.clone()));
-        let res = dropoff(&user, &member, &company2, id.clone(), process.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), Some("memo".into()), &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company: Company| {
+            dropoff(&user, &member, &company, id.clone(), process.clone(), resource.clone(), process.costs().clone(), Some(loc.clone()), Some("memo".into()), &now)
+        });
 
         // can't dropoff from a process you don't own
         let mut process3 = process.clone();
@@ -272,10 +271,9 @@ mod tests {
         let res = pickup(&user, &member2, &company, id.clone(), resource.clone(), process.clone(), Some("memo".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now.clone()));
-        let res = pickup(&user, &member, &company2, id.clone(), resource.clone(), process.clone(), Some("memo".into()), &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company: Company| {
+            pickup(&user, &member, &company, id.clone(), resource.clone(), process.clone(), Some("memo".into()), &now)
+        });
 
         // can't consume into a process you don't own
         let mut process3 = process.clone();

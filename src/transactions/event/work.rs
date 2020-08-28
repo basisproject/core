@@ -14,7 +14,7 @@ use crate::{
         event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
         member::Member,
-        lib::basis_model::Deletable,
+        lib::basis_model::ActiveState,
         process::Process,
         user::User,
     },
@@ -43,8 +43,8 @@ pub fn work(caller: &User, member: &Member, company: &Company, id: EventID, work
     } else {
         member.access_check(caller.id(), company.id(), CompanyPermission::WorkAdmin)?;
     }
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
 
     let effort = {
@@ -108,7 +108,7 @@ mod tests {
             lib::agent::Agent,
             occupation::OccupationID,
             process::ProcessID,
-            testutils::{make_user, make_company, make_member_worker, make_process},
+            testutils::{deleted_company_tester, make_user, make_company, make_member_worker, make_process},
             user::UserID,
         },
     };
@@ -159,10 +159,9 @@ mod tests {
         let res = work(&user, &member2, &company, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now2.clone()));
-        let res = work(&user, &member, &company2, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company: Company| {
+            work(&user, &member, &company, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2)
+        });
 
         // test worker != member
         let mut worker2 = worker.clone();
@@ -205,10 +204,9 @@ mod tests {
         let res = work(&user, &member3, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now2.clone()));
-        let res = work(&user, &member2, &company2, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now2, |company: Company| {
+            work(&user, &member2, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2)
+        });
 
         // can't work into a process you don't own
         let mut process3 = process.clone();

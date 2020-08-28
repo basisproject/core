@@ -22,7 +22,7 @@ use crate::{
         member::Member,
         lib::{
             agent::Agent,
-            basis_model::Deletable,
+            basis_model::{ActiveState, Deletable},
         },
         resource::{Resource, ResourceID},
         resource_spec::ResourceSpecID,
@@ -37,8 +37,8 @@ use vf_rs::{vf, dfc};
 pub fn create(caller: &User, member: &Member, company: &Company, id: ResourceID, spec_id: ResourceSpecID, lot: Option<dfc::ProductBatch>, name: Option<String>, tracking_id: Option<String>, classifications: Vec<Url>, note: Option<String>, unit_of_effort: Option<Unit>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResources)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceCreate)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     let model = Resource::builder()
         .id(id)
@@ -69,8 +69,8 @@ pub fn create(caller: &User, member: &Member, company: &Company, id: ResourceID,
 pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Resource, lot: Option<dfc::ProductBatch>, name: Option<String>, tracking_id: Option<String>, classifications: Option<Vec<Url>>, note: Option<String>, unit_of_effort: Option<Unit>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResources)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceUpdate)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     if lot.is_some() {
         subject.inner_mut().set_lot(lot);
@@ -101,8 +101,11 @@ pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Re
 pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: Resource, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResources)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceDelete)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
+    }
+    if subject.is_deleted() {
+        Err(Error::ObjectIsDeleted("resource".into()))?;
     }
     if !subject.costs().is_zero() {
         Err(Error::CannotEraseCosts)?;
@@ -120,7 +123,7 @@ mod tests {
             member::MemberID,
             occupation::OccupationID,
             resource_spec::ResourceSpecID,
-            testutils::{make_user, make_company, make_member_worker, make_resource_spec},
+            testutils::{deleted_company_tester, make_user, make_company, make_member_worker, make_resource_spec},
             user::UserID,
         },
         util,
@@ -167,10 +170,9 @@ mod tests {
         let res = create(&user2, &member, &company, id.clone(), spec.id().clone(), Some(lot.clone()), Some("widget batch".into()), None, vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()], Some("niceee".into()), Some(Unit::Hour), true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now.clone()));
-        let res = create(&user, &member, &company2, id.clone(), spec.id().clone(), Some(lot.clone()), Some("widget batch".into()), None, vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()], Some("niceee".into()), Some(Unit::Hour), true, &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company: Company| {
+            create(&user, &member, &company, id.clone(), spec.id().clone(), Some(lot.clone()), Some("widget batch".into()), None, vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()], Some("niceee".into()), Some(Unit::Hour), true, &now)
+        });
     }
 
     #[test]
@@ -191,7 +193,6 @@ mod tests {
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         member.set_permissions(vec![CompanyPermission::ResourceUpdate]);
-        let now2 = util::time::now();
         let mods = update(&user, &member, &company, resource.clone(), None, Some("better widgets".into()), Some("444-computers-and-equipment".into()), None, None, Some(Unit::WattHour), Some(false), &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
@@ -215,10 +216,9 @@ mod tests {
         let res = update(&user2, &member, &company, resource.clone(), None, Some("better widgets".into()), Some("444-computers-and-equipment".into()), None, None, Some(Unit::WattHour), Some(false), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now2.clone()));
-        let res = update(&user, &member, &company2, resource.clone(), None, Some("better widgets".into()), Some("444-computers-and-equipment".into()), None, None, Some(Unit::WattHour), Some(false), &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company: Company| {
+            update(&user, &member, &company, resource.clone(), None, Some("better widgets".into()), Some("444-computers-and-equipment".into()), None, None, Some(Unit::WattHour), Some(false), &now)
+        });
     }
 
     #[test]
@@ -263,10 +263,9 @@ mod tests {
         let res = delete(&user2, &member, &company, resource.clone(), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now2.clone()));
-        let res = delete(&user, &member, &company2, resource.clone(), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now2, |company: Company| {
+            delete(&user, &member, &company, resource.clone(), &now2)
+        });
     }
 }
 

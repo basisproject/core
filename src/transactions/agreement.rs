@@ -16,7 +16,7 @@ use crate::{
         Modifications,
         lib::{
             agent::AgentID,
-            basis_model::Deletable,
+            basis_model::ActiveState,
         },
         agreement::{Agreement, AgreementID},
         company::{Company, Permission as CompanyPermission},
@@ -35,8 +35,8 @@ use vf_rs::vf;
 pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company, id: AgreementID, participants: Vec<AgentID>, name: T, note: T, created: Option<DateTime<Utc>>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateAgreements)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::AgreementCreate)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     let model = Agreement::builder()
         .id(id)
@@ -61,8 +61,8 @@ pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company
 pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Agreement, participants: Option<Vec<AgentID>>, name: Option<String>, note: Option<String>, created: Option<Option<DateTime<Utc>>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateAgreements)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::AgreementUpdate)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     if let Some(participants) = participants {
         subject.set_participants(participants);
@@ -92,7 +92,7 @@ mod tests {
             company::CompanyID,
             member::MemberID,
             occupation::OccupationID,
-            testutils::{make_user, make_company, make_member_worker},
+            testutils::{deleted_company_tester, make_user, make_company, make_member_worker},
             user::UserID,
         },
         util,
@@ -132,10 +132,9 @@ mod tests {
         let res = create(&user2, &member, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company_to.clone();
-        company2.set_deleted(Some(now.clone()));
-        let res = create(&user, &member, &company2, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company_to.clone(), &now, |company: Company| {
+            create(&user, &member, &company, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now)
+        });
     }
 
     #[test]
@@ -174,10 +173,9 @@ mod tests {
         let res = update(&user2, &member, &company_to, agreement1.clone(), None, Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company_to2 = company_to.clone();
-        company_to2.set_deleted(Some(now2.clone()));
-        let res = update(&user, &member, &company_to2, agreement1.clone(), None, Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company_to.clone(), &now2, |company: Company| {
+            update(&user, &member, &company, agreement1.clone(), None, Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2)
+        });
     }
 }
 

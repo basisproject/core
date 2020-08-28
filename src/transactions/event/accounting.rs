@@ -15,7 +15,7 @@ use crate::{
         event::{Event, EventID, EventProcessState, MoveType},
         company::{Company, Permission as CompanyPermission},
         member::Member,
-        lib::basis_model::Deletable,
+        lib::basis_model::ActiveState,
         process::Process,
         resource::Resource,
         user::User,
@@ -30,8 +30,8 @@ use vf_rs::{vf, geo::SpatialThing};
 pub fn lower<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Lower)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
 
     let measure = {
@@ -80,8 +80,8 @@ pub fn lower<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Co
 pub fn move_costs(caller: &User, member: &Member, company: &Company, id: EventID, process_from: Process, process_to: Process, move_costs: Costs, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::MoveCosts)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
 
     let process_from_id = process_from.id().clone();
@@ -128,8 +128,8 @@ pub fn move_costs(caller: &User, member: &Member, company: &Company, id: EventID
 pub fn move_resource<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, resource_measure: T, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::MoveResource)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
 
     let measure = {
@@ -190,8 +190,8 @@ pub fn move_resource<T: Into<NumericUnion>>(caller: &User, member: &Member, comp
 pub fn raise<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Raise)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
 
     let measure = {
@@ -245,7 +245,7 @@ mod tests {
             occupation::OccupationID,
             process::{Process, ProcessID},
             resource::ResourceID,
-            testutils::{make_user, make_company, make_member_worker, make_process, make_resource},
+            testutils::{deleted_company_tester, make_user, make_company, make_member_worker, make_process, make_resource},
             user::UserID,
         },
         util,
@@ -301,10 +301,9 @@ mod tests {
         let res = lower(&user, &member2, &company, id.clone(), resource.clone(), 8, Some("a note".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now.clone()));
-        let res = lower(&user, &member, &company2, id.clone(), resource.clone(), 8, Some("a note".into()), &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company: Company| {
+            lower(&user, &member, &company, id.clone(), resource.clone(), 8, Some("a note".into()), &now)
+        });
 
         // a company that doesn't own a resource can't lower it
         let mut resource3 = resource.clone();
@@ -377,10 +376,9 @@ mod tests {
         let res = move_costs(&user, &member2, &company, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), Some("my note".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now.clone()));
-        let res = move_costs(&user, &member, &company2, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), Some("my note".into()), &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company: Company| {
+            move_costs(&user, &member, &company, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), Some("my note".into()), &now)
+        });
 
         // can't move costs from a process you don't own
         let mut process_from3 = process_from.clone();
@@ -502,10 +500,9 @@ mod tests {
         let res = move_resource(&user, &member2, &company, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, Some(loc.clone()), Some("lol".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company_2 = company.clone();
-        company_2.set_deleted(Some(now.clone()));
-        let res = move_resource(&user, &member, &company_2, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, Some(loc.clone()), Some("lol".into()), &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company: Company| {
+            move_resource(&user, &member, &company, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, Some(loc.clone()), Some("lol".into()), &now)
+        });
 
         // can't move into a resource you don't own
         let mut resource_to3 = resource_to.clone();
@@ -574,10 +571,9 @@ mod tests {
         let res = raise(&user, &member2, &company, id.clone(), resource.clone(), 8, Some("toot".into()), &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now.clone()));
-        let res = raise(&user, &member, &company2, id.clone(), resource.clone(), 8, Some("toot".into()), &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company: Company| {
+            raise(&user, &member, &company, id.clone(), resource.clone(), 8, Some("toot".into()), &now)
+        });
 
         // a company that doesn't own a resource can't raise it
         let mut resource3 = resource.clone();
