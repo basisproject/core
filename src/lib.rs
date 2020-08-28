@@ -1,7 +1,4 @@
-//! Welcome to the Basis Core. We realize there are many choices when evaluating
-//! rust-based economic libraries that facilitate a socialist mode of production
-//! and appreciate your choice of using Basis to further your revolutionary
-//! goals.
+//! Welcome to the Basis Core.
 //!
 //! This library provides a functional interface for interacting with a graph of
 //! economic nodes engaging in a socialist mode of production. What this means

@@ -14,11 +14,11 @@
 //! - `User` - An individual user who is a member of a company.
 //! - `Worker` - An individual who works at the parent company, making widgets
 //! or growing vegetables or any other productive role. Workers are the only
-//! members that can perform [work transactions][1] (via a [Process]) for a
+//! members that can perform [work transactions][1] (via a [Process][0]) for a
 //! company, which assign costs to companies and print and transfer credits to
 //! the worker's preferred account.
 //!
-//! [Process]: ../process/struct.Process.html
+//! [0]: ../process/struct.Process.html
 //! [1]: ../../transactions/event/work/index.html
 
 use crate::{
