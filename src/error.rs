@@ -38,6 +38,9 @@ pub enum Error {
     /// units, such as adding 12 Hours to 16 Kilograms
     #[error("operation on measurement with mismatched units")]
     MeasureUnitsMismatched,
+    /// The given `Member` must be a `MemberWorker` class
+    #[error("the member given must be a worker (not company, user, etc)")]
+    MemberMustBeWorker,
     /// We're missing required fields in a call
     #[error("fields missing {0:?}")]
     MissingFields(Vec<String>),

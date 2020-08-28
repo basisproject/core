@@ -1,6 +1,6 @@
 //! The user is the point of access to the entire system. Users have
 //! permissions, users own accounts, users are linked to companies (via
-//! `CompanyMember` objects), and much more.
+//! `Member` objects), and much more.
 //!
 //! Every person in the system (whether they are a member or not) is represented
 //! by a `User` object.
@@ -8,7 +8,10 @@
 use crate::{
     access::{Permission, Role},
     models::{
-        lib::agent::{Agent, AgentID},
+        lib::{
+            agent::{Agent, AgentID},
+            basis_model::ActiveState,
+        },
     },
     error::{Error, Result},
 };

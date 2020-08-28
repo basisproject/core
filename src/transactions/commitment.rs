@@ -20,8 +20,11 @@ use crate::{
         agreement::Agreement,
         commitment::{Commitment, CommitmentID},
         company::{Company, Permission as CompanyPermission},
-        company_member::CompanyMember,
-        lib::agent::{Agent, AgentID},
+        member::Member,
+        lib::{
+            agent::{Agent, AgentID},
+            basis_model::Deletable,
+        },
         process::ProcessID,
         resource::ResourceID,
         resource_spec::ResourceSpecID,
@@ -34,7 +37,7 @@ use url::Url;
 use vf_rs::{vf, geo::SpatialThing};
 
 /// Create a new commitment
-pub fn create(caller: &User, member: &CompanyMember, company: &Company, agreement: &Agreement, id: CommitmentID, move_costs: Costs, action: OrderAction, agreed_in: Option<Url>, at_location: Option<SpatialThing>, created: Option<DateTime<Utc>>, due: Option<DateTime<Utc>>, effort_quantity: Option<Measure>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, has_point_in_time: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, input_of: Option<ProcessID>, name: Option<String>, note: Option<String>, output_of: Option<ProcessID>, provider: AgentID, receiver: AgentID, resource_conforms_to: Option<ResourceSpecID>, resource_inventoried_as: Option<ResourceID>, resource_quantity: Option<Measure>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create(caller: &User, member: &Member, company: &Company, agreement: &Agreement, id: CommitmentID, move_costs: Costs, action: OrderAction, agreed_in: Option<Url>, at_location: Option<SpatialThing>, created: Option<DateTime<Utc>>, due: Option<DateTime<Utc>>, effort_quantity: Option<Measure>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, has_point_in_time: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, input_of: Option<ProcessID>, name: Option<String>, note: Option<String>, output_of: Option<ProcessID>, provider: AgentID, receiver: AgentID, resource_conforms_to: Option<ResourceSpecID>, resource_inventoried_as: Option<ResourceID>, resource_quantity: Option<Measure>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateCommitments)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::CommitmentCreate)?;
     if company.is_deleted() {
@@ -92,7 +95,7 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, agreemen
 }
 
 /// Update a commitment
-pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: Commitment, move_costs: Option<Costs>, action: Option<OrderAction>, agreed_in: Option<Option<Url>>, at_location: Option<Option<SpatialThing>>, created: Option<Option<DateTime<Utc>>>, due: Option<Option<DateTime<Utc>>>, effort_quantity: Option<Option<Measure>>, finished: Option<Option<bool>>, has_beginning: Option<Option<DateTime<Utc>>>, has_end: Option<Option<DateTime<Utc>>>, has_point_in_time: Option<Option<DateTime<Utc>>>, in_scope_of: Option<Vec<AgentID>>, input_of: Option<Option<ProcessID>>, name: Option<Option<String>>, note: Option<Option<String>>, output_of: Option<Option<ProcessID>>, resource_conforms_to: Option<Option<ResourceSpecID>>, resource_inventoried_as: Option<Option<ResourceID>>, resource_quantity: Option<Option<Measure>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Commitment, move_costs: Option<Costs>, action: Option<OrderAction>, agreed_in: Option<Option<Url>>, at_location: Option<Option<SpatialThing>>, created: Option<Option<DateTime<Utc>>>, due: Option<Option<DateTime<Utc>>>, effort_quantity: Option<Option<Measure>>, finished: Option<Option<bool>>, has_beginning: Option<Option<DateTime<Utc>>>, has_end: Option<Option<DateTime<Utc>>>, has_point_in_time: Option<Option<DateTime<Utc>>>, in_scope_of: Option<Vec<AgentID>>, input_of: Option<Option<ProcessID>>, name: Option<Option<String>>, note: Option<Option<String>>, output_of: Option<Option<ProcessID>>, resource_conforms_to: Option<Option<ResourceSpecID>>, resource_inventoried_as: Option<Option<ResourceID>>, resource_quantity: Option<Option<Measure>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateCommitments)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::CommitmentUpdate)?;
     if company.is_deleted() {
@@ -171,7 +174,7 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
 }
 
 /// Delete a commitment
-pub fn delete(caller: &User, member: &CompanyMember, company: &Company, mut subject: Commitment, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: Commitment, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateCommitments)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::CommitmentDelete)?;
     if company.is_deleted() {
@@ -187,10 +190,10 @@ mod tests {
     use crate::{
         models::{
             agreement::AgreementID,
-            company::{CompanyID, CompanyType},
-            company_member::CompanyMemberID,
+            company::CompanyID,
+            member::MemberID,
             occupation::OccupationID,
-            testutils::{make_agreement, make_user, make_company, make_member, make_resource},
+            testutils::{make_agreement, make_user, make_company, make_member_worker, make_resource},
             user::UserID,
         },
         util,
@@ -202,11 +205,11 @@ mod tests {
     fn can_create() {
         let now = util::time::now();
         let id = CommitmentID::create();
-        let company_from = make_company(&CompanyID::create(), CompanyType::Private, "bridget's widgets", &now);
-        let company_to = make_company(&CompanyID::create(), CompanyType::Private, "larry's chairs", &now);
+        let company_from = make_company(&CompanyID::create(), "bridget's widgets", &now);
+        let company_to = make_company(&CompanyID::create(), "larry's chairs", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 111222", "UwU big order of widgetzzz", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate], &now);
         let costs = Costs::new_with_labor("widgetmaker", 42);
         let resource = make_resource(&ResourceID::new("widget1"), company_from.id(), &Measure::new(dec!(30), Unit::One), &Costs::new_with_labor("widgetmaker", dec!(50)), &now);
         let loc = SpatialThing::builder()
@@ -276,11 +279,11 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = CommitmentID::create();
-        let company_from = make_company(&CompanyID::create(), CompanyType::Private, "bridget's widgets", &now);
-        let company_to = make_company(&CompanyID::create(), CompanyType::Private, "larry's chairs", &now);
+        let company_from = make_company(&CompanyID::create(), "bridget's widgets", &now);
+        let company_to = make_company(&CompanyID::create(), "larry's chairs", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 111222", "UwU big order of widgetzzz", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate, CompanyPermission::CommitmentUpdate], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate, CompanyPermission::CommitmentUpdate], &now);
         let costs1 = Costs::new_with_labor("widgetmaker", 42);
         let costs2 = Costs::new_with_labor("widgetmaker", 31);
         let resource = make_resource(&ResourceID::new("widget1"), company_from.id(), &Measure::new(dec!(30), Unit::One), &Costs::new_with_labor("widgetmaker", dec!(50)), &now);
@@ -343,11 +346,11 @@ mod tests {
     fn can_delete() {
         let now = util::time::now();
         let id = CommitmentID::create();
-        let company_from = make_company(&CompanyID::create(), CompanyType::Private, "bridget's widgets", &now);
-        let company_to = make_company(&CompanyID::create(), CompanyType::Private, "larry's dairies (outdoor outdoor. shutup parker. thank you parker, shutup. thank you.)", &now);
+        let company_from = make_company(&CompanyID::create(), "bridget's widgets", &now);
+        let company_to = make_company(&CompanyID::create(), "larry's dairies (outdoor outdoor. shutup parker. thank you parker, shutup. thank you.)", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 111222", "UwU big order of widgetzzz", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate, CompanyPermission::CommitmentDelete], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate, CompanyPermission::CommitmentDelete], &now);
         let resource = make_resource(&ResourceID::new("widget1"), company_from.id(), &Measure::new(dec!(30), Unit::One), &Costs::new_with_labor("widgetmaker", dec!(50)), &now);
         let costs1 = Costs::new_with_labor("widgetmaker", 42);
         let loc = SpatialThing::builder()

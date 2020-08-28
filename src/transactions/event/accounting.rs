@@ -14,7 +14,8 @@ use crate::{
         Modifications,
         event::{Event, EventID, EventProcessState, MoveType},
         company::{Company, Permission as CompanyPermission},
-        company_member::CompanyMember,
+        member::Member,
+        lib::basis_model::Deletable,
         process::Process,
         resource::Resource,
         user::User,
@@ -26,7 +27,7 @@ use vf_rs::{vf, geo::SpatialThing};
 
 /// Lower the quantity (both accounting and obhand) or a resource by a fixed
 /// amount.
-pub fn lower<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn lower<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Lower)?;
     if company.is_deleted() {
@@ -76,7 +77,7 @@ pub fn lower<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, compa
 ///
 /// This can be useful to send costs from one process to another, for instance
 /// if a process has an excess of costs that should be moved somewhere else.
-pub fn move_costs(caller: &User, member: &CompanyMember, company: &Company, id: EventID, process_from: Process, process_to: Process, move_costs: Costs, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn move_costs(caller: &User, member: &Member, company: &Company, id: EventID, process_from: Process, process_to: Process, move_costs: Costs, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::MoveCosts)?;
     if company.is_deleted() {
@@ -124,7 +125,7 @@ pub fn move_costs(caller: &User, member: &CompanyMember, company: &Company, id: 
 
 /// Move a resource internally. This can split a resource into two, or move one
 /// resource entirely into another one.
-pub fn move_resource<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, resource_measure: T, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn move_resource<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, resource_measure: T, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::MoveResource)?;
     if company.is_deleted() {
@@ -186,7 +187,7 @@ pub fn move_resource<T: Into<NumericUnion>>(caller: &User, member: &CompanyMembe
 
 /// Raise the quantity (both accounting and obhand) or a resource by a fixed
 /// amount.
-pub fn raise<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn raise<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Raise)?;
     if company.is_deleted() {
@@ -238,13 +239,13 @@ mod tests {
     use crate::{
         models::{
             lib::agent::Agent,
-            company::{CompanyID, CompanyType},
-            company_member::CompanyMemberID,
+            company::CompanyID,
+            member::MemberID,
             event::{EventID, EventError},
             occupation::OccupationID,
             process::{Process, ProcessID},
             resource::ResourceID,
-            testutils::{make_user, make_company, make_member, make_process, make_resource},
+            testutils::{make_user, make_company, make_member_worker, make_process, make_resource},
             user::UserID,
         },
         util,
@@ -256,10 +257,10 @@ mod tests {
     fn can_lower() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
 
         let res = lower(&user, &member, &company, id.clone(), resource.clone(), 8, Some("my note".into()), &now);
@@ -322,10 +323,10 @@ mod tests {
     fn can_move_costs() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's planks", &now);
+        let company = make_company(&CompanyID::create(), "jerry's planks", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("lawyer");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let process_from = make_process(&ProcessID::create(), company.id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), dec!(177.25)), &now);
         let process_to = make_process(&ProcessID::create(), company.id(), "overflow labor", &Costs::new_with_labor(occupation_id.clone(), dec!(804)), &now);
 
@@ -398,10 +399,10 @@ mod tests {
     fn can_move_resource() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's planks", &now);
+        let company = make_company(&CompanyID::create(), "jerry's planks", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("plank"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let resource_to = make_resource(&ResourceID::new("plank"), company.id(), &Measure::new(dec!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
         let loc = SpatialThing::builder()
@@ -529,10 +530,10 @@ mod tests {
     fn can_raise() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
 
         let res = raise(&user, &member, &company, id.clone(), resource.clone(), 8, Some("toot".into()), &now);

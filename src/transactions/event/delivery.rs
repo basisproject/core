@@ -14,7 +14,8 @@ use crate::{
         Modifications,
         event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
-        company_member::CompanyMember,
+        member::Member,
+        lib::basis_model::Deletable,
         process::Process,
         resource::Resource,
         user::User,
@@ -27,7 +28,7 @@ use vf_rs::{vf, geo::SpatialThing};
 /// created.
 ///
 /// This operates on a whole resource.
-pub fn dropoff(caller: &User, member: &CompanyMember, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn dropoff(caller: &User, member: &Member, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Dropoff)?;
     if company.is_deleted() {
@@ -78,7 +79,7 @@ pub fn dropoff(caller: &User, member: &CompanyMember, company: &Company, id: Eve
 /// `transfer-custody` event).
 ///
 /// This operates on a whole resource.
-pub fn pickup(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn pickup(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, process: Process, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Pickup)?;
     if company.is_deleted() {
@@ -128,14 +129,14 @@ mod tests {
     use super::*;
     use crate::{
         models::{
-            company::{CompanyID, CompanyType},
-            company_member::CompanyMemberID,
+            company::CompanyID,
+            member::MemberID,
             event::{EventError, EventID},
             lib::agent::Agent,
             occupation::OccupationID,
             process::ProcessID,
             resource::ResourceID,
-            testutils::{make_user, make_company, make_member, make_process, make_resource},
+            testutils::{make_user, make_company, make_member_worker, make_process, make_resource},
             user::UserID,
         },
         util,
@@ -147,10 +148,10 @@ mod tests {
     fn can_dropoff() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("trucker");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("machinist", 157), &now);
         let costs = Costs::new_with_labor(occupation_id.clone(), dec!(42.2));
         let process = make_process(&ProcessID::create(), company.id(), "deliver widgets", &costs, &now);
@@ -234,10 +235,10 @@ mod tests {
     fn can_pickup() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let process = make_process(&ProcessID::create(), company.id(), "make widgets", &Costs::new(), &now);
 

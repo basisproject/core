@@ -13,7 +13,8 @@ use crate::{
         Modifications,
         event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
-        company_member::CompanyMember,
+        member::Member,
+        lib::basis_model::Deletable,
         process::Process,
         user::User,
     },
@@ -33,7 +34,7 @@ use vf_rs::vf;
 ///
 /// Note that this creates a full work event with a defined start and end. This
 /// function cannot create pending work events.
-pub fn work(caller: &User, member: &CompanyMember, company: &Company, id: EventID, worker: CompanyMember, process: Process, wage_cost: Option<Decimal>, begin: DateTime<Utc>, end: DateTime<Utc>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn work(caller: &User, member: &Member, company: &Company, id: EventID, worker: Member, process: Process, wage_cost: Option<Decimal>, begin: DateTime<Utc>, end: DateTime<Utc>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     // if we're recording our own work event, we can just check the regular
     // `Work` permission, otherwise we need admin privs
@@ -51,8 +52,9 @@ pub fn work(caller: &User, member: &CompanyMember, company: &Company, id: EventI
         let hours = Decimal::from(milliseconds) / Decimal::from(1000 * 60 * 60);
         Measure::new(hours, Unit::Hour)
     };
+    let occupation_id = worker.occupation_id().ok_or(Error::MemberMustBeWorker)?.clone();
     let costs = match wage_cost {
-        Some(val) => Costs::new_with_labor(worker.inner().relationship().clone(), val),
+        Some(val) => Costs::new_with_labor(occupation_id, val),
         None => Costs::new(),
     };
     let process_id = process.id().clone();
@@ -100,13 +102,13 @@ mod tests {
     use super::*;
     use crate::{
         models::{
-            company::{CompanyID, CompanyType},
-            company_member::CompanyMemberID,
+            company::CompanyID,
+            member::*,
             event::{Event, EventID, EventError},
             lib::agent::Agent,
             occupation::OccupationID,
             process::ProcessID,
-            testutils::{make_user, make_company, make_member, make_process},
+            testutils::{make_user, make_company, make_member_worker, make_process},
             user::UserID,
         },
     };
@@ -117,10 +119,10 @@ mod tests {
         let now: DateTime<Utc> = "2018-06-06T00:00:00Z".parse().unwrap();
         let now2: DateTime<Utc> = "2018-06-06T06:52:00Z".parse().unwrap();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![CompanyPermission::Work], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![CompanyPermission::Work], &now);
         let worker = member.clone();
         let process = make_process(&ProcessID::create(), company.id(), "make widgets", &Costs::new_with_labor(occupation_id.clone(), dec!(177.5)), &now);
 
@@ -164,7 +166,7 @@ mod tests {
 
         // test worker != member
         let mut worker2 = worker.clone();
-        worker2.set_id(CompanyMemberID::create());
+        worker2.set_id(MemberID::create());
         let res = work(&user, &member, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
@@ -213,6 +215,14 @@ mod tests {
         process3.set_company_id(CompanyID::new("zing"));
         let res = work(&user, &member2, &company, id.clone(), worker2.clone(), process3.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
+
+        let mut worker3 = worker2.clone();
+        worker3.set_class(MemberClass::User(MemberUser::new()));
+        let res = work(&user, &member2, &company, id.clone(), worker3.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
+        worker3.set_class(MemberClass::Company(MemberCompany::new()));
+        let res = work(&user, &member2, &company, id.clone(), worker3.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
     }
 }
 

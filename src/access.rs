@@ -30,8 +30,7 @@ pub enum Permission {
 
     CompanyAdminDelete,
     CompanyAdminUpdate,
-    CompanyCreatePrivate,
-    CompanySetType,
+    CompanyCreate,
     CompanyUpdateAgreements,
     CompanyUpdateCommitments,
     CompanyUpdateIntents,
@@ -41,12 +40,12 @@ pub enum Permission {
     CompanyUpdateProcesses,
     CompanyUpdateProcessSpecs,
 
+    CurrencyCreate,
+    CurrencyDelete,
+    CurrencyUpdate,
+
     EventCreate,
     EventUpdate,
-
-    RegionCreate,
-    RegionDelete,
-    RegionUpdate,
 
     UserAdminCreate,
     UserAdminUpdate,
@@ -54,7 +53,6 @@ pub enum Permission {
     UserDelete,
     UserSetRoles,
     UserUpdate,
-
 
     ResourceSpecCreate,
     ResourceSpecDelete,
@@ -100,14 +98,16 @@ impl Role {
             }
             Role::Bank => {
                 vec![
-                    Permission::CompanySetType,
+                    Permission::CurrencyCreate,
+                    Permission::CurrencyUpdate,
+                    Permission::CurrencyDelete,
                 ]
             },
             Role::User => {
                 vec![
                     Permission::UserUpdate,
                     Permission::UserDelete,
-                    Permission::CompanyCreatePrivate,
+                    Permission::CompanyCreate,
                     Permission::CompanyUpdateAgreements,
                     Permission::CompanyUpdateCommitments,
                     Permission::CompanyUpdateIntents,
@@ -179,20 +179,18 @@ pub mod tests {
         assert!(super_admin.can(&Permission::UserUpdate));
         assert!(super_admin.can(&Permission::UserAdminUpdate));
         assert!(super_admin.can(&Permission::UserDelete));
-        assert!(super_admin.can(&Permission::CompanyCreatePrivate));
+        assert!(super_admin.can(&Permission::CompanyCreate));
         assert!(super_admin.can(&Permission::CompanyAdminUpdate));
         assert!(super_admin.can(&Permission::CompanyAdminDelete));
-        assert!(super_admin.can(&Permission::CompanySetType));
 
         let comp_admin = Role::CompanyAdmin;
         assert!(!comp_admin.can(&Permission::UserCreate));
         assert!(!comp_admin.can(&Permission::UserUpdate));
         assert!(!comp_admin.can(&Permission::UserAdminUpdate));
         assert!(!comp_admin.can(&Permission::UserDelete));
-        assert!(!comp_admin.can(&Permission::CompanyCreatePrivate));
+        assert!(!comp_admin.can(&Permission::CompanyCreate));
         assert!(comp_admin.can(&Permission::CompanyAdminUpdate));
         assert!(comp_admin.can(&Permission::CompanyAdminDelete));
-        assert!(!comp_admin.can(&Permission::CompanySetType));
     }
 }
 

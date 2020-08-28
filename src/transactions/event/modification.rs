@@ -14,7 +14,8 @@ use crate::{
         Modifications,
         event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
-        company_member::CompanyMember,
+        member::Member,
+        lib::basis_model::Deletable,
         process::Process,
         resource::Resource,
         user::User,
@@ -27,7 +28,7 @@ use vf_rs::vf;
 ///
 /// Effectively, you `accept` a resource into a repair process, and the output
 /// of that process would be `modify`.
-pub fn accept<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn accept<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, process: Process, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Accept)?;
     if company.is_deleted() {
@@ -81,7 +82,7 @@ pub fn accept<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, comp
 ///
 /// Effectively, you `accept` a resource into a repair process, and the output
 /// of that process would be `modify`.
-pub fn modify<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn modify<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Modify)?;
     if company.is_deleted() {
@@ -136,14 +137,14 @@ mod tests {
     use super::*;
     use crate::{
         models::{
-            company::{CompanyID, CompanyType},
-            company_member::CompanyMemberID,
+            company::CompanyID,
+            member::MemberID,
             event::{EventError, EventID},
             lib::agent::Agent,
             occupation::OccupationID,
             process::ProcessID,
             resource::ResourceID,
-            testutils::{make_user, make_company, make_member, make_process, make_resource},
+            testutils::{make_user, make_company, make_member_worker, make_process, make_resource},
             user::UserID,
         },
         util,
@@ -155,10 +156,10 @@ mod tests {
     fn can_accept() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("mechanic");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_resource("steel", 157), &now);
         let process = make_process(&ProcessID::create(), company.id(), "make widgets", &Costs::new(), &now);
 
@@ -229,10 +230,10 @@ mod tests {
     fn can_modify() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("mechanic");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("car"), company.id(), &Measure::new(dec!(3), Unit::One), &Costs::new_with_resource("steel", 157), &now);
         let costs = Costs::new_with_labor(occupation_id.clone(), dec!(102.3));
         let process = make_process(&ProcessID::create(), company.id(), "repair car", &costs, &now);

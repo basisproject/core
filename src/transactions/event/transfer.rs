@@ -15,9 +15,12 @@ use crate::{
         Modifications,
         agreement::Agreement,
         event::{Event, EventID, EventProcessState},
-        lib::agent::Agent,
+        lib::{
+            agent::Agent,
+            basis_model::Deletable,
+        },
         company::{Company, Permission as CompanyPermission},
-        company_member::CompanyMember,
+        member::Member,
         resource::Resource,
         user::User,
     },
@@ -29,7 +32,7 @@ use vf_rs::vf;
 
 /// Transfer a resource (custody and ownership) from one company to another,
 /// moving a set of costs with it.
-pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::Transfer)?;
     if company_from.is_deleted() {
@@ -98,7 +101,7 @@ pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, co
 
 /// Transfer ownership (but not custody) of a resource from one company to
 /// another, moving a set of costs with it.
-pub fn transfer_all_rights<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn transfer_all_rights<T: Into<NumericUnion>>(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::Transfer)?;
     if company_from.is_deleted() {
@@ -167,7 +170,7 @@ pub fn transfer_all_rights<T: Into<NumericUnion>>(caller: &User, member: &Compan
 
 /// Transfer custody (but not ownership) of a resource from one company to
 /// another, moving a set of costs with it.
-pub fn transfer_custody<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn transfer_custody<T: Into<NumericUnion>>(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::Transfer)?;
     if company_from.is_deleted() {
@@ -240,13 +243,13 @@ mod tests {
     use crate::{
         models::{
             agreement::AgreementID,
-            company::{CompanyID, CompanyType},
-            company_member::CompanyMemberID,
+            company::CompanyID,
+            member::MemberID,
             event::{EventID, EventError},
             lib::agent::Agent,
             occupation::OccupationID,
             resource::ResourceID,
-            testutils::{make_agreement, make_user, make_company, make_member, make_resource},
+            testutils::{make_agreement, make_user, make_company, make_member_worker, make_resource},
             user::UserID,
         },
         util,
@@ -258,13 +261,13 @@ mod tests {
     fn can_transfer() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's planks", &now);
-        let company2 = make_company(&CompanyID::create(), CompanyType::Private, "jinkey's skateboards", &now);
+        let company = make_company(&CompanyID::create(), "jerry's planks", &now);
+        let company2 = make_company(&CompanyID::create(), "jinkey's skateboards", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company.agent_id(), company2.agent_id()], "order 1234", "gotta get some planks", &now);
         let agreed_in: Url = "https://legalzoom.com/standard-boilerplate-hereto-notwithstanding-each-of-them-damage-to-the-hood-ornament-alone".parse().unwrap();
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("plank"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let resource_to = make_resource(&ResourceID::new("plank"), company2.id(), &Measure::new(dec!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
 
@@ -393,13 +396,13 @@ mod tests {
     fn can_transfer_all_rights() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's planks", &now);
-        let company2 = make_company(&CompanyID::create(), CompanyType::Private, "jinkey's skateboards", &now);
+        let company = make_company(&CompanyID::create(), "jerry's planks", &now);
+        let company2 = make_company(&CompanyID::create(), "jinkey's skateboards", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company.agent_id(), company2.agent_id()], "order 1234", "gotta get some planks", &now);
         let agreed_in: Url = "https://legalzoom.com/is-it-too-much-to-ask-for-todays-pedestrian-to-wear-at-least-one-piece-of-reflective-clothing".parse().unwrap();
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("plank"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let resource_to = make_resource(&ResourceID::new("plank"), company2.id(), &Measure::new(dec!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
 
@@ -521,13 +524,13 @@ mod tests {
     fn can_transfer_custody() {
         let now = util::time::now();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's planks", &now);
-        let company2 = make_company(&CompanyID::create(), CompanyType::Private, "jinkey's skateboards", &now);
+        let company = make_company(&CompanyID::create(), "jerry's planks", &now);
+        let company2 = make_company(&CompanyID::create(), "jinkey's skateboards", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company.agent_id(), company2.agent_id()], "order 1234", "gotta get some planks", &now);
         let agreed_in: Url = "https://legaldoom.com/trade-secrets-trade-secrets".parse().unwrap();
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("plank"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let resource_to = make_resource(&ResourceID::new("plank"), company2.id(), &Measure::new(dec!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
 

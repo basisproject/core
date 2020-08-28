@@ -19,8 +19,11 @@ use crate::{
         Op,
         Modifications,
         company::{Company, Permission as CompanyPermission},
-        company_member::CompanyMember,
-        lib::agent::Agent,
+        member::Member,
+        lib::{
+            agent::Agent,
+            basis_model::Deletable,
+        },
         resource::{Resource, ResourceID},
         resource_spec::ResourceSpecID,
         user::User,
@@ -31,7 +34,7 @@ use url::Url;
 use vf_rs::{vf, dfc};
 
 /// Create a new resource
-pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: ResourceID, spec_id: ResourceSpecID, lot: Option<dfc::ProductBatch>, name: Option<String>, tracking_id: Option<String>, classifications: Vec<Url>, note: Option<String>, unit_of_effort: Option<Unit>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create(caller: &User, member: &Member, company: &Company, id: ResourceID, spec_id: ResourceSpecID, lot: Option<dfc::ProductBatch>, name: Option<String>, tracking_id: Option<String>, classifications: Vec<Url>, note: Option<String>, unit_of_effort: Option<Unit>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResources)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceCreate)?;
     if company.is_deleted() {
@@ -63,7 +66,7 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: Reso
 }
 
 /// Update a resource
-pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: Resource, lot: Option<dfc::ProductBatch>, name: Option<String>, tracking_id: Option<String>, classifications: Option<Vec<Url>>, note: Option<String>, unit_of_effort: Option<Unit>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Resource, lot: Option<dfc::ProductBatch>, name: Option<String>, tracking_id: Option<String>, classifications: Option<Vec<Url>>, note: Option<String>, unit_of_effort: Option<Unit>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResources)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceUpdate)?;
     if company.is_deleted() {
@@ -95,7 +98,7 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
 }
 
 /// Delete a resource
-pub fn delete(caller: &User, member: &CompanyMember, company: &Company, mut subject: Resource, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: Resource, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResources)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceDelete)?;
     if company.is_deleted() {
@@ -113,11 +116,11 @@ mod tests {
     use super::*;
     use crate::{
         models::{
-            company::{CompanyID, CompanyType},
-            company_member::CompanyMemberID,
+            company::CompanyID,
+            member::MemberID,
             occupation::OccupationID,
             resource_spec::ResourceSpecID,
-            testutils::{make_user, make_company, make_member, make_resource_spec},
+            testutils::{make_user, make_company, make_member_worker, make_resource_spec},
             user::UserID,
         },
         util,
@@ -127,9 +130,9 @@ mod tests {
     fn can_create() {
         let now = util::time::now();
         let id = ResourceID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
         let spec = make_resource_spec(&ResourceSpecID::create(), company.id(), "widgets, baby", &now);
         let lot = dfc::ProductBatch::builder()
             .batch_number("123")
@@ -174,9 +177,9 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = ResourceID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
+        let mut member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
         let spec = make_resource_spec(&ResourceSpecID::create(), company.id(), "widgets, baby", &now);
         let lot = dfc::ProductBatch::builder()
             .batch_number("123")
@@ -222,9 +225,9 @@ mod tests {
     fn can_delete() {
         let now = util::time::now();
         let id = ResourceID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
+        let mut member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
         let spec = make_resource_spec(&ResourceSpecID::create(), company.id(), "widgets, baby", &now);
         let lot = dfc::ProductBatch::builder()
             .batch_number("123")

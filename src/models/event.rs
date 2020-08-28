@@ -27,8 +27,11 @@ use crate::{
         Modifications,
 
         agreement::AgreementID,
-        company_member::CompanyMember,
-        lib::agent::{Agent, AgentID},
+        member::{Member},
+        lib::{
+            agent::{Agent, AgentID},
+            basis_model::Deletable,
+        },
         process::{Process, ProcessID},
         resource::{Resource, ResourceID},
         resource_spec::ResourceSpecID,
@@ -171,7 +174,7 @@ pub struct EventProcessState {
     /// The process this event is an output of
     output_of: Option<Process>,
     /// The provider (if a member) performing an action (generally `Work`)
-    provider: Option<CompanyMember>,
+    provider: Option<Member>,
     /// The resource this event operates on (Consume/Produce/etc)
     resource: Option<Resource>,
     /// The secondary resource we're operating on (Transfer/Move/etc)
@@ -440,7 +443,7 @@ impl Event {
             Action::Work => {
                 let mut input_process = state.input_of.clone().ok_or(EventError::MissingInputProcess)?;
                 let member = state.provider.clone().ok_or(EventError::MissingProvider)?;
-                let occupation_id = member.inner().relationship().clone();
+                let occupation_id = member.occupation_id().ok_or(Error::MemberMustBeWorker)?;
                 let move_costs = self.move_costs().as_ref().ok_or(EventError::MissingCosts)?;
 
                 // grab JUST this occupation's costs from the event. in other
@@ -463,7 +466,7 @@ impl Event {
                 };
                 let mut costs = Costs::new();
                 costs.track_labor(occupation_id.clone(), occupation_costs);
-                costs.track_labor_hours(occupation_id, hours);
+                costs.track_labor_hours(occupation_id.clone(), hours);
                 input_process.receive_costs(&costs)?;
                 res.modify_process(input_process);
             }
@@ -681,7 +684,7 @@ mod tests {
         costs::Costs,
         models::{
             company::{CompanyID, Permission},
-            company_member::{Compensation},
+            member::*,
             process::Process,
             resource::Resource,
             user::UserID,
@@ -939,18 +942,18 @@ mod tests {
             .updated(now.clone())
             .build().unwrap();
         if !provider_is_company {
-            let member = CompanyMember::builder()
+            let member = Member::builder()
                 .id("5555")
                 .inner(
                     vf::AgentRelationship::builder()
                         .subject(UserID::from("jerry"))
                         .object(CompanyID::from("jerry's widgets ultd"))
-                        .relationship("CEO")
+                        .relationship(())
                         .build().unwrap()
                 )
                 .active(true)
                 .permissions(vec![Permission::MemberCreate, Permission::MemberSetPermissions, Permission::MemberDelete])
-                .compensation(Some(Compensation::new_hourly(dec!(0.0), "12345")))
+                .class(MemberClass::Worker(MemberWorker::new("CEO", Some(Compensation::new_hourly(dec!(0.0), "12345")))))
                 .created(now.clone())
                 .updated(now.clone())
                 .build().unwrap();
@@ -1631,6 +1634,14 @@ mod tests {
         state3.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
         let res = event.process(state3.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
+
+        let mut state4 = state.clone();
+        state4.provider.as_mut().unwrap().set_class(MemberClass::User(MemberUser::new()));
+        let res = event.process(state4.clone(), &now);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
+        state4.provider.as_mut().unwrap().set_class(MemberClass::Company(MemberCompany::new()));
+        let res = event.process(state4.clone(), &now);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
     }
 
     #[test]
@@ -1662,6 +1673,14 @@ mod tests {
         state3.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
         let res = event.process(state3.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
+
+        let mut state4 = state.clone();
+        state4.provider.as_mut().unwrap().set_class(MemberClass::User(MemberUser::new()));
+        let res = event.process(state4.clone(), &now);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
+        state4.provider.as_mut().unwrap().set_class(MemberClass::Company(MemberCompany::new()));
+        let res = event.process(state4.clone(), &now);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
     }
 
     #[test]
@@ -1699,6 +1718,14 @@ mod tests {
         state3.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
         let res = event.process(state3.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
+
+        let mut state4 = state.clone();
+        state4.provider.as_mut().unwrap().set_class(MemberClass::User(MemberUser::new()));
+        let res = event.process(state4.clone(), &now);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
+        state4.provider.as_mut().unwrap().set_class(MemberClass::Company(MemberCompany::new()));
+        let res = event.process(state4.clone(), &now);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
     }
 }
 

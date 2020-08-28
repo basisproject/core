@@ -17,8 +17,11 @@ use crate::{
         Op,
         Modifications,
         company::{Company, Permission as CompanyPermission},
-        company_member::CompanyMember,
-        lib::agent::{Agent, AgentID},
+        member::Member,
+        lib::{
+            agent::{Agent, AgentID},
+            basis_model::Deletable,
+        },
         intent::{Intent, IntentID},
         resource::ResourceID,
         resource_spec::ResourceSpecID,
@@ -31,7 +34,7 @@ use url::Url;
 use vf_rs::{vf, geo::SpatialThing};
 
 /// Create a new intent
-pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: IntentID, move_costs: Option<Costs>, action: OrderAction, agreed_in: Option<Url>, at_location: Option<SpatialThing>, available_quantity: Option<Measure>, due: Option<DateTime<Utc>>, effort_quantity: Option<Measure>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, has_point_in_time: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, name: Option<String>, note: Option<String>, provider: Option<AgentID>, receiver: Option<AgentID>, resource_conforms_to: Option<ResourceSpecID>, resource_inventoried_as: Option<ResourceID>, resource_quantity: Option<Measure>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create(caller: &User, member: &Member, company: &Company, id: IntentID, move_costs: Option<Costs>, action: OrderAction, agreed_in: Option<Url>, at_location: Option<SpatialThing>, available_quantity: Option<Measure>, due: Option<DateTime<Utc>>, effort_quantity: Option<Measure>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, has_point_in_time: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, name: Option<String>, note: Option<String>, provider: Option<AgentID>, receiver: Option<AgentID>, resource_conforms_to: Option<ResourceSpecID>, resource_inventoried_as: Option<ResourceID>, resource_quantity: Option<Measure>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateIntents)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::IntentCreate)?;
     if company.is_deleted() {
@@ -86,7 +89,7 @@ pub fn create(caller: &User, member: &CompanyMember, company: &Company, id: Inte
 }
 
 /// Update an intent
-pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: Intent, move_costs: Option<Option<Costs>>, action: Option<OrderAction>, agreed_in: Option<Option<Url>>, at_location: Option<Option<SpatialThing>>, available_quantity: Option<Option<Measure>>, due: Option<Option<DateTime<Utc>>>, effort_quantity: Option<Option<Measure>>, finished: Option<Option<bool>>, has_beginning: Option<Option<DateTime<Utc>>>, has_end: Option<Option<DateTime<Utc>>>, has_point_in_time: Option<Option<DateTime<Utc>>>, in_scope_of: Option<Vec<AgentID>>, name: Option<Option<String>>, note: Option<Option<String>>, provider: Option<Option<AgentID>>, receiver: Option<Option<AgentID>>, resource_conforms_to: Option<Option<ResourceSpecID>>, resource_inventoried_as: Option<Option<ResourceID>>, resource_quantity: Option<Option<Measure>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Intent, move_costs: Option<Option<Costs>>, action: Option<OrderAction>, agreed_in: Option<Option<Url>>, at_location: Option<Option<SpatialThing>>, available_quantity: Option<Option<Measure>>, due: Option<Option<DateTime<Utc>>>, effort_quantity: Option<Option<Measure>>, finished: Option<Option<bool>>, has_beginning: Option<Option<DateTime<Utc>>>, has_end: Option<Option<DateTime<Utc>>>, has_point_in_time: Option<Option<DateTime<Utc>>>, in_scope_of: Option<Vec<AgentID>>, name: Option<Option<String>>, note: Option<Option<String>>, provider: Option<Option<AgentID>>, receiver: Option<Option<AgentID>>, resource_conforms_to: Option<Option<ResourceSpecID>>, resource_inventoried_as: Option<Option<ResourceID>>, resource_quantity: Option<Option<Measure>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateIntents)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::IntentUpdate)?;
     if company.is_deleted() {
@@ -179,7 +182,7 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
 }
 
 /// Delete an intent
-pub fn delete(caller: &User, member: &CompanyMember, company: &Company, mut subject: Intent, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: Intent, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateIntents)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::IntentDelete)?;
     if company.is_deleted() {
@@ -194,10 +197,10 @@ mod tests {
     use super::*;
     use crate::{
         models::{
-            company::{CompanyID, CompanyType},
-            company_member::CompanyMemberID,
+            company::CompanyID,
+            member::MemberID,
             occupation::OccupationID,
-            testutils::{make_user, make_company, make_member},
+            testutils::{make_user, make_company, make_member_worker},
             user::UserID,
         },
         util,
@@ -208,9 +211,9 @@ mod tests {
     fn can_create() {
         let now = util::time::now();
         let id = IntentID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate], &now);
         let costs = Costs::new_with_labor("widgetmaker", 42);
         let loc = SpatialThing::builder()
             .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
@@ -275,9 +278,9 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = IntentID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate, CompanyPermission::IntentUpdate], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate, CompanyPermission::IntentUpdate], &now);
         let costs1 = Costs::new_with_labor("widgetmaker", 42);
         let costs2 = Costs::new_with_labor("widgetmaker", 41);
         let loc = SpatialThing::builder()
@@ -345,9 +348,9 @@ mod tests {
     fn can_delete() {
         let now = util::time::now();
         let id = IntentID::create();
-        let company = make_company(&CompanyID::create(), CompanyType::Private, "jerry's widgets", &now);
+        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate, CompanyPermission::IntentDelete], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate, CompanyPermission::IntentDelete], &now);
         let costs = Costs::new_with_labor("widgetmaker", 42);
         let loc = SpatialThing::builder()
             .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))

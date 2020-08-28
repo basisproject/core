@@ -17,8 +17,8 @@ use crate::{
     models::{
         Op,
         Modifications,
-        company::{Company, CompanyID, CompanyType, Permission as CompanyPermission},
-        company_member::{CompanyMember, CompanyMemberID},
+        company::{Company, CompanyID, Permission as CompanyPermission},
+        member::{Member, MemberID, MemberClass, MemberWorker},
         occupation::OccupationID,
         user::User,
     },
@@ -26,11 +26,10 @@ use crate::{
 use vf_rs::vf;
 
 /// Creates a new private company
-pub fn create_private<T: Into<String>>(caller: &User, id: CompanyID, company_name: T, company_email: T, company_active: bool, founder_id: CompanyMemberID, founder_occupation_id: OccupationID, founder_active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
-    caller.access_check(Permission::CompanyCreatePrivate)?;
+pub fn create<T: Into<String>>(caller: &User, id: CompanyID, company_name: T, company_email: T, company_active: bool, founder_id: MemberID, founder_occupation_id: OccupationID, founder_active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+    caller.access_check(Permission::CompanyCreate)?;
     let company = Company::builder()
         .id(id.clone())
-        .ty(CompanyType::Private)
         .inner(
             vf::Agent::builder()
                 .name(company_name)
@@ -43,16 +42,17 @@ pub fn create_private<T: Into<String>>(caller: &User, id: CompanyID, company_nam
         .updated(now.clone())
         .build()
         .map_err(|e| Error::BuilderFailed(e))?;
-    let founder = CompanyMember::builder()
+    let founder = Member::builder()
         .id(founder_id)
         .inner(
             vf::AgentRelationship::builder()
                 .subject(caller.id().clone())
                 .object(id.clone())
-                .relationship(founder_occupation_id)
+                .relationship(())
                 .build()
                 .map_err(|e| Error::BuilderFailed(e))?
         )
+        .class(MemberClass::Worker(MemberWorker::new(founder_occupation_id, None)))
         .permissions(vec![CompanyPermission::All])
         .active(founder_active)
         .created(now.clone())
@@ -66,7 +66,7 @@ pub fn create_private<T: Into<String>>(caller: &User, id: CompanyID, company_nam
 }
 
 /// Update a private company
-pub fn update_private(caller: &User, member: Option<&CompanyMember>, mut subject: Company, name: Option<String>, email: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(caller: &User, member: Option<&Member>, mut subject: Company, name: Option<String>, email: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyAdminUpdate)
         .or_else(|_| member.ok_or(Error::InsufficientPrivileges)?.access_check(caller.id(), subject.id(), CompanyPermission::CompanyUpdate))?;
     if let Some(name) = name {
@@ -83,7 +83,7 @@ pub fn update_private(caller: &User, member: Option<&CompanyMember>, mut subject
 }
 
 /// Delete a private company
-pub fn delete_private(caller: &User, member: Option<&CompanyMember>, mut subject: Company, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(caller: &User, member: Option<&Member>, mut subject: Company, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyAdminDelete)
         .or_else(|_| member.ok_or(Error::InsufficientPrivileges)?.access_check(caller.id(), subject.id(), CompanyPermission::CompanyDelete))?;
     subject.set_deleted(Some(now.clone()));
@@ -105,23 +105,22 @@ mod tests {
     };
 
     #[test]
-    fn can_create_private() {
+    fn can_create() {
         let id = CompanyID::create();
-        let founder_id = CompanyMemberID::create();
+        let founder_id = MemberID::create();
         let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
         let now = util::time::now();
-        let user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
+        let user = make_user(&UserID::create(), Some(vec![Role::User]), &now);
         // just makin' some widgets, huh? that's cool. hey, I made a widget once,
         // it was actually pretty fun. hey if you're free later maybe we could
         // make some widgets togethe...oh, you're busy? oh ok, that's cool, no
         // problem. hey, maybe next time.
-        let mods = create_private(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
+        let mods = create(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 2);
 
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
-        let founder = mods[1].clone().expect_op::<CompanyMember>(Op::Create).unwrap();
+        let founder = mods[1].clone().expect_op::<Member>(Op::Create).unwrap();
         assert_eq!(company.id(), &id);
-        assert_eq!(company.ty(), &CompanyType::Private);
         assert_eq!(company.inner().name(), "jerry's widgets");
         assert_eq!(company.email(), "jerry@widgets.expert");
         assert_eq!(company.active(), &true);
@@ -130,7 +129,7 @@ mod tests {
         assert_eq!(founder.id(), &founder_id);
         assert_eq!(founder.inner().subject(), &user.agent_id());
         assert_eq!(founder.inner().object(), &id.clone().into());
-        assert_eq!(founder.inner().relationship(), &occupation_id);
+        assert_eq!(founder.occupation_id(), Some(&occupation_id));
         assert_eq!(founder.permissions(), &vec![CompanyPermission::All]);
         assert_eq!(founder.active(), &true);
         assert_eq!(founder.created(), &now);
@@ -138,19 +137,19 @@ mod tests {
     }
 
     #[test]
-    fn can_update_private() {
+    fn can_update() {
         let id = CompanyID::create();
-        let founder_id = CompanyMemberID::create();
+        let founder_id = MemberID::create();
         let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
         let now = util::time::now();
-        let mut user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
-        let mods = create_private(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
+        let mut user = make_user(&UserID::create(), Some(vec![Role::User]), &now);
+        let mods = create(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
-        let founder = mods[1].clone().expect_op::<CompanyMember>(Op::Create).unwrap();
+        let founder = mods[1].clone().expect_op::<Member>(Op::Create).unwrap();
 
         user.set_roles(vec![Role::User]);
         let now2 = util::time::now();
-        let mods = update_private(&user, Some(&founder), company.clone(), Some("Cool Widgets Ltd".into()), None, Some(false), &now2).unwrap().into_vec();
+        let mods = update(&user, Some(&founder), company.clone(), Some("Cool Widgets Ltd".into()), None, Some(false), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
         let company2 = mods[0].clone().expect_op::<Company>(Op::Update).unwrap();
         assert_eq!(company2.id(), company.id());
@@ -160,40 +159,40 @@ mod tests {
         assert_eq!(company2.created(), &now);
         assert_eq!(company2.updated(), &now2);
 
-        let res = update_private(&user, None, company.clone(), Some("Cool Widgets Ltd".into()), None, Some(false), &now2);
+        let res = update(&user, None, company.clone(), Some("Cool Widgets Ltd".into()), None, Some(false), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let user = make_user(&UserID::create(), None, &now);
-        let res = update_private(&user, Some(&founder), company.clone(), Some("Cool Widgets Ltd".into()), None, Some(false), &now2);
+        let res = update(&user, Some(&founder), company.clone(), Some("Cool Widgets Ltd".into()), None, Some(false), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
     #[test]
     fn can_delete() {
         let id = CompanyID::create();
-        let founder_id = CompanyMemberID::create();
+        let founder_id = MemberID::create();
         let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
         let now = util::time::now();
-        let mut user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
-        let mods = create_private(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
+        let mut user = make_user(&UserID::create(), Some(vec![Role::User]), &now);
+        let mods = create(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
-        let founder = mods[1].clone().expect_op::<CompanyMember>(Op::Create).unwrap();
+        let founder = mods[1].clone().expect_op::<Member>(Op::Create).unwrap();
 
         user.set_roles(vec![Role::User]);
         let now2 = util::time::now();
-        let mods = delete_private(&user, Some(&founder), company.clone(), &now2).unwrap().into_vec();
+        let mods = delete(&user, Some(&founder), company.clone(), &now2).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
         let company2 = mods[0].clone().expect_op::<Company>(Op::Delete).unwrap();
         assert_eq!(company2.created(), &now);
         assert_eq!(company2.updated(), &now);
         assert_eq!(company2.deleted(), &Some(now2));
 
-        let res = delete_private(&user, None, company.clone(), &now2);
+        let res = delete(&user, None, company.clone(), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let user = make_user(&UserID::create(), None, &now);
         let now3 = util::time::now();
-        let res = delete_private(&user, Some(&founder), company.clone(), &now3);
+        let res = delete(&user, Some(&founder), company.clone(), &now3);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 }
