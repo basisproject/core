@@ -67,9 +67,6 @@ pub enum Error {
     /// match expectation.
     #[error("Op does not match expectation")]
     OpMismatch,
-    /// When we try to perform an operation on a deleted user
-    #[error("operation on deleted user")]
-    UserIsDeleted,
     /// When we try to convert an AgentID to another ID type but it fails (like
     /// `let company_id: CompanyID = AgentID::UserID(user_id).try_from()?;`).
     #[error("AgentID is the wrong type")]
