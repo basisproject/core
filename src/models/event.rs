@@ -30,7 +30,7 @@ use crate::{
         member::{Member},
         lib::{
             agent::{Agent, AgentID},
-            basis_model::Deletable,
+            basis_model::ActiveState,
         },
         process::{Process, ProcessID},
         resource::{Resource, ResourceID},
@@ -56,9 +56,9 @@ pub enum EventError {
     /// does not make sense and I'm afraid I cannot allow this to happen.
     #[error("cannot specify an end date without a begin date")]
     DateEndMustHaveBegin,
-    /// We're trying to add inputs to a deleted process. No. Bad.
-    #[error("cannot add inputs to a deleted process")]
-    InputOnDeletedProcess,
+    /// We're trying to add inputs to a process that is inactive or deleted.
+    #[error("cannot add inputs to an inactive/deleted process")]
+    InputOnInactiveProcess,
     /// We expected an InputOutput value but didn't find one
     #[error("missing InputOutput designation")]
     InvalidInputOutput,
@@ -490,8 +490,8 @@ impl Event {
                 if self.inner().receiver() != &process2.company_id().clone().into() {
                     Err(EventError::ProcessOwnerMismatch)?;
                 }
-                if process2.is_deleted() {
-                    Err(EventError::InputOnDeletedProcess)?;
+                if !process2.is_active() {
+                    Err(EventError::InputOnInactiveProcess)?;
                 }
             }
             (Some(process), None) => {
@@ -501,8 +501,8 @@ impl Event {
                 if action.input_output() == Some(InputOutput::Input) && self.inner().receiver() != &process.company_id().clone().into() {
                     Err(EventError::ProcessOwnerMismatch)?;
                 }
-                if action.input_output() == Some(InputOutput::Input) && process.is_deleted() {
-                    Err(EventError::InputOnDeletedProcess)?;
+                if action.input_output() == Some(InputOutput::Input) && !process.is_active() {
+                    Err(EventError::InputOnInactiveProcess)?;
                 }
             }
             _ => {}
@@ -900,6 +900,7 @@ mod tests {
             .inner(vf::Process::builder().name("Make widgets").build().unwrap())
             .company_id(company_id.clone())
             .costs(Costs::new_with_labor("machinist", dec!(100.0)))
+            .active(true)
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();
@@ -908,6 +909,7 @@ mod tests {
             .inner(vf::Process::builder().name("Check widgets").build().unwrap())
             .company_id(company_to.clone())
             .costs(Costs::default())
+            .active(true)
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();
@@ -1108,7 +1110,11 @@ mod tests {
         let mut state2 = state.clone();
         state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
         let res = event.process(state2.clone(), &now);
-        assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
+        assert_eq!(res, Err(Error::Event(EventError::InputOnInactiveProcess)));
+        state2.input_of.as_mut().unwrap().set_deleted(None);
+        state2.input_of.as_mut().unwrap().set_active(false);
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::InputOnInactiveProcess)));
 
         let mut state3 = state.clone();
         state3.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
@@ -1147,7 +1153,11 @@ mod tests {
         let mut state2 = state.clone();
         state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
         let res = event.process(state2.clone(), &now);
-        assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
+        assert_eq!(res, Err(Error::Event(EventError::InputOnInactiveProcess)));
+        state2.input_of.as_mut().unwrap().set_deleted(None);
+        state2.input_of.as_mut().unwrap().set_active(false);
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::InputOnInactiveProcess)));
     }
 
     #[test]
@@ -1241,7 +1251,11 @@ mod tests {
         let mut state2 = state.clone();
         state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
         let res = event.process(state2.clone(), &now);
-        assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
+        assert_eq!(res, Err(Error::Event(EventError::InputOnInactiveProcess)));
+        state2.input_of.as_mut().unwrap().set_deleted(None);
+        state2.input_of.as_mut().unwrap().set_active(false);
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::InputOnInactiveProcess)));
 
         let mut state3 = state.clone();
         state3.output_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
@@ -1628,7 +1642,11 @@ mod tests {
         let mut state2 = state.clone();
         state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
         let res = event.process(state2.clone(), &now);
-        assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
+        assert_eq!(res, Err(Error::Event(EventError::InputOnInactiveProcess)));
+        state2.input_of.as_mut().unwrap().set_deleted(None);
+        state2.input_of.as_mut().unwrap().set_active(false);
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::InputOnInactiveProcess)));
 
         let mut state3 = state.clone();
         state3.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
@@ -1667,7 +1685,11 @@ mod tests {
         let mut state2 = state.clone();
         state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
         let res = event.process(state2.clone(), &now);
-        assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
+        assert_eq!(res, Err(Error::Event(EventError::InputOnInactiveProcess)));
+        state2.input_of.as_mut().unwrap().set_deleted(None);
+        state2.input_of.as_mut().unwrap().set_active(false);
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::InputOnInactiveProcess)));
 
         let mut state3 = state.clone();
         state3.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
@@ -1712,7 +1734,11 @@ mod tests {
         let mut state2 = state.clone();
         state2.input_of.as_mut().unwrap().set_deleted(Some(now.clone()));
         let res = event.process(state2.clone(), &now);
-        assert_eq!(res, Err(Error::Event(EventError::InputOnDeletedProcess)));
+        assert_eq!(res, Err(Error::Event(EventError::InputOnInactiveProcess)));
+        state2.input_of.as_mut().unwrap().set_deleted(None);
+        state2.input_of.as_mut().unwrap().set_active(false);
+        let res = event.process(state2.clone(), &now);
+        assert_eq!(res, Err(Error::Event(EventError::InputOnInactiveProcess)));
 
         let mut state3 = state.clone();
         state3.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));

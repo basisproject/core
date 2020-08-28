@@ -302,6 +302,7 @@ pub(crate) mod testutils {
             .inner(vf::Process::builder().name(name).build().unwrap())
             .company_id(company_id.clone())
             .costs(costs.clone())
+            .active(true)
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap()
