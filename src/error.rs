@@ -60,6 +60,10 @@ pub enum Error {
     /// attached to the deleted object).
     #[error("object {0} is deleted")]
     ObjectIsDeleted(String),
+    /// When we try to update an object that is inactive (or an object attached
+    /// to the inactive object).
+    #[error("object {0} is inactive")]
+    ObjectIsInactive(String),
     /// When we try to modify an object that is now in a read-only state.
     #[error("object {0} is read-only")]
     ObjectIsReadOnly(String),

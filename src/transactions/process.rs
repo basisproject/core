@@ -29,7 +29,7 @@ use crate::{
         member::Member,
         lib::{
             agent::AgentID,
-            basis_model::Deletable,
+            basis_model::{ActiveState, Deletable},
         },
         process::{Process, ProcessID},
         process_spec::ProcessSpecID,
@@ -43,8 +43,8 @@ use vf_rs::vf;
 pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company, id: ProcessID, spec_id: ProcessSpecID, name: T, note: T, classifications: Vec<Url>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateProcesses)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessCreate)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     let model = Process::builder()
         .id(id)
@@ -74,8 +74,8 @@ pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company
 pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Process, name: Option<String>, note: Option<String>, classifications: Option<Vec<Url>>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, in_scope_of: Option<Vec<AgentID>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateProcesses)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessUpdate)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     if let Some(name) = name {
         subject.inner_mut().set_name(name);
@@ -109,8 +109,11 @@ pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Pr
 pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: Process, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateProcesses)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessDelete)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
+    }
+    if subject.is_deleted() {
+        Err(Error::ObjectIsDeleted("process".into()))?;
     }
     if !subject.costs().is_zero() {
         Err(Error::CannotEraseCosts)?;
@@ -129,7 +132,7 @@ mod tests {
             lib::agent::Agent,
             occupation::OccupationID,
             process_spec::ProcessSpecID,
-            testutils::{make_user, make_company, make_member_worker, make_process_spec},
+            testutils::{deleted_company_tester, make_user, make_company, make_member_worker, make_process_spec},
             user::UserID,
         },
         util,
@@ -173,10 +176,9 @@ mod tests {
         let res = create(&user2, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now.clone()));
-        let res = create(&user, &member, &company2, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company: Company| {
+            create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now)
+        });
     }
 
     #[test]
@@ -219,10 +221,9 @@ mod tests {
         let res = update(&user2, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.agent_id()]), Some(false), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now2.clone()));
-        let res = update(&user, &member, &company2, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.agent_id()]), Some(false), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now2, |company: Company| {
+            update(&user, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.agent_id()]), Some(false), &now2)
+        });
     }
 
     #[test]
@@ -265,10 +266,9 @@ mod tests {
         let res = delete(&user2, &member, &company, process.clone(), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now2.clone()));
-        let res = delete(&user, &member, &company2, process.clone(), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now2, |company: Company| {
+            delete(&user, &member, &company, process.clone(), &now2)
+        });
     }
 }
 

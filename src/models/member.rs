@@ -211,6 +211,16 @@ basis_model! {
 }
 
 impl Member {
+    /// Grab the the member's agent id for this member record
+    pub fn member_id(&self) -> &AgentID {
+        self.inner().subject()
+    }
+
+    /// Grab the the groups's agent id for this member record
+    pub fn group_id(&self) -> &AgentID {
+        self.inner().object()
+    }
+
     /// Determines if a member can perform an action (base on their permissions
     /// list). Note that we don't use roles here, the idea is that companies
     /// manage their own roles and permissions are assigned to users directly.
@@ -224,20 +234,10 @@ impl Member {
 
     /// Check if this member can perform an action on a company.
     pub fn access_check(&self, user_id: &UserID, company_id: &CompanyID, permission: Permission) -> Result<()> {
-        if self.inner().subject() != &user_id.clone().into() || self.inner().object() != &company_id.clone().into() || !self.can(&permission) {
+        if self.member_id() != &user_id.clone().into() || self.group_id() != &company_id.clone().into() || !self.can(&permission) {
             Err(Error::InsufficientPrivileges)?;
         }
         Ok(())
-    }
-
-    /// Grab the the member's agent id for this member record
-    pub fn member_id(&self) -> &AgentID {
-        self.inner().subject()
-    }
-
-    /// Grab the the groups's agent id for this member record
-    pub fn group_id(&self) -> &AgentID {
-        self.inner().object()
     }
 
     /// Try and get a `CompanyID` from this member's group id.

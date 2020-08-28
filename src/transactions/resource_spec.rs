@@ -19,7 +19,7 @@ use crate::{
         Modifications,
         company::{Company, Permission as CompanyPermission},
         member::Member,
-        lib::basis_model::Deletable,
+        lib::basis_model::{ActiveState, Deletable},
         resource_spec::{ResourceSpec, ResourceSpecID},
         user::User,
     },
@@ -32,8 +32,8 @@ use vf_rs::vf;
 pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company, id: ResourceSpecID, name: T, note: T, classifications: Vec<Url>, default_unit_of_effort: Option<Unit>, default_unit_of_resource: Option<Unit>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResourceSpecs)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceSpecCreate)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     let model = ResourceSpec::builder()
         .id(id)
@@ -60,8 +60,8 @@ pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company
 pub fn update(caller: &User, member: &Member, company: &Company, mut subject: ResourceSpec, name: Option<String>, note: Option<String>, classifications: Option<Vec<Url>>, default_unit_of_effort: Option<Unit>, default_unit_of_resource: Option<Unit>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResourceSpecs)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceSpecUpdate)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     if let Some(name) = name {
         subject.inner_mut().set_name(name);
@@ -89,8 +89,11 @@ pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Re
 pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: ResourceSpec, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResourceSpecs)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceSpecDelete)?;
-    if company.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
+    }
+    if subject.is_deleted() {
+        Err(Error::ObjectIsDeleted("resource_spec".into()))?;
     }
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
@@ -105,7 +108,7 @@ mod tests {
             member::MemberID,
             occupation::OccupationID,
             resource_spec::{ResourceSpec, ResourceSpecID},
-            testutils::{make_user, make_company, make_member_worker},
+            testutils::{deleted_company_tester, make_user, make_company, make_member_worker},
             user::UserID,
         },
         util,
@@ -145,10 +148,9 @@ mod tests {
         let res = create(&user2, &member, &company, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now.clone()));
-        let res = create(&user, &member, &company2, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company: Company| {
+            create(&user, &member, &company, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now)
+        });
     }
 
     #[test]
@@ -187,10 +189,9 @@ mod tests {
         let res = update(&user2, &member, &company, recspec.clone(), Some("best widget".into()), None, None, Some(Unit::WattHour), None, Some(false), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now2.clone()));
-        let res = update(&user, &member, &company2, recspec.clone(), Some("best widget".into()), None, None, Some(Unit::WattHour), None, Some(false), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now2, |company: Company| {
+            update(&user, &member, &company, recspec.clone(), Some("best widget".into()), None, None, Some(Unit::WattHour), None, Some(false), &now2)
+        });
     }
 
     #[test]
@@ -228,10 +229,9 @@ mod tests {
         let res = delete(&user2, &member, &company, recspec.clone(), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now2.clone()));
-        let res = delete(&user, &member, &company2, recspec.clone(), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now2, |company: Company| {
+            delete(&user, &member, &company, recspec.clone(), &now2)
+        });
     }
 }
 

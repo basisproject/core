@@ -17,7 +17,7 @@ use crate::{
         member::Member,
         lib::{
             agent::Agent,
-            basis_model::Deletable,
+            basis_model::ActiveState,
         },
         process::Process,
         user::User,
@@ -30,11 +30,11 @@ use vf_rs::vf;
 pub fn deliver_service(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, process_from: Process, process_to: Process, move_costs: Costs, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::DeliverService)?;
-    if company_from.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company_from.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
-    if company_to.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company_to.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     if !agreement.has_participant(&company_from.agent_id()) || !agreement.has_participant(&company_from.agent_id()) {
         // can't create an event for an agreement you are not party to
@@ -94,7 +94,7 @@ mod tests {
             lib::agent::Agent,
             occupation::OccupationID,
             process::{Process, ProcessID},
-            testutils::{make_agreement, make_user, make_company, make_member_worker, make_process},
+            testutils::{deleted_company_tester, make_agreement, make_user, make_company, make_member_worker, make_process},
             user::UserID,
         },
         util,
@@ -162,15 +162,12 @@ mod tests {
         let res = deliver_service(&user, &member2, &company_from, &company_to, &agreement, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), None, None, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company_from2 = company_from.clone();
-        company_from2.set_deleted(Some(now.clone()));
-        let res = deliver_service(&user, &member, &company_from2, &company_to, &agreement, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), None, None, &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
-
-        let mut company_to2 = company_from.clone();
-        company_to2.set_deleted(Some(now.clone()));
-        let res = deliver_service(&user, &member, &company_from, &company_to2, &agreement, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), None, None, &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company_from.clone(), &now, |company_from: Company| {
+            deliver_service(&user, &member, &company_from, &company_to, &agreement, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), None, None, &now)
+        });
+        deleted_company_tester(company_to.clone(), &now, |company_to: Company| {
+            deliver_service(&user, &member, &company_from, &company_to, &agreement, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), None, None, &now)
+        });
 
         // can't move costs from a process you don't own
         let mut process_from3 = process_from.clone();

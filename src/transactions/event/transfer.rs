@@ -17,7 +17,7 @@ use crate::{
         event::{Event, EventID, EventProcessState},
         lib::{
             agent::Agent,
-            basis_model::Deletable,
+            basis_model::ActiveState,
         },
         company::{Company, Permission as CompanyPermission},
         member::Member,
@@ -35,11 +35,11 @@ use vf_rs::vf;
 pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::Transfer)?;
-    if company_from.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company_from.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
-    if company_to.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company_to.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     if !agreement.has_participant(&company_from.agent_id()) || !agreement.has_participant(&company_from.agent_id()) {
         // can't create an event for an agreement you are not party to
@@ -104,11 +104,11 @@ pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &Member, company_f
 pub fn transfer_all_rights<T: Into<NumericUnion>>(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::Transfer)?;
-    if company_from.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company_from.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
-    if company_to.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company_to.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     if !agreement.has_participant(&company_from.agent_id()) || !agreement.has_participant(&company_from.agent_id()) {
         // can't create an event for an agreement you are not party to
@@ -173,11 +173,11 @@ pub fn transfer_all_rights<T: Into<NumericUnion>>(caller: &User, member: &Member
 pub fn transfer_custody<T: Into<NumericUnion>>(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::Transfer)?;
-    if company_from.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company_from.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
-    if company_to.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !company_to.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     if !agreement.has_participant(&company_from.agent_id()) || !agreement.has_participant(&company_from.agent_id()) {
         // can't create an event for an agreement you are not party to
@@ -249,7 +249,7 @@ mod tests {
             lib::agent::Agent,
             occupation::OccupationID,
             resource::ResourceID,
-            testutils::{make_agreement, make_user, make_company, make_member_worker, make_resource},
+            testutils::{deleted_company_tester, make_agreement, make_user, make_company, make_member_worker, make_resource},
             user::UserID,
         },
         util,
@@ -362,10 +362,12 @@ mod tests {
         let res = transfer(&user, &member2, &company, &company2, &agreement, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, None, None, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company_2 = company.clone();
-        company_2.set_deleted(Some(now.clone()));
-        let res = transfer(&user, &member, &company_2, &company2, &agreement, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, None, None, &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company: Company| {
+            transfer(&user, &member, &company, &company2, &agreement, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, None, None, &now)
+        });
+        deleted_company_tester(company2.clone(), &now, |company_to: Company| {
+            transfer(&user, &member, &company, &company_to, &agreement, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, None, None, &now)
+        });
 
         // can't transfer into a resource you don't own
         let mut resource_to3 = resource_to.clone();
@@ -496,10 +498,12 @@ mod tests {
         let res = transfer_all_rights(&user, &member2, &company, &company2, &agreement, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, None, None, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company_2 = company.clone();
-        company_2.set_deleted(Some(now.clone()));
-        let res = transfer_all_rights(&user, &member, &company_2, &company2, &agreement, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, None, None, &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company_from: Company| {
+            transfer_all_rights(&user, &member, &company_from, &company2, &agreement, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, None, None, &now)
+        });
+        deleted_company_tester(company2.clone(), &now, |company_to: Company| {
+            transfer_all_rights(&user, &member, &company, &company_to, &agreement, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, None, None, &now)
+        });
 
         // can't transfer into a resource you don't own
         let mut resource_to3 = resource_to.clone();
@@ -624,10 +628,12 @@ mod tests {
         let res = transfer_custody(&user, &member2, &company, &company2, &agreement, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, None, None, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company_2 = company.clone();
-        company_2.set_deleted(Some(now.clone()));
-        let res = transfer_custody(&user, &member, &company_2, &company2, &agreement, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, None, None, &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company_from: Company| {
+            transfer_custody(&user, &member, &company_from, &company2, &agreement, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, None, None, &now)
+        });
+        deleted_company_tester(company2.clone(), &now, |company_to: Company| {
+            transfer_custody(&user, &member, &company, &company_to, &agreement, id.clone(), resource.clone(), ResourceMover::Update(resource_to.clone()), Costs::new_with_labor("homemaker", 23), 8, None, None, &now)
+        });
 
         // can't override a resource you don't own
         let mut resource_to3 = resource_to.clone();

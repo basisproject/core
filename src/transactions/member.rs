@@ -16,7 +16,7 @@ use crate::{
         member::{Compensation, Member, MemberID, MemberClass},
         lib::{
             agent::Agent,
-            basis_model::Deletable,
+            basis_model::{ActiveState, Deletable},
         },
         occupation::OccupationID,
         user::User,
@@ -29,11 +29,11 @@ use vf_rs::vf;
 pub fn create<T: Agent>(caller: &User, member: &Member, id: MemberID, agent_from: T, agent_to: Company, class: MemberClass, permissions: Vec<CompanyPermission>, agreement: Option<Url>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateMembers)?;
     member.access_check(caller.id(), agent_to.id(), CompanyPermission::MemberCreate)?;
-    if agent_from.is_deleted() {
-        Err(Error::ObjectIsDeleted("agent".into()))?;
+    if !agent_from.is_active() {
+        Err(Error::ObjectIsInactive("agent".into()))?;
     }
-    if agent_to.is_deleted() {
-        Err(Error::ObjectIsDeleted("company".into()))?;
+    if !agent_to.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
     }
     let model = Member::builder()
         .id(id)
@@ -108,6 +108,9 @@ pub fn set_compensation(caller: &User, member: &Member, mut subject: Member, com
 pub fn delete(caller: &User, member: &Member, mut subject: Member, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateMembers)?;
     member.access_check(caller.id(), &subject.company_id()?, CompanyPermission::MemberDelete)?;
+    if subject.is_deleted() {
+        Err(Error::ObjectIsDeleted("member".into()))?;
+    }
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
@@ -125,7 +128,7 @@ mod tests {
                 basis_model::ActiveState,
             },
             user::UserID,
-            testutils::{make_user, make_company, make_member_worker},
+            testutils::{deleted_company_tester, make_user, make_company, make_member_worker},
         },
         util,
     };
@@ -168,15 +171,14 @@ mod tests {
         let res = create(&user3, &existing_member, id.clone(), new_user.clone(), company.clone(), new_class.clone(), vec![], Some(agreement.clone()), true, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now.clone()));
-        let res = create(&user, &existing_member, id.clone(), new_user.clone(), company2.clone(), new_class.clone(), vec![], Some(agreement.clone()), true, &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+        deleted_company_tester(company.clone(), &now, |company: Company| {
+            create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), new_class.clone(), vec![], Some(agreement.clone()), true, &now)
+        });
 
         let mut new_user2 = new_user.clone();
         new_user2.set_deleted(Some(now.clone()));
         let res = create(&user, &existing_member, id.clone(), new_user2.clone(), company.clone(), new_class.clone(), vec![], Some(agreement.clone()), true, &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("agent".into())));
+        assert_eq!(res, Err(Error::ObjectIsInactive("agent".into())));
     }
 
     #[test]

@@ -230,6 +230,7 @@ pub(crate) mod testutils {
     //! Some model-making utilities to make unit testing easier. The full
     //! end-to-end tests will happen in the integration tests.
 
+    use super::*;
     use chrono::{DateTime, Utc};
     use crate::{
         access::Role,
@@ -238,7 +239,9 @@ pub(crate) mod testutils {
             agreement::{Agreement, AgreementID},
             company::{Company, CompanyID, Permission as CompanyPermission},
             member::*,
-            lib::agent::AgentID,
+            lib::{
+                agent::AgentID,
+            },
             occupation::OccupationID,
             process::{Process, ProcessID},
             process_spec::{ProcessSpec, ProcessSpecID},
@@ -365,6 +368,34 @@ pub(crate) mod testutils {
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap()
+    }
+
+    pub fn deleted_company_tester<F>(company: Company, now: &DateTime<Utc>, testfn: F)
+        where F: Fn(Company) -> Result<Modifications>
+    {
+        let mut company1 = company.clone();
+        company1.set_deleted(None);
+        company1.set_active(true);
+        let res = testfn(company1);
+        assert!(res.is_ok());
+
+        let mut company2 = company.clone();
+        company2.set_deleted(Some(now.clone()));
+        company2.set_active(true);
+        let res = testfn(company2);
+        assert_eq!(res, Err(Error::ObjectIsInactive("company".into())));
+
+        let mut company3 = company.clone();
+        company3.set_deleted(None);
+        company3.set_active(false);
+        let res = testfn(company3);
+        assert_eq!(res, Err(Error::ObjectIsInactive("company".into())));
+
+        let mut company4 = company.clone();
+        company4.set_deleted(Some(now.clone()));
+        company4.set_active(false);
+        let res = testfn(company4);
+        assert_eq!(res, Err(Error::ObjectIsInactive("company".into())));
     }
 }
 
