@@ -15,6 +15,7 @@ use crate::{
         event::{Event, EventID, EventProcessState, MoveType},
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
+        lib::basis_model::Deletable,
         process::Process,
         resource::Resource,
         user::User,
@@ -244,7 +245,7 @@ mod tests {
             occupation::OccupationID,
             process::{Process, ProcessID},
             resource::ResourceID,
-            testutils::{make_user, make_company, make_member, make_process, make_resource},
+            testutils::{make_user, make_company, make_member_worker, make_process, make_resource},
             user::UserID,
         },
         util,
@@ -259,7 +260,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
 
         let res = lower(&user, &member, &company, id.clone(), resource.clone(), 8, Some("my note".into()), &now);
@@ -325,7 +326,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), "jerry's planks", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("lawyer");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let process_from = make_process(&ProcessID::create(), company.id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), dec!(177.25)), &now);
         let process_to = make_process(&ProcessID::create(), company.id(), "overflow labor", &Costs::new_with_labor(occupation_id.clone(), dec!(804)), &now);
 
@@ -401,7 +402,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), "jerry's planks", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("plank"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let resource_to = make_resource(&ResourceID::new("plank"), company.id(), &Measure::new(dec!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
         let loc = SpatialThing::builder()
@@ -532,7 +533,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
 
         let res = raise(&user, &member, &company, id.clone(), resource.clone(), 8, Some("toot".into()), &now);

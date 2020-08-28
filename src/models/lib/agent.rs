@@ -3,6 +3,7 @@ use crate::{
     models::{
         company::CompanyID,
         company_member::CompanyMemberID,
+        lib::basis_model::Deletable,
         user::UserID,
     },
 };
@@ -11,7 +12,7 @@ use std::convert::TryFrom;
 
 /// A trait that holds common agent functionality, generally applied to models
 /// with ID types implemented in `AgentID`.
-pub trait Agent {
+pub trait Agent: Deletable {
     /// Convert the model's ID to and AgentID.
     fn agent_id(&self) -> AgentID;
 }

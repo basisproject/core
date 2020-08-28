@@ -27,7 +27,10 @@ use crate::{
         Modifications,
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
-        lib::agent::AgentID,
+        lib::{
+            agent::AgentID,
+            basis_model::Deletable,
+        },
         process::{Process, ProcessID},
         process_spec::ProcessSpecID,
         user::User,
@@ -126,7 +129,7 @@ mod tests {
             lib::agent::Agent,
             occupation::OccupationID,
             process_spec::ProcessSpecID,
-            testutils::{make_user, make_company, make_member, make_process_spec},
+            testutils::{make_user, make_company, make_member_worker, make_process_spec},
             user::UserID,
         },
         util,
@@ -138,7 +141,7 @@ mod tests {
         let id = ProcessID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
         let spec = make_process_spec(&ProcessSpecID::create(), company.id(), "Make Gazelle Freestyle", true, &now);
 
         let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
@@ -182,7 +185,7 @@ mod tests {
         let id = ProcessID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
+        let mut member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
         let spec = make_process_spec(&ProcessSpecID::create(), company.id(), "Make Gazelle Freestyle", true, &now);
         let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
         let process = mods[0].clone().expect_op::<Process>(Op::Create).unwrap();
@@ -228,7 +231,7 @@ mod tests {
         let id = ProcessID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
+        let mut member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
         let spec = make_process_spec(&ProcessSpecID::create(), company.id(), "Make Gazelle Freestyle", true, &now);
         let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
         let process = mods[0].clone().expect_op::<Process>(Op::Create).unwrap();

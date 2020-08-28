@@ -27,8 +27,11 @@ use crate::{
         Modifications,
 
         agreement::AgreementID,
-        company_member::CompanyMember,
-        lib::agent::{Agent, AgentID},
+        company_member::{CompanyMember},
+        lib::{
+            agent::{Agent, AgentID},
+            basis_model::Deletable,
+        },
         process::{Process, ProcessID},
         resource::{Resource, ResourceID},
         resource_spec::ResourceSpecID,
@@ -440,7 +443,7 @@ impl Event {
             Action::Work => {
                 let mut input_process = state.input_of.clone().ok_or(EventError::MissingInputProcess)?;
                 let member = state.provider.clone().ok_or(EventError::MissingProvider)?;
-                let occupation_id = member.inner().relationship().clone();
+                let occupation_id = member.occupation_id().ok_or(Error::MemberMustBeWorker)?;
                 let move_costs = self.move_costs().as_ref().ok_or(EventError::MissingCosts)?;
 
                 // grab JUST this occupation's costs from the event. in other
@@ -463,7 +466,7 @@ impl Event {
                 };
                 let mut costs = Costs::new();
                 costs.track_labor(occupation_id.clone(), occupation_costs);
-                costs.track_labor_hours(occupation_id, hours);
+                costs.track_labor_hours(occupation_id.clone(), hours);
                 input_process.receive_costs(&costs)?;
                 res.modify_process(input_process);
             }
@@ -681,7 +684,7 @@ mod tests {
         costs::Costs,
         models::{
             company::{CompanyID, Permission},
-            company_member::{Compensation},
+            company_member::*,
             process::Process,
             resource::Resource,
             user::UserID,
@@ -945,12 +948,12 @@ mod tests {
                     vf::AgentRelationship::builder()
                         .subject(UserID::from("jerry"))
                         .object(CompanyID::from("jerry's widgets ultd"))
-                        .relationship("CEO")
+                        .relationship(())
                         .build().unwrap()
                 )
                 .active(true)
                 .permissions(vec![Permission::MemberCreate, Permission::MemberSetPermissions, Permission::MemberDelete])
-                .compensation(Some(Compensation::new_hourly(dec!(0.0), "12345")))
+                .class(MemberClass::Worker(MemberWorker::new("CEO", Some(Compensation::new_hourly(dec!(0.0), "12345")))))
                 .created(now.clone())
                 .updated(now.clone())
                 .build().unwrap();

@@ -1,6 +1,20 @@
 /// A trait that all model IDs implement.
 pub trait ModelID: Into<String> + From<String> + Clone + PartialEq + Eq + std::hash::Hash {}
 
+/// A trait that describes an object that can be deleted.
+pub trait Deletable {
+    /// Checks whether or not this object has been deleted.
+    fn is_deleted(&self) -> bool;
+}
+
+/// A trait that describes and object that can be in an (de)actived state.
+pub trait ActiveState: Deletable {
+    /// Determine if this model is active. This also reads the `deleted` field
+    /// and will return false if the model has been deleted, so this method is
+    /// the canonical place to check if the model can be used.
+    fn is_active(&self) -> bool;
+}
+
 macro_rules! basis_model {
     (
         $(#[$struct_meta:meta])*
@@ -61,6 +75,7 @@ macro_rules! basis_model {
 
         pub(crate) mod inner {
             use super::*;
+            use crate::models::lib::basis_model::Deletable;
 
             basis_model_inner! {
                 $(#[$struct_meta])*
@@ -92,18 +107,17 @@ macro_rules! basis_model {
                 pub(crate) fn builder() -> $builder {
                     $builder::default()
                 }
+            }
 
-                /// Determine if this model is active. This also reads the
-                /// `deleted` field and will return false if the model has been
-                /// deleted, so this method is the canonical place to check if
-                /// the model can be used.
-                pub fn is_active(&self) -> bool {
-                    self.active && !self.is_deleted()
-                }
-
-                /// Checks if the model has been deleted.
-                pub fn is_deleted(&self) -> bool {
+            impl crate::models::lib::basis_model::Deletable for $model {
+                fn is_deleted(&self) -> bool {
                     self.deleted.is_some()
+                }
+            }
+
+            impl crate::models::lib::basis_model::ActiveState for $model {
+                fn is_active(&self) -> bool {
+                    self.active && !self.is_deleted()
                 }
             }
 

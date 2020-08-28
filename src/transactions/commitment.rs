@@ -21,7 +21,10 @@ use crate::{
         commitment::{Commitment, CommitmentID},
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
-        lib::agent::{Agent, AgentID},
+        lib::{
+            agent::{Agent, AgentID},
+            basis_model::Deletable,
+        },
         process::ProcessID,
         resource::ResourceID,
         resource_spec::ResourceSpecID,
@@ -190,7 +193,7 @@ mod tests {
             company::CompanyID,
             company_member::CompanyMemberID,
             occupation::OccupationID,
-            testutils::{make_agreement, make_user, make_company, make_member, make_resource},
+            testutils::{make_agreement, make_user, make_company, make_member_worker, make_resource},
             user::UserID,
         },
         util,
@@ -206,7 +209,7 @@ mod tests {
         let company_to = make_company(&CompanyID::create(), "larry's chairs", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 111222", "UwU big order of widgetzzz", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate], &now);
         let costs = Costs::new_with_labor("widgetmaker", 42);
         let resource = make_resource(&ResourceID::new("widget1"), company_from.id(), &Measure::new(dec!(30), Unit::One), &Costs::new_with_labor("widgetmaker", dec!(50)), &now);
         let loc = SpatialThing::builder()
@@ -280,7 +283,7 @@ mod tests {
         let company_to = make_company(&CompanyID::create(), "larry's chairs", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 111222", "UwU big order of widgetzzz", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate, CompanyPermission::CommitmentUpdate], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate, CompanyPermission::CommitmentUpdate], &now);
         let costs1 = Costs::new_with_labor("widgetmaker", 42);
         let costs2 = Costs::new_with_labor("widgetmaker", 31);
         let resource = make_resource(&ResourceID::new("widget1"), company_from.id(), &Measure::new(dec!(30), Unit::One), &Costs::new_with_labor("widgetmaker", dec!(50)), &now);
@@ -347,7 +350,7 @@ mod tests {
         let company_to = make_company(&CompanyID::create(), "larry's dairies (outdoor outdoor. shutup parker. thank you parker, shutup. thank you.)", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 111222", "UwU big order of widgetzzz", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate, CompanyPermission::CommitmentDelete], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::CommitmentCreate, CompanyPermission::CommitmentDelete], &now);
         let resource = make_resource(&ResourceID::new("widget1"), company_from.id(), &Measure::new(dec!(30), Unit::One), &Costs::new_with_labor("widgetmaker", dec!(50)), &now);
         let costs1 = Costs::new_with_labor("widgetmaker", 42);
         let loc = SpatialThing::builder()

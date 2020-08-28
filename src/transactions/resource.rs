@@ -20,7 +20,10 @@ use crate::{
         Modifications,
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
-        lib::agent::Agent,
+        lib::{
+            agent::Agent,
+            basis_model::Deletable,
+        },
         resource::{Resource, ResourceID},
         resource_spec::ResourceSpecID,
         user::User,
@@ -117,7 +120,7 @@ mod tests {
             company_member::CompanyMemberID,
             occupation::OccupationID,
             resource_spec::ResourceSpecID,
-            testutils::{make_user, make_company, make_member, make_resource_spec},
+            testutils::{make_user, make_company, make_member_worker, make_resource_spec},
             user::UserID,
         },
         util,
@@ -129,7 +132,7 @@ mod tests {
         let id = ResourceID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
         let spec = make_resource_spec(&ResourceSpecID::create(), company.id(), "widgets, baby", &now);
         let lot = dfc::ProductBatch::builder()
             .batch_number("123")
@@ -176,7 +179,7 @@ mod tests {
         let id = ResourceID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
+        let mut member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
         let spec = make_resource_spec(&ResourceSpecID::create(), company.id(), "widgets, baby", &now);
         let lot = dfc::ProductBatch::builder()
             .batch_number("123")
@@ -224,7 +227,7 @@ mod tests {
         let id = ResourceID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
+        let mut member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceCreate], &now);
         let spec = make_resource_spec(&ResourceSpecID::create(), company.id(), "widgets, baby", &now);
         let lot = dfc::ProductBatch::builder()
             .batch_number("123")

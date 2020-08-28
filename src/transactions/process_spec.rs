@@ -18,6 +18,7 @@ use crate::{
         Modifications,
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
+        lib::basis_model::Deletable,
         process_spec::{ProcessSpec, ProcessSpecID},
         user::User,
     },
@@ -89,7 +90,7 @@ mod tests {
             company_member::CompanyMemberID,
             occupation::OccupationID,
             process_spec::{ProcessSpec, ProcessSpecID},
-            testutils::{make_user, make_company, make_member},
+            testutils::{make_user, make_company, make_member_worker},
             user::UserID,
         },
         util,
@@ -101,7 +102,7 @@ mod tests {
         let id = ProcessSpecID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
 
         let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
@@ -138,7 +139,7 @@ mod tests {
         let id = ProcessSpecID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
+        let mut member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
         let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_vec();
         let recspec = mods[0].clone().expect_op::<ProcessSpec>(Op::Create).unwrap();
 
@@ -177,7 +178,7 @@ mod tests {
         let id = ProcessSpecID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
+        let mut member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
         let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_vec();
         let recspec = mods[0].clone().expect_op::<ProcessSpec>(Op::Create).unwrap();
 

@@ -14,6 +14,7 @@ use crate::{
         event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
+        lib::basis_model::Deletable,
         process::Process,
         user::User,
     },
@@ -51,8 +52,9 @@ pub fn work(caller: &User, member: &CompanyMember, company: &Company, id: EventI
         let hours = Decimal::from(milliseconds) / Decimal::from(1000 * 60 * 60);
         Measure::new(hours, Unit::Hour)
     };
+    let occupation_id = worker.occupation_id().ok_or(Error::MemberMustBeWorker)?.clone();
     let costs = match wage_cost {
-        Some(val) => Costs::new_with_labor(worker.inner().relationship().clone(), val),
+        Some(val) => Costs::new_with_labor(occupation_id, val),
         None => Costs::new(),
     };
     let process_id = process.id().clone();
@@ -106,7 +108,7 @@ mod tests {
             lib::agent::Agent,
             occupation::OccupationID,
             process::ProcessID,
-            testutils::{make_user, make_company, make_member, make_process},
+            testutils::{make_user, make_company, make_member_worker, make_process},
             user::UserID,
         },
     };
@@ -120,7 +122,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![CompanyPermission::Work], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![CompanyPermission::Work], &now);
         let worker = member.clone();
         let process = make_process(&ProcessID::create(), company.id(), "make widgets", &Costs::new_with_labor(occupation_id.clone(), dec!(177.5)), &now);
 

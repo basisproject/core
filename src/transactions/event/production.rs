@@ -13,6 +13,7 @@ use crate::{
         event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
+        lib::basis_model::Deletable,
         process::Process,
         resource::Resource,
         user::User,
@@ -266,7 +267,7 @@ mod tests {
             occupation::OccupationID,
             process::ProcessID,
             resource::ResourceID,
-            testutils::{make_user, make_company, make_member, make_process, make_resource},
+            testutils::{make_user, make_company, make_member_worker, make_process, make_resource},
             user::UserID,
         },
         util,
@@ -281,7 +282,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let mut costs = Costs::new();
         costs.track_labor(occupation_id.clone(), dec!(42.2));
@@ -366,7 +367,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let mut costs = Costs::new();
         costs.track_labor(occupation_id.clone(), dec!(42.2));
@@ -451,7 +452,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let mut costs = Costs::new();
         costs.track_labor(occupation_id.clone(), dec!(42.2));
@@ -537,7 +538,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let mut costs = Costs::new();
         costs.track_labor(occupation_id.clone(), dec!(42.2));

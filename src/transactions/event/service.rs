@@ -15,7 +15,10 @@ use crate::{
         event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
-        lib::agent::Agent,
+        lib::{
+            agent::Agent,
+            basis_model::Deletable,
+        },
         process::Process,
         user::User,
     },
@@ -91,7 +94,7 @@ mod tests {
             lib::agent::Agent,
             occupation::OccupationID,
             process::{Process, ProcessID},
-            testutils::{make_agreement, make_user, make_company, make_member, make_process},
+            testutils::{make_agreement, make_user, make_company, make_member_worker, make_process},
             user::UserID,
         },
         util,
@@ -108,7 +111,7 @@ mod tests {
         let agreed_in: Url = "https://legalzoom.com/my-dad-is-suing-your-dad-the-agreement".parse().unwrap();
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("lawyer");
-        let member = make_member(&CompanyMemberID::create(), user.id(), company_from.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company_from.id(), &occupation_id, vec![], &now);
         let process_from = make_process(&ProcessID::create(), company_from.id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), dec!(177.25)), &now);
         let process_to = make_process(&ProcessID::create(), company_to.id(), "employee legal agreement drafting", &Costs::new_with_labor(occupation_id.clone(), dec!(804)), &now);
 

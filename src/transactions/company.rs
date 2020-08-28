@@ -18,7 +18,7 @@ use crate::{
         Op,
         Modifications,
         company::{Company, CompanyID, Permission as CompanyPermission},
-        company_member::{CompanyMember, CompanyMemberID},
+        company_member::{CompanyMember, CompanyMemberID, MemberClass, MemberWorker},
         occupation::OccupationID,
         user::User,
     },
@@ -48,10 +48,11 @@ pub fn create<T: Into<String>>(caller: &User, id: CompanyID, company_name: T, co
             vf::AgentRelationship::builder()
                 .subject(caller.id().clone())
                 .object(id.clone())
-                .relationship(founder_occupation_id)
+                .relationship(())
                 .build()
                 .map_err(|e| Error::BuilderFailed(e))?
         )
+        .class(MemberClass::Worker(MemberWorker::new(founder_occupation_id, None)))
         .permissions(vec![CompanyPermission::All])
         .active(founder_active)
         .created(now.clone())
@@ -128,7 +129,7 @@ mod tests {
         assert_eq!(founder.id(), &founder_id);
         assert_eq!(founder.inner().subject(), &user.agent_id());
         assert_eq!(founder.inner().object(), &id.clone().into());
-        assert_eq!(founder.inner().relationship(), &occupation_id);
+        assert_eq!(founder.occupation_id(), Some(&occupation_id));
         assert_eq!(founder.permissions(), &vec![CompanyPermission::All]);
         assert_eq!(founder.active(), &true);
         assert_eq!(founder.created(), &now);

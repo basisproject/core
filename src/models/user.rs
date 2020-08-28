@@ -8,7 +8,10 @@
 use crate::{
     access::{Permission, Role},
     models::{
-        lib::agent::{Agent, AgentID},
+        lib::{
+            agent::{Agent, AgentID},
+            basis_model::ActiveState,
+        },
     },
     error::{Error, Result},
 };

@@ -14,7 +14,10 @@ use crate::{
     models::{
         Op,
         Modifications,
-        lib::agent::AgentID,
+        lib::{
+            agent::AgentID,
+            basis_model::Deletable,
+        },
         agreement::{Agreement, AgreementID},
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
@@ -89,7 +92,7 @@ mod tests {
             company::CompanyID,
             company_member::CompanyMemberID,
             occupation::OccupationID,
-            testutils::{make_user, make_company, make_member},
+            testutils::{make_user, make_company, make_member_worker},
             user::UserID,
         },
         util,
@@ -102,7 +105,7 @@ mod tests {
         let company_to = make_company(&CompanyID::create(), "sam's widgets", &now);
         let company_from = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate], &now);
         let participants = vec![company_to.agent_id(), company_from.agent_id()];
 
         let mods = create(&user, &member, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
@@ -142,7 +145,7 @@ mod tests {
         let company_to = make_company(&CompanyID::create(), "sam's widgets", &now);
         let company_from = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate, CompanyPermission::AgreementUpdate], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate, CompanyPermission::AgreementUpdate], &now);
         let participants = vec![company_to.agent_id(), company_from.agent_id()];
 
         let mods = create(&user, &member, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();

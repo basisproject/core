@@ -18,7 +18,10 @@ use crate::{
         Modifications,
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
-        lib::agent::{Agent, AgentID},
+        lib::{
+            agent::{Agent, AgentID},
+            basis_model::Deletable,
+        },
         intent::{Intent, IntentID},
         resource::ResourceID,
         resource_spec::ResourceSpecID,
@@ -197,7 +200,7 @@ mod tests {
             company::CompanyID,
             company_member::CompanyMemberID,
             occupation::OccupationID,
-            testutils::{make_user, make_company, make_member},
+            testutils::{make_user, make_company, make_member_worker},
             user::UserID,
         },
         util,
@@ -210,7 +213,7 @@ mod tests {
         let id = IntentID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate], &now);
         let costs = Costs::new_with_labor("widgetmaker", 42);
         let loc = SpatialThing::builder()
             .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
@@ -277,7 +280,7 @@ mod tests {
         let id = IntentID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate, CompanyPermission::IntentUpdate], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate, CompanyPermission::IntentUpdate], &now);
         let costs1 = Costs::new_with_labor("widgetmaker", 42);
         let costs2 = Costs::new_with_labor("widgetmaker", 41);
         let loc = SpatialThing::builder()
@@ -347,7 +350,7 @@ mod tests {
         let id = IntentID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate, CompanyPermission::IntentDelete], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate, CompanyPermission::IntentDelete], &now);
         let costs = Costs::new_with_labor("widgetmaker", 42);
         let loc = SpatialThing::builder()
             .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))

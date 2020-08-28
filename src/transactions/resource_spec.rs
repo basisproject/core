@@ -19,6 +19,7 @@ use crate::{
         Modifications,
         company::{Company, Permission as CompanyPermission},
         company_member::CompanyMember,
+        lib::basis_model::Deletable,
         resource_spec::{ResourceSpec, ResourceSpecID},
         user::User,
     },
@@ -104,7 +105,7 @@ mod tests {
             company_member::CompanyMemberID,
             occupation::OccupationID,
             resource_spec::{ResourceSpec, ResourceSpecID},
-            testutils::{make_user, make_company, make_member},
+            testutils::{make_user, make_company, make_member_worker},
             user::UserID,
         },
         util,
@@ -116,7 +117,7 @@ mod tests {
         let id = ResourceSpecID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
+        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
 
         let mods = create(&user, &member, &company, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
@@ -156,7 +157,7 @@ mod tests {
         let id = ResourceSpecID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
+        let mut member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
         let mods = create(&user, &member, &company, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now).unwrap().into_vec();
         let recspec = mods[0].clone().expect_op::<ResourceSpec>(Op::Create).unwrap();
 
@@ -198,7 +199,7 @@ mod tests {
         let id = ResourceSpecID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
+        let mut member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
         let mods = create(&user, &member, &company, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now).unwrap().into_vec();
         let recspec = mods[0].clone().expect_op::<ResourceSpec>(Op::Create).unwrap();
 
