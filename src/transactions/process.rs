@@ -26,7 +26,7 @@ use crate::{
         Op,
         Modifications,
         company::{Company, Permission as CompanyPermission},
-        company_member::CompanyMember,
+        member::Member,
         lib::{
             agent::AgentID,
             basis_model::Deletable,
@@ -40,7 +40,7 @@ use url::Url;
 use vf_rs::vf;
 
 /// Create a new process
-pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &Company, id: ProcessID, spec_id: ProcessSpecID, name: T, note: T, classifications: Vec<Url>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company, id: ProcessID, spec_id: ProcessSpecID, name: T, note: T, classifications: Vec<Url>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateProcesses)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessCreate)?;
     if company.is_deleted() {
@@ -71,7 +71,7 @@ pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &
 }
 
 /// Update a process
-pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: Process, name: Option<String>, note: Option<String>, classifications: Option<Vec<Url>>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, in_scope_of: Option<Vec<AgentID>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Process, name: Option<String>, note: Option<String>, classifications: Option<Vec<Url>>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, in_scope_of: Option<Vec<AgentID>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateProcesses)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessUpdate)?;
     if company.is_deleted() {
@@ -106,7 +106,7 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
 }
 
 /// Delete a process
-pub fn delete(caller: &User, member: &CompanyMember, company: &Company, mut subject: Process, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: Process, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateProcesses)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessDelete)?;
     if company.is_deleted() {
@@ -125,7 +125,7 @@ mod tests {
     use crate::{
         models::{
             company::CompanyID,
-            company_member::CompanyMemberID,
+            member::MemberID,
             lib::agent::Agent,
             occupation::OccupationID,
             process_spec::ProcessSpecID,
@@ -141,7 +141,7 @@ mod tests {
         let id = ProcessID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
         let spec = make_process_spec(&ProcessSpecID::create(), company.id(), "Make Gazelle Freestyle", true, &now);
 
         let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
@@ -185,7 +185,7 @@ mod tests {
         let id = ProcessID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
+        let mut member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
         let spec = make_process_spec(&ProcessSpecID::create(), company.id(), "Make Gazelle Freestyle", true, &now);
         let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
         let process = mods[0].clone().expect_op::<Process>(Op::Create).unwrap();
@@ -231,7 +231,7 @@ mod tests {
         let id = ProcessID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
+        let mut member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
         let spec = make_process_spec(&ProcessSpecID::create(), company.id(), "Make Gazelle Freestyle", true, &now);
         let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
         let process = mods[0].clone().expect_op::<Process>(Op::Create).unwrap();

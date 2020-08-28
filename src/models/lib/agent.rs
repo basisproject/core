@@ -2,7 +2,7 @@ use crate::{
     error::{Result, Error},
     models::{
         company::CompanyID,
-        company_member::CompanyMemberID,
+        member::MemberID,
         lib::basis_model::Deletable,
         user::UserID,
     },
@@ -26,7 +26,7 @@ pub enum AgentID {
     #[serde(rename = "company")]
     CompanyID(CompanyID),
     #[serde(rename = "member")]
-    CompanyMemberID(CompanyMemberID),
+    MemberID(MemberID),
     #[serde(rename = "user")]
     UserID(UserID),
 }
@@ -54,6 +54,6 @@ macro_rules! impl_agent_for_model_id {
 }
 
 impl_agent_for_model_id! { CompanyID }
-impl_agent_for_model_id! { CompanyMemberID }
+impl_agent_for_model_id! { MemberID }
 impl_agent_for_model_id! { UserID }
 

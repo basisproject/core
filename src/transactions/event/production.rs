@@ -12,7 +12,7 @@ use crate::{
         Modifications,
         event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
-        company_member::CompanyMember,
+        member::Member,
         lib::basis_model::Deletable,
         process::Process,
         resource::Resource,
@@ -31,7 +31,7 @@ use vf_rs::vf;
 /// Note that the resource *can* have a cost, and those costs can be moved by
 /// citing. For instance, if it took a year of research to derive a formula,
 /// the costs of that research would be imbued in the formula.
-pub fn cite(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn cite(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Cite)?;
     if company.is_deleted() {
@@ -82,7 +82,7 @@ pub fn cite(caller: &User, member: &CompanyMember, company: &Company, id: EventI
 /// If you make widgets out of steel, then steel is the resource, and the
 /// process would be the fabrication that "consumes" steel (with the output,
 /// ie `produce`, of a widget).
-pub fn consume<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, move_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn consume<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, move_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Consume)?;
     if company.is_deleted() {
@@ -139,7 +139,7 @@ pub fn consume<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, com
 ///
 /// For instance, a process might `consume` steel and have a `work` input and
 /// then `produce` a widget.
-pub fn produce<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, produce_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn produce<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, produce_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Produce)?;
     if company.is_deleted() {
@@ -209,7 +209,7 @@ pub fn produce<T: Into<NumericUnion>>(caller: &User, member: &CompanyMember, com
 /// If you're trying to express some resource being "used up" (for instance
 /// screws being used to build a chair) then you'll probably want `consume`
 /// instead of `use`.
-pub fn useeee(caller: &User, member: &CompanyMember, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, effort_quantity: Option<Measure>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn useeee(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, effort_quantity: Option<Measure>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Use)?;
     if company.is_deleted() {
@@ -261,7 +261,7 @@ mod tests {
     use crate::{
         models::{
             company::CompanyID,
-            company_member::CompanyMemberID,
+            member::MemberID,
             event::{EventError, EventID},
             lib::agent::Agent,
             occupation::OccupationID,
@@ -282,7 +282,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let mut costs = Costs::new();
         costs.track_labor(occupation_id.clone(), dec!(42.2));
@@ -367,7 +367,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let mut costs = Costs::new();
         costs.track_labor(occupation_id.clone(), dec!(42.2));
@@ -452,7 +452,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let mut costs = Costs::new();
         costs.track_labor(occupation_id.clone(), dec!(42.2));
@@ -538,7 +538,7 @@ mod tests {
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let mut costs = Costs::new();
         costs.track_labor(occupation_id.clone(), dec!(42.2));

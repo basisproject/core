@@ -34,7 +34,7 @@ macro_rules! load_models {
             (agreement, Agreement, AgreementID),
             (commitment, Commitment, CommitmentID),
             (company, Company, CompanyID),
-            (company_member, CompanyMember, CompanyMemberID),
+            (member, Member, MemberID),
             (currency, Currency, CurrencyID),
             (event, Event, EventID),
             (intent, Intent, IntentID),

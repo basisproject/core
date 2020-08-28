@@ -237,7 +237,7 @@ pub(crate) mod testutils {
         models::{
             agreement::{Agreement, AgreementID},
             company::{Company, CompanyID, Permission as CompanyPermission},
-            company_member::*,
+            member::*,
             lib::agent::AgentID,
             occupation::OccupationID,
             process::{Process, ProcessID},
@@ -278,8 +278,8 @@ pub(crate) mod testutils {
             .build().unwrap()
     }
 
-    pub fn make_member_worker(member_id: &CompanyMemberID, user_id: &UserID, company_id: &CompanyID, occupation_id: &OccupationID, permissions: Vec<CompanyPermission>, now: &DateTime<Utc>) -> CompanyMember {
-        CompanyMember::builder()
+    pub fn make_member_worker(member_id: &MemberID, user_id: &UserID, company_id: &CompanyID, occupation_id: &OccupationID, permissions: Vec<CompanyPermission>, now: &DateTime<Utc>) -> Member {
+        Member::builder()
             .id(member_id.clone())
             .inner(
                 vf::AgentRelationship::builder()

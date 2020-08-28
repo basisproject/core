@@ -14,7 +14,7 @@ use crate::{
         agreement::Agreement,
         event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
-        company_member::CompanyMember,
+        member::Member,
         lib::{
             agent::Agent,
             basis_model::Deletable,
@@ -27,7 +27,7 @@ use url::Url;
 use vf_rs::vf;
 
 /// Provide a service to another agent, moving costs along the way.
-pub fn deliver_service(caller: &User, member: &CompanyMember, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, process_from: Process, process_to: Process, move_costs: Costs, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn deliver_service(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, process_from: Process, process_to: Process, move_costs: Costs, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::DeliverService)?;
     if company_from.is_deleted() {
@@ -89,7 +89,7 @@ mod tests {
         models::{
             agreement::AgreementID,
             company::CompanyID,
-            company_member::CompanyMemberID,
+            member::MemberID,
             event::{EventID, EventError},
             lib::agent::Agent,
             occupation::OccupationID,
@@ -111,7 +111,7 @@ mod tests {
         let agreed_in: Url = "https://legalzoom.com/my-dad-is-suing-your-dad-the-agreement".parse().unwrap();
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("lawyer");
-        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company_from.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company_from.id(), &occupation_id, vec![], &now);
         let process_from = make_process(&ProcessID::create(), company_from.id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), dec!(177.25)), &now);
         let process_to = make_process(&ProcessID::create(), company_to.id(), "employee legal agreement drafting", &Costs::new_with_labor(occupation_id.clone(), dec!(804)), &now);
 

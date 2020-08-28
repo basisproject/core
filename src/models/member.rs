@@ -153,7 +153,7 @@ impl MemberWorker {
     }
 }
 
-/// Describes the type of membership for a particular CompanyMember record.
+/// Describes the type of membership for a particular Member record.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum MemberClass {
     /// This member is another company.
@@ -177,8 +177,8 @@ pub enum MemberClass {
 basis_model! {
     /// A member of a company. Links a user to a company, and has other attached
     /// information like compensation, permission roles, etc.
-    pub struct CompanyMember {
-        id: <<CompanyMemberID>>,
+    pub struct Member {
+        id: <<MemberID>>,
         /// Our inner VF relationship (stores the AgentIDs of both the parties
         /// involved in the relationship under `subject`/`object`).
         inner: vf::AgentRelationship<(), AgentID, ()>,
@@ -194,10 +194,10 @@ basis_model! {
         /// user members would need to agree to).
         agreement: Option<Url>,
     }
-    CompanyMemberBuilder
+    MemberBuilder
 }
 
-impl CompanyMember {
+impl Member {
     /// Determines if a member can perform an action (base on their permissions
     /// list). Note that we don't use roles here, the idea is that companies
     /// manage their own roles and permissions are assigned to users directly.
@@ -249,7 +249,7 @@ impl CompanyMember {
     }
 }
 
-impl Agent for CompanyMember {
+impl Agent for Member {
     fn agent_id(&self) -> AgentID {
         self.id().clone().into()
     }
@@ -271,7 +271,7 @@ mod test {
     #[test]
     fn can() {
         let now = util::time::now();
-        let member = make_member_worker(&CompanyMemberID::create(), &UserID::create(), &CompanyID::create(), &OccupationID::create(), vec![CompanyPermission::MemberCreate, CompanyPermission::MemberUpdate], &now);
+        let member = make_member_worker(&MemberID::create(), &UserID::create(), &CompanyID::create(), &OccupationID::create(), vec![CompanyPermission::MemberCreate, CompanyPermission::MemberUpdate], &now);
         let user_id: UserID = member.member_id().clone().try_into().unwrap();
         let company_id: CompanyID = member.group_id().clone().try_into().unwrap();
         assert!(member.can(&CompanyPermission::MemberCreate));

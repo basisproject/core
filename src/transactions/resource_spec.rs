@@ -18,7 +18,7 @@ use crate::{
         Op,
         Modifications,
         company::{Company, Permission as CompanyPermission},
-        company_member::CompanyMember,
+        member::Member,
         lib::basis_model::Deletable,
         resource_spec::{ResourceSpec, ResourceSpecID},
         user::User,
@@ -29,7 +29,7 @@ use url::Url;
 use vf_rs::vf;
 
 /// Create a new ResourceSpec
-pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &Company, id: ResourceSpecID, name: T, note: T, classifications: Vec<Url>, default_unit_of_effort: Option<Unit>, default_unit_of_resource: Option<Unit>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company, id: ResourceSpecID, name: T, note: T, classifications: Vec<Url>, default_unit_of_effort: Option<Unit>, default_unit_of_resource: Option<Unit>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResourceSpecs)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceSpecCreate)?;
     if company.is_deleted() {
@@ -57,7 +57,7 @@ pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &
 }
 
 /// Update a resource spec
-pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: ResourceSpec, name: Option<String>, note: Option<String>, classifications: Option<Vec<Url>>, default_unit_of_effort: Option<Unit>, default_unit_of_resource: Option<Unit>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(caller: &User, member: &Member, company: &Company, mut subject: ResourceSpec, name: Option<String>, note: Option<String>, classifications: Option<Vec<Url>>, default_unit_of_effort: Option<Unit>, default_unit_of_resource: Option<Unit>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResourceSpecs)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceSpecUpdate)?;
     if company.is_deleted() {
@@ -86,7 +86,7 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
 }
 
 /// Delete a resource spec
-pub fn delete(caller: &User, member: &CompanyMember, company: &Company, mut subject: ResourceSpec, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: ResourceSpec, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResourceSpecs)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceSpecDelete)?;
     if company.is_deleted() {
@@ -102,7 +102,7 @@ mod tests {
     use crate::{
         models::{
             company::CompanyID,
-            company_member::CompanyMemberID,
+            member::MemberID,
             occupation::OccupationID,
             resource_spec::{ResourceSpec, ResourceSpecID},
             testutils::{make_user, make_company, make_member_worker},
@@ -117,7 +117,7 @@ mod tests {
         let id = ResourceSpecID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
 
         let mods = create(&user, &member, &company, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
@@ -157,7 +157,7 @@ mod tests {
         let id = ResourceSpecID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
+        let mut member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
         let mods = create(&user, &member, &company, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now).unwrap().into_vec();
         let recspec = mods[0].clone().expect_op::<ResourceSpec>(Op::Create).unwrap();
 
@@ -199,7 +199,7 @@ mod tests {
         let id = ResourceSpecID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
+        let mut member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
         let mods = create(&user, &member, &company, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now).unwrap().into_vec();
         let recspec = mods[0].clone().expect_op::<ResourceSpec>(Op::Create).unwrap();
 

@@ -20,7 +20,7 @@ use crate::{
         },
         agreement::{Agreement, AgreementID},
         company::{Company, Permission as CompanyPermission},
-        company_member::CompanyMember,
+        member::Member,
         user::User,
     },
 };
@@ -32,7 +32,7 @@ use vf_rs::vf;
 /// agreement's `participants` list will be allowed to complete updates. This
 /// makes it so only those involved in the agreement can modify it or any of its
 /// data in any way.
-pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &Company, id: AgreementID, participants: Vec<AgentID>, name: T, note: T, created: Option<DateTime<Utc>>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company, id: AgreementID, participants: Vec<AgentID>, name: T, note: T, created: Option<DateTime<Utc>>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateAgreements)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::AgreementCreate)?;
     if company.is_deleted() {
@@ -58,7 +58,7 @@ pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &
 }
 
 /// Update an agreement, including the participant list.
-pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: Agreement, participants: Option<Vec<AgentID>>, name: Option<String>, note: Option<String>, created: Option<Option<DateTime<Utc>>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Agreement, participants: Option<Vec<AgentID>>, name: Option<String>, note: Option<String>, created: Option<Option<DateTime<Utc>>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateAgreements)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::AgreementUpdate)?;
     if company.is_deleted() {
@@ -90,7 +90,7 @@ mod tests {
         models::{
             lib::agent::Agent,
             company::CompanyID,
-            company_member::CompanyMemberID,
+            member::MemberID,
             occupation::OccupationID,
             testutils::{make_user, make_company, make_member_worker},
             user::UserID,
@@ -105,7 +105,7 @@ mod tests {
         let company_to = make_company(&CompanyID::create(), "sam's widgets", &now);
         let company_from = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate], &now);
         let participants = vec![company_to.agent_id(), company_from.agent_id()];
 
         let mods = create(&user, &member, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
@@ -145,7 +145,7 @@ mod tests {
         let company_to = make_company(&CompanyID::create(), "sam's widgets", &now);
         let company_from = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate, CompanyPermission::AgreementUpdate], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate, CompanyPermission::AgreementUpdate], &now);
         let participants = vec![company_to.agent_id(), company_from.agent_id()];
 
         let mods = create(&user, &member, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();

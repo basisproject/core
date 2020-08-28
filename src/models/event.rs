@@ -27,7 +27,7 @@ use crate::{
         Modifications,
 
         agreement::AgreementID,
-        company_member::{CompanyMember},
+        member::{Member},
         lib::{
             agent::{Agent, AgentID},
             basis_model::Deletable,
@@ -174,7 +174,7 @@ pub struct EventProcessState {
     /// The process this event is an output of
     output_of: Option<Process>,
     /// The provider (if a member) performing an action (generally `Work`)
-    provider: Option<CompanyMember>,
+    provider: Option<Member>,
     /// The resource this event operates on (Consume/Produce/etc)
     resource: Option<Resource>,
     /// The secondary resource we're operating on (Transfer/Move/etc)
@@ -684,7 +684,7 @@ mod tests {
         costs::Costs,
         models::{
             company::{CompanyID, Permission},
-            company_member::*,
+            member::*,
             process::Process,
             resource::Resource,
             user::UserID,
@@ -942,7 +942,7 @@ mod tests {
             .updated(now.clone())
             .build().unwrap();
         if !provider_is_company {
-            let member = CompanyMember::builder()
+            let member = Member::builder()
                 .id("5555")
                 .inner(
                     vf::AgentRelationship::builder()

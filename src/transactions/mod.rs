@@ -27,7 +27,7 @@ pub enum OrderAction {
 pub mod agreement;
 pub mod commitment;
 pub mod company;
-pub mod company_member;
+pub mod member;
 //pub mod currency;
 pub mod event;
 pub mod intent;

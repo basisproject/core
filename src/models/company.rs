@@ -8,7 +8,7 @@
 //! This ultimately gives more control to companies to determine their own roles
 //! (outside the perview of this library) as needed.
 //!
-//! [Members]: ../company_member/struct.CompanyMember.html
+//! [Members]: ../member/struct.Member.html
 //! [access]: ../../access/
 
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
 use serde::{Serialize, Deserialize};
 use vf_rs::vf;
 
-/// A permission gives a CompanyMember the ability to perform certain actions
+/// A permission gives a Member the ability to perform certain actions
 /// within the context of a company they have a relationship (a set of roles)
 /// with. 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

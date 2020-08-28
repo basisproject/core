@@ -17,7 +17,7 @@ use crate::{
         Op,
         Modifications,
         company::{Company, Permission as CompanyPermission},
-        company_member::CompanyMember,
+        member::Member,
         lib::basis_model::Deletable,
         process_spec::{ProcessSpec, ProcessSpecID},
         user::User,
@@ -26,7 +26,7 @@ use crate::{
 use vf_rs::vf;
 
 /// Create a new ProcessSpec
-pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &Company, id: ProcessSpecID, name: T, note: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company, id: ProcessSpecID, name: T, note: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateProcessSpecs)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessSpecCreate)?;
     if company.is_deleted() {
@@ -51,7 +51,7 @@ pub fn create<T: Into<String>>(caller: &User, member: &CompanyMember, company: &
 }
 
 /// Update a resource spec
-pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subject: ProcessSpec, name: Option<String>, note: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(caller: &User, member: &Member, company: &Company, mut subject: ProcessSpec, name: Option<String>, note: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateProcessSpecs)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessSpecUpdate)?;
     if company.is_deleted() {
@@ -71,7 +71,7 @@ pub fn update(caller: &User, member: &CompanyMember, company: &Company, mut subj
 }
 
 /// Delete a resource spec
-pub fn delete(caller: &User, member: &CompanyMember, company: &Company, mut subject: ProcessSpec, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: ProcessSpec, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateProcessSpecs)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessSpecDelete)?;
     if company.is_deleted() {
@@ -87,7 +87,7 @@ mod tests {
     use crate::{
         models::{
             company::CompanyID,
-            company_member::CompanyMemberID,
+            member::MemberID,
             occupation::OccupationID,
             process_spec::{ProcessSpec, ProcessSpecID},
             testutils::{make_user, make_company, make_member_worker},
@@ -102,7 +102,7 @@ mod tests {
         let id = ProcessSpecID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
 
         let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
@@ -139,7 +139,7 @@ mod tests {
         let id = ProcessSpecID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
+        let mut member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
         let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_vec();
         let recspec = mods[0].clone().expect_op::<ProcessSpec>(Op::Create).unwrap();
 
@@ -178,7 +178,7 @@ mod tests {
         let id = ProcessSpecID::create();
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member_worker(&CompanyMemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
+        let mut member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
         let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_vec();
         let recspec = mods[0].clone().expect_op::<ProcessSpec>(Op::Create).unwrap();
 
