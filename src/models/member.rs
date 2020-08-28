@@ -1,12 +1,25 @@
-//! A company member represents a link between a user in the system and a
-//! company, and carries other information with it such as position (occupation)
-//! in the company, access permissions, and compensation.
+//! A member is a link between an agent (a user or a company) to a parent
+//! company. This link can carry other information, such occupation or
+//! compensation in the case of a worker member. All memberships grant ownership
+//! of the parent company, and this ownership is exercised by *individual*
+//! members.
 //!
-//! Members can perform labor into a [Process] within the company, which earns
-//! them credits and adds costs to the company which much be assigned to
-//! outgoing products and services.
+//! Members have classes which describe the membership:
+//!
+//! - `Company` - Describes a company that is a member of another company. This
+//! membership might come with certain privileges, such as usage of resources
+//! in the larger company. When a smaller company becomes a members of a larger
+//! company, the smaller company's members also become implicit members, and
+//! become part owners of the parent company.
+//! - `User` - An individual user who is a member of a company.
+//! - `Worker` - An individual who works at the parent company, making widgets
+//! or growing vegetables or any other productive role. Workers are the only
+//! members that can perform [work transactions][1] (via a [Process]) for a
+//! company, which assign costs to companies and print and transfer credits to
+//! the worker's preferred account.
 //!
 //! [Process]: ../process/struct.Process.html
+//! [1]: ../../transactions/event/work/index.html
 
 use crate::{
     error::{Error, Result},
