@@ -103,7 +103,7 @@ mod tests {
     use crate::{
         models::{
             company::CompanyID,
-            member::MemberID,
+            member::*,
             event::{Event, EventID, EventError},
             lib::agent::Agent,
             occupation::OccupationID,
@@ -215,6 +215,14 @@ mod tests {
         process3.set_company_id(CompanyID::new("zing"));
         let res = work(&user, &member2, &company, id.clone(), worker2.clone(), process3.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
+
+        let mut worker3 = worker2.clone();
+        worker3.set_class(MemberClass::User(MemberUser::new()));
+        let res = work(&user, &member2, &company, id.clone(), worker3.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
+        worker3.set_class(MemberClass::Company(MemberCompany::new()));
+        let res = work(&user, &member2, &company, id.clone(), worker3.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
     }
 }
 

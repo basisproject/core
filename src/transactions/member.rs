@@ -119,7 +119,7 @@ mod tests {
         models::{
             account::AccountID,
             company::CompanyID,
-            member::MemberWorker,
+            member::*,
             lib::{
                 agent::Agent,
                 basis_model::ActiveState,
@@ -219,6 +219,14 @@ mod tests {
 
         let res = update(&new_user, &existing_member, member.clone(), Some(new_occupation.clone()), Some(agreement.clone()), None, &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut member3 = member2.clone();
+        member3.set_class(MemberClass::User(MemberUser::new()));
+        let res = update(&user, &existing_member, member3.clone(), Some(new_occupation.clone()), Some(agreement.clone()), None, &now2);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
+        member3.set_class(MemberClass::Company(MemberCompany::new()));
+        let res = update(&user, &existing_member, member3.clone(), Some(new_occupation.clone()), Some(agreement.clone()), None, &now2);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
     }
 
     #[test]
@@ -253,6 +261,14 @@ mod tests {
         user2.set_roles(vec![]);
         let res = set_permissions(&user2, &existing_member, member.clone(), vec![CompanyPermission::ResourceSpecCreate], &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut member3 = member2.clone();
+        member3.set_class(MemberClass::User(MemberUser::new()));
+        let res = set_permissions(&user, &existing_member, member3.clone(), vec![CompanyPermission::ResourceSpecCreate], &now2);
+        assert!(res.is_ok());
+        member3.set_class(MemberClass::Company(MemberCompany::new()));
+        let res = set_permissions(&user, &existing_member, member3.clone(), vec![CompanyPermission::ResourceSpecCreate], &now2);
+        assert!(res.is_ok());
     }
 
     #[test]
@@ -288,6 +304,14 @@ mod tests {
         user2.set_roles(vec![]);
         let res = set_compensation(&user2, &existing_member, member.clone(), compensation.clone(), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut member3 = member2.clone();
+        member3.set_class(MemberClass::User(MemberUser::new()));
+        let res = set_compensation(&user, &existing_member, member3.clone(), compensation.clone(), &now2);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
+        member3.set_class(MemberClass::Company(MemberCompany::new()));
+        let res = set_compensation(&user, &existing_member, member3.clone(), compensation.clone(), &now2);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
     }
 
     #[test]

@@ -1634,6 +1634,14 @@ mod tests {
         state3.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
         let res = event.process(state3.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
+
+        let mut state4 = state.clone();
+        state4.provider.as_mut().unwrap().set_class(MemberClass::User(MemberUser::new()));
+        let res = event.process(state4.clone(), &now);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
+        state4.provider.as_mut().unwrap().set_class(MemberClass::Company(MemberCompany::new()));
+        let res = event.process(state4.clone(), &now);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
     }
 
     #[test]
@@ -1665,6 +1673,14 @@ mod tests {
         state3.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
         let res = event.process(state3.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
+
+        let mut state4 = state.clone();
+        state4.provider.as_mut().unwrap().set_class(MemberClass::User(MemberUser::new()));
+        let res = event.process(state4.clone(), &now);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
+        state4.provider.as_mut().unwrap().set_class(MemberClass::Company(MemberCompany::new()));
+        let res = event.process(state4.clone(), &now);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
     }
 
     #[test]
@@ -1702,6 +1718,14 @@ mod tests {
         state3.input_of.as_mut().map(|x| x.set_company_id(CompanyID::new("bliv")));
         let res = event.process(state3.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
+
+        let mut state4 = state.clone();
+        state4.provider.as_mut().unwrap().set_class(MemberClass::User(MemberUser::new()));
+        let res = event.process(state4.clone(), &now);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
+        state4.provider.as_mut().unwrap().set_class(MemberClass::Company(MemberCompany::new()));
+        let res = event.process(state4.clone(), &now);
+        assert_eq!(res, Err(Error::MemberMustBeWorker));
     }
 }
 
