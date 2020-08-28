@@ -11,6 +11,7 @@ use crate::{
     models::{
         Op,
         Modifications,
+        lib::basis_model::Deletable,
         user::{User, UserID},
     },
 };
@@ -81,6 +82,9 @@ pub fn set_roles(caller: &User, mut subject: User, roles: Vec<Role>, now: &DateT
 /// Delete a user
 pub fn delete(caller: &User, mut subject: User, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::UserDelete)?;
+    if subject.is_deleted() {
+        Err(Error::ObjectIsDeleted("user".into()))?;
+    }
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
