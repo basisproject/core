@@ -199,7 +199,7 @@ mod tests {
             testutils::{deleted_company_tester, make_agreement, make_user, make_company, make_member_worker, make_resource},
             user::UserID,
         },
-        util,
+        util::{self, test},
     };
     use om2::Unit;
     use rust_decimal_macros::*;
@@ -219,7 +219,12 @@ mod tests {
             .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
             .build().unwrap();
 
-        let mods = create(&user, &member, &company_to, &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.agent_id(), company_to.agent_id(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now).unwrap().into_vec();
+        let testfn = |user, member, company| {
+            create(&user, &member, &company, &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.agent_id(), company_to.agent_id(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now)
+        };
+        test::standard_transaction_tests(user.clone(), member.clone(), company_to.clone(), testfn.clone());
+
+        let mods = testfn(user.clone(), member.clone(), company_to.clone()).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let commitment = mods[0].clone().expect_op::<Commitment>(Op::Create).unwrap();
@@ -249,20 +254,6 @@ mod tests {
         assert_eq!(commitment.created(), &now);
         assert_eq!(commitment.updated(), &now);
         assert_eq!(commitment.deleted(), &None);
-
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![CompanyPermission::ProcessDelete]);
-        let res = create(&user, &member2, &company_to, &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.agent_id(), company_to.agent_id(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = create(&user2, &member, &company_to, &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.agent_id(), company_to.agent_id(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company_to.clone(), &now, |company: Company| {
-            create(&user, &member, &company, &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.agent_id(), company_to.agent_id(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now)
-        });
 
         let mut company3 = company_to.clone();
         let mut company4 = company_to.clone();
@@ -297,7 +288,12 @@ mod tests {
         let mods = create(&user, &member, &company_to, &agreement, id.clone(), costs1.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.agent_id(), company_to.agent_id(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now).unwrap().into_vec();
         let commitment1 = mods[0].clone().expect_op::<Commitment>(Op::Create).unwrap();
         let now2 = util::time::now();
-        let mods = update(&user, &member, &company_to, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.agent_id()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2).unwrap().into_vec();
+
+        let testfn = |user, member, company| {
+            update(&user, &member, &company, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.agent_id()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2)
+        };
+        test::standard_transaction_tests(user.clone(), member.clone(), company_to.clone(), testfn.clone());
+        let mods = testfn(user.clone(), member.clone(), company_to.clone()).unwrap().into_vec();
         let commitment2 = mods[0].clone().expect_op::<Commitment>(Op::Update).unwrap();
 
         assert_eq!(commitment2.id(), commitment1.id());
@@ -327,20 +323,6 @@ mod tests {
         assert_eq!(commitment2.created(), &now);
         assert_eq!(commitment2.updated(), &now2);
         assert_eq!(commitment2.deleted(), &None);
-
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![CompanyPermission::ProcessDelete]);
-        let res = update(&user, &member2, &company_to, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.agent_id()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = update(&user2, &member, &company_to, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.agent_id()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company_to.clone(), &now2, |company: Company| {
-            update(&user, &member, &company, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.agent_id()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2)
-        });
     }
 
     #[test]
@@ -360,9 +342,15 @@ mod tests {
 
         let mods = create(&user, &member, &company_to, &agreement, id.clone(), costs1.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.agent_id(), company_to.agent_id(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now).unwrap().into_vec();
         let commitment1 = mods[0].clone().expect_op::<Commitment>(Op::Create).unwrap();
-
         let now2 = util::time::now();
-        let mods = delete(&user, &member, &company_to, commitment1.clone(), &now2).unwrap().into_vec();
+
+        let testfn = |user, member, company| {
+            delete(&user, &member, &company, commitment1.clone(), &now2)
+        };
+        test::standard_transaction_tests(user.clone(), member.clone(), company_to.clone(), testfn.clone());
+        double_deleted_tester!(commitment1, "commitment", |subject| delete(&user, &member, &company_to, subject, &now));
+
+        let mods = testfn(user.clone(), member.clone(), company_to.clone()).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let commitment2 = mods[0].clone().expect_op::<Commitment>(Op::Delete).unwrap();
@@ -393,22 +381,6 @@ mod tests {
         assert_eq!(commitment2.created(), commitment1.created());
         assert_eq!(commitment2.updated(), commitment1.updated());
         assert_eq!(commitment2.deleted(), &Some(now2.clone()));
-
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![CompanyPermission::ProcessDelete]);
-        let res = delete(&user, &member2, &company_to, commitment1.clone(), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = delete(&user2, &member, &company_to, commitment1.clone(), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company_to.clone(), &now2, |company: Company| {
-            delete(&user, &member, &company, commitment1.clone(), &now2)
-        });
-
-        double_deleted_tester!(commitment1, "commitment", |subject| delete(&user, &member, &company_to, subject, &now));
     }
 }
 
