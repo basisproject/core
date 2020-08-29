@@ -23,7 +23,7 @@ use crate::{
         member::Member,
         lib::{
             agent::{Agent, AgentID},
-            basis_model::{ActiveState, Deletable},
+            basis_model::Model,
         },
         process::ProcessID,
         resource::ResourceID,
@@ -196,7 +196,7 @@ mod tests {
             company::CompanyID,
             member::MemberID,
             occupation::OccupationID,
-            testutils::{deleted_company_tester, make_agreement, make_user, make_company, make_member_worker, make_resource},
+            testutils::{make_agreement, make_user, make_company, make_member_worker, make_resource},
             user::UserID,
         },
         util::{self, test},

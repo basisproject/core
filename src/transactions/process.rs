@@ -29,7 +29,7 @@ use crate::{
         member::Member,
         lib::{
             agent::AgentID,
-            basis_model::{ActiveState, Deletable},
+            basis_model::Model,
         },
         process::{Process, ProcessID},
         process_spec::ProcessSpecID,

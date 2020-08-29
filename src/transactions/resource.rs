@@ -22,7 +22,7 @@ use crate::{
         member::Member,
         lib::{
             agent::Agent,
-            basis_model::{ActiveState, Deletable},
+            basis_model::Model,
         },
         resource::{Resource, ResourceID},
         resource_spec::ResourceSpecID,

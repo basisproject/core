@@ -16,7 +16,7 @@ use crate::{
         Modifications,
         lib::{
             agent::AgentID,
-            basis_model::ActiveState,
+            basis_model::Model,
         },
         agreement::{Agreement, AgreementID},
         company::{Company, Permission as CompanyPermission},

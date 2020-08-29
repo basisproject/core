@@ -11,7 +11,7 @@ use crate::{
     models::{
         Op,
         Modifications,
-        lib::basis_model::Deletable,
+        lib::basis_model::Model,
         user::{User, UserID},
     },
 };

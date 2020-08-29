@@ -16,7 +16,7 @@ use crate::{
         member::{Compensation, Member, MemberID, MemberClass},
         lib::{
             agent::Agent,
-            basis_model::{ActiveState, Deletable},
+            basis_model::Model,
         },
         occupation::OccupationID,
         user::User,
@@ -125,7 +125,7 @@ mod tests {
             member::*,
             lib::{
                 agent::Agent,
-                basis_model::ActiveState,
+                basis_model::Model,
             },
             user::UserID,
             testutils::{deleted_company_tester, make_user, make_company, make_member_worker},

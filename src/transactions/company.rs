@@ -18,7 +18,7 @@ use crate::{
         Op,
         Modifications,
         company::{Company, CompanyID, Permission as CompanyPermission},
-        lib::basis_model::Deletable,
+        lib::basis_model::Model,
         member::{Member, MemberID, MemberClass, MemberWorker},
         occupation::OccupationID,
         user::User,

@@ -15,7 +15,7 @@ use crate::{
         event::{Event, EventID, EventProcessState, MoveType},
         company::{Company, Permission as CompanyPermission},
         member::Member,
-        lib::basis_model::ActiveState,
+        lib::basis_model::Model,
         process::Process,
         resource::Resource,
         user::User,

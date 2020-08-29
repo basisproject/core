@@ -17,7 +17,7 @@ use crate::{
         member::Member,
         lib::{
             agent::Agent,
-            basis_model::ActiveState,
+            basis_model::Model,
         },
         process::Process,
         user::User,

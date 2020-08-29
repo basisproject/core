@@ -20,7 +20,7 @@ use crate::{
         member::Member,
         lib::{
             agent::{Agent, AgentID},
-            basis_model::{ActiveState, Deletable},
+            basis_model::Model,
         },
         intent::{Intent, IntentID},
         resource::ResourceID,

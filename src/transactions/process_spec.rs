@@ -18,7 +18,7 @@ use crate::{
         Modifications,
         company::{Company, Permission as CompanyPermission},
         member::Member,
-        lib::basis_model::{ActiveState, Deletable},
+        lib::basis_model::Model,
         process_spec::{ProcessSpec, ProcessSpecID},
         user::User,
     },

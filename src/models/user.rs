@@ -10,7 +10,7 @@ use crate::{
     models::{
         lib::{
             agent::{Agent, AgentID},
-            basis_model::ActiveState,
+            basis_model::Model,
         },
     },
     error::{Error, Result},

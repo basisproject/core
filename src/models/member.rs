@@ -28,7 +28,7 @@ use crate::{
         company::{CompanyID, Permission},
         lib::{
             agent::{Agent, AgentID},
-            basis_model::ActiveState,
+            basis_model::Model,
         },
         occupation::OccupationID,
         user::UserID,
