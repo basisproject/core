@@ -5,9 +5,16 @@ pub trait ModelID: Into<String> + From<String> + Clone + PartialEq + Eq + std::h
 pub trait Model {
     /// Checks whether or not this model has been deleted.
     fn is_deleted(&self) -> bool;
+
     /// Determine if this model is active. This checks both the `active` and
     /// `deleted` fields for the model.
     fn is_active(&self) -> bool;
+
+    /// Set the model's deleted value
+    fn set_deleted(&mut self, deleted: Option<chrono::DateTime<chrono::Utc>>);
+
+    /// Set the model's active value
+    fn set_active(&mut self, active: bool);
 }
 
 macro_rules! basis_model {
@@ -111,6 +118,14 @@ macro_rules! basis_model {
 
                 fn is_active(&self) -> bool {
                     self.active && !self.is_deleted()
+                }
+
+                fn set_deleted(&mut self, deleted: Option<chrono::DateTime<chrono::Utc>>) {
+                    $model::set_deleted(self, deleted);
+                }
+
+                fn set_active(&mut self, active: bool) {
+                    $model::set_active(self, active);
                 }
             }
 
