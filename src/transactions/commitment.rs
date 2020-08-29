@@ -219,12 +219,12 @@ mod tests {
             .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
             .build().unwrap();
 
-        let testfn = |user, member, company| {
+        let testfn = |user, member, company, _: Option<Commitment>| {
             create(&user, &member, &company, &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(loc.clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.agent_id(), company_to.agent_id(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now)
         };
-        test::standard_transaction_tests(user.clone(), member.clone(), company_to.clone(), testfn.clone());
+        test::standard_transaction_tests(user.clone(), member.clone(), company_to.clone(), None, testfn.clone());
 
-        let mods = testfn(user.clone(), member.clone(), company_to.clone()).unwrap().into_vec();
+        let mods = testfn(user.clone(), member.clone(), company_to.clone(), None).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let commitment = mods[0].clone().expect_op::<Commitment>(Op::Create).unwrap();
@@ -289,11 +289,11 @@ mod tests {
         let commitment1 = mods[0].clone().expect_op::<Commitment>(Op::Create).unwrap();
         let now2 = util::time::now();
 
-        let testfn = |user, member, company| {
+        let testfn = |user, member, company, _: Option<Commitment>| {
             update(&user, &member, &company, commitment1.clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.agent_id()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2)
         };
-        test::standard_transaction_tests(user.clone(), member.clone(), company_to.clone(), testfn.clone());
-        let mods = testfn(user.clone(), member.clone(), company_to.clone()).unwrap().into_vec();
+        test::standard_transaction_tests(user.clone(), member.clone(), company_to.clone(), None, testfn.clone());
+        let mods = testfn(user.clone(), member.clone(), company_to.clone(), None).unwrap().into_vec();
         let commitment2 = mods[0].clone().expect_op::<Commitment>(Op::Update).unwrap();
 
         assert_eq!(commitment2.id(), commitment1.id());
@@ -344,13 +344,13 @@ mod tests {
         let commitment1 = mods[0].clone().expect_op::<Commitment>(Op::Create).unwrap();
         let now2 = util::time::now();
 
-        let testfn = |user, member, company| {
-            delete(&user, &member, &company, commitment1.clone(), &now2)
+        let testfn = |user, member, company, subject: Option<Commitment>| {
+            delete(&user, &member, &company, subject.unwrap_or(commitment1.clone()), &now2)
         };
-        test::standard_transaction_tests(user.clone(), member.clone(), company_to.clone(), testfn.clone());
-        double_deleted_tester!(commitment1, "commitment", |subject| delete(&user, &member, &company_to, subject, &now));
+        test::standard_transaction_tests(user.clone(), member.clone(), company_to.clone(), None, testfn.clone());
+        test::double_deleted_tester(user.clone(), member.clone(), company_to.clone(), commitment1.clone(), "commitment", testfn.clone());
 
-        let mods = testfn(user.clone(), member.clone(), company_to.clone()).unwrap().into_vec();
+        let mods = testfn(user.clone(), member.clone(), company_to.clone(), None).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let commitment2 = mods[0].clone().expect_op::<Commitment>(Op::Delete).unwrap();

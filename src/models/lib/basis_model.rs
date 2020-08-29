@@ -2,7 +2,7 @@
 pub trait ModelID: Into<String> + From<String> + Clone + PartialEq + Eq + std::hash::Hash {}
 
 /// A trait that all models implement which handles common functionality
-pub trait Model {
+pub trait Model: Clone + PartialEq {
     /// Checks whether or not this model has been deleted.
     fn is_deleted(&self) -> bool;
 
