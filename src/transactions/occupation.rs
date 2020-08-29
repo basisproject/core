@@ -12,6 +12,7 @@ use crate::{
     models::{
         Op,
         Modifications,
+        lib::basis_model::Deletable,
         occupation::{Occupation, OccupationID},
         user::User,
     },
@@ -57,6 +58,9 @@ pub fn update(caller: &User, mut subject: Occupation, label: Option<String>, not
 /// Delete an `Occupation`
 pub fn delete(caller: &User, mut subject: Occupation, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::OccupationDelete)?;
+    if subject.is_deleted() {
+        Err(Error::ObjectIsDeleted("occupation".into()))?;
+    }
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
@@ -136,9 +140,14 @@ mod tests {
         let subject2 = mods[0].clone().expect_op::<Occupation>(Op::Delete).unwrap();
         assert_eq!(subject2.id(), &id);
 
-        let user = make_user(&UserID::create(), None, &now);
-        let res = delete(&user, subject2, &now);
+        let user2 = make_user(&UserID::create(), None, &now);
+        let res = delete(&user2, subject2, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut subject3 = subject.clone();
+        subject3.set_deleted(Some(now.clone()));
+        let res = delete(&user, subject3.clone(), &now);
+        assert_eq!(res, Err(Error::ObjectIsDeleted("occupation".into())));
     }
 }
 

@@ -349,6 +349,11 @@ mod tests {
         user2.set_roles(vec![]);
         let res = delete(&user2, &existing_member, member.clone(), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut member3 = member.clone();
+        member3.set_deleted(Some(now2.clone()));
+        let res = delete(&user, &existing_member, member3.clone(), &now2);
+        assert_eq!(res, Err(Error::ObjectIsDeleted("member".into())));
     }
 }
 

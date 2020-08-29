@@ -407,6 +407,11 @@ mod tests {
         deleted_company_tester(company_to.clone(), &now2, |company: Company| {
             delete(&user, &member, &company, commitment1.clone(), &now2)
         });
+
+        let mut commitment3 = commitment1.clone();
+        commitment3.set_deleted(Some(now2.clone()));
+        let res = delete(&user, &member, &company_to, commitment3.clone(), &now2);
+        assert_eq!(res, Err(Error::ObjectIsDeleted("commitment".into())));
     }
 }
 

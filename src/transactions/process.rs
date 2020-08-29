@@ -269,6 +269,11 @@ mod tests {
         deleted_company_tester(company.clone(), &now2, |company: Company| {
             delete(&user, &member, &company, process.clone(), &now2)
         });
+
+        let mut process3 = process.clone();
+        process3.set_deleted(Some(now2.clone()));
+        let res = delete(&user, &member, &company, process3.clone(), &now2);
+        assert_eq!(res, Err(Error::ObjectIsDeleted("process".into())));
     }
 }
 
