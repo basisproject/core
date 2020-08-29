@@ -140,9 +140,14 @@ mod tests {
         let subject2 = mods[0].clone().expect_op::<Occupation>(Op::Delete).unwrap();
         assert_eq!(subject2.id(), &id);
 
-        let user = make_user(&UserID::create(), None, &now);
-        let res = delete(&user, subject2, &now);
+        let user2 = make_user(&UserID::create(), None, &now);
+        let res = delete(&user2, subject2, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut subject3 = subject.clone();
+        subject3.set_deleted(Some(now.clone()));
+        let res = delete(&user, subject3.clone(), &now);
+        assert_eq!(res, Err(Error::ObjectIsDeleted("occupation".into())));
     }
 }
 

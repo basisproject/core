@@ -197,7 +197,7 @@ mod tests {
         let id = UserID::create();
         let now = util::time::now();
         let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
-        let mods = delete(&user.clone(), user, &now).unwrap().into_vec();
+        let mods = delete(&user, user.clone(), &now).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let deleted = mods[0].clone().expect_op::<User>(Op::Delete).unwrap();
@@ -205,6 +205,11 @@ mod tests {
 
         let res = delete(&deleted.clone(), deleted, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut user3 = user.clone();
+        user3.set_deleted(Some(now.clone()));
+        let res = delete(&user, user3.clone(), &now);
+        assert_eq!(res, Err(Error::ObjectIsDeleted("user".into())));
     }
 }
 

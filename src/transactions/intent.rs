@@ -403,6 +403,11 @@ mod tests {
         deleted_company_tester(company.clone(), &now2, |company: Company| {
             delete(&user, &member, &company, intent1.clone(), &now2)
         });
+
+        let mut intent3 = intent1.clone();
+        intent3.set_deleted(Some(now2.clone()));
+        let res = delete(&user, &member, &company, intent3.clone(), &now2);
+        assert_eq!(res, Err(Error::ObjectIsDeleted("intent".into())));
     }
 }
 

@@ -18,6 +18,7 @@ use crate::{
         Op,
         Modifications,
         company::{Company, CompanyID, Permission as CompanyPermission},
+        lib::basis_model::Deletable,
         member::{Member, MemberID, MemberClass, MemberWorker},
         occupation::OccupationID,
         user::User,
@@ -86,6 +87,9 @@ pub fn update(caller: &User, member: Option<&Member>, mut subject: Company, name
 pub fn delete(caller: &User, member: Option<&Member>, mut subject: Company, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyAdminDelete)
         .or_else(|_| member.ok_or(Error::InsufficientPrivileges)?.access_check(caller.id(), subject.id(), CompanyPermission::CompanyDelete))?;
+    if subject.is_deleted() {
+        Err(Error::ObjectIsDeleted("company".into()))?;
+    }
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
@@ -190,10 +194,15 @@ mod tests {
         let res = delete(&user, None, company.clone(), &now2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let user = make_user(&UserID::create(), None, &now);
+        let user2 = make_user(&UserID::create(), None, &now);
         let now3 = util::time::now();
-        let res = delete(&user, Some(&founder), company.clone(), &now3);
+        let res = delete(&user2, Some(&founder), company.clone(), &now3);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut company3 = company.clone();
+        company3.set_deleted(Some(now2.clone()));
+        let res = delete(&user, Some(&founder), company3.clone(), &now2);
+        assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
     }
 }
 
