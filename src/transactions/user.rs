@@ -206,10 +206,7 @@ mod tests {
         let res = delete(&deleted.clone(), deleted, &now);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut user3 = user.clone();
-        user3.set_deleted(Some(now.clone()));
-        let res = delete(&user, user3.clone(), &now);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("user".into())));
+        double_deleted_tester!(user, "user", |subject| delete(&user, subject, &now));
     }
 }
 

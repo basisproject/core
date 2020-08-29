@@ -209,10 +209,7 @@ mod tests {
             delete(&user, &member, &company, procspec.clone(), &now2)
         });
 
-        let mut procspec3 = procspec.clone();
-        procspec3.set_deleted(Some(now2.clone()));
-        let res = delete(&user, &member, &company, procspec3.clone(), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("process_spec".into())));
+        double_deleted_tester!(procspec, "process_spec", |subject| delete(&user, &member, &company, subject, &now2));
     }
 }
 

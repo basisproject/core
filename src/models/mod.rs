@@ -225,6 +225,7 @@ mod tests {
     }
 }
 
+#[macro_use]
 #[cfg(test)]
 pub(crate) mod testutils {
     //! Some model-making utilities to make unit testing easier. The full
@@ -396,6 +397,15 @@ pub(crate) mod testutils {
         company4.set_active(false);
         let res = testfn(company4);
         assert_eq!(res, Err(Error::ObjectIsInactive("company".into())));
+    }
+
+    macro_rules! double_deleted_tester {
+        ($model:ident, $ty:expr, $deletefn:expr) => {
+            let mut model2 = $model.clone();
+            model2.set_deleted(Some(crate::util::time::now()));
+            let res: crate::error::Result<crate::models::Modifications> = $deletefn(model2);
+            assert_eq!(res, Err(crate::error::Error::ObjectIsDeleted($ty.into())));
+        }
     }
 }
 

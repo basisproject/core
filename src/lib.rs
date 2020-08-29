@@ -39,6 +39,7 @@ pub mod error;
 mod util;
 #[macro_use]
 pub mod access;
+#[macro_use]
 pub mod models;
 pub mod costs;
 pub mod transactions;

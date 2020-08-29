@@ -233,10 +233,7 @@ mod tests {
             delete(&user, &member, &company, recspec.clone(), &now2)
         });
 
-        let mut recspec3 = recspec.clone();
-        recspec3.set_deleted(Some(now2.clone()));
-        let res = delete(&user, &member, &company, recspec3.clone(), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("resource_spec".into())));
+        double_deleted_tester!(recspec, "resource_spec", |subject| delete(&user, &member, &company, subject, &now2));
     }
 }
 

@@ -270,10 +270,7 @@ mod tests {
             delete(&user, &member, &company, process.clone(), &now2)
         });
 
-        let mut process3 = process.clone();
-        process3.set_deleted(Some(now2.clone()));
-        let res = delete(&user, &member, &company, process3.clone(), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("process".into())));
+        double_deleted_tester!(process, "process", |subject| delete(&user, &member, &company, subject, &now2));
     }
 }
 

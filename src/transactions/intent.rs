@@ -404,10 +404,7 @@ mod tests {
             delete(&user, &member, &company, intent1.clone(), &now2)
         });
 
-        let mut intent3 = intent1.clone();
-        intent3.set_deleted(Some(now2.clone()));
-        let res = delete(&user, &member, &company, intent3.clone(), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("intent".into())));
+        double_deleted_tester!(intent1, "intent", |subject| delete(&user, &member, &company, subject, &now2));
     }
 }
 
