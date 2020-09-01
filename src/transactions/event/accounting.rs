@@ -248,7 +248,7 @@ mod tests {
             testutils::{deleted_company_tester, make_user, make_company, make_member_worker, make_process, make_resource},
             user::UserID,
         },
-        util,
+        util::{self, test},
     };
     use om2::Unit;
     use rust_decimal_macros::*;
@@ -260,15 +260,15 @@ mod tests {
         let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("machinist");
-        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![], &now);
+        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![CompanyPermission::Lower], &now);
         let resource = make_resource(&ResourceID::new("widget"), company.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
 
-        let res = lower(&user, &member, &company, id.clone(), resource.clone(), 8, Some("my note".into()), &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
+        let testfn = |user, member, company, _: Option<Event>| {
+            lower(&user, &member, &company, id.clone(), resource.clone(), 8, Some("a note".into()), &now)
+        };
+        test::standard_transaction_tests(user.clone(), member.clone(), company.clone(), None, testfn.clone());
 
-        let mut member = member.clone();
-        member.set_permissions(vec![CompanyPermission::Lower]);
-        let mods = lower(&user, &member, &company, id.clone(), resource.clone(), 8, Some("a note".into()), &now).unwrap().into_vec();
+        let mods = testfn(user.clone(), member.clone(), company.clone(), None).unwrap().into_vec();
         assert_eq!(mods.len(), 2);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         let resource2 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
@@ -291,19 +291,6 @@ mod tests {
         assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(7), Unit::One)));
         assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(7), Unit::One)));
         assert_eq!(resource2.costs(), resource.costs());
-
-        let user2 = make_user(&UserID::create(), Some(vec![]), &now);
-        let res = lower(&user2, &member, &company, id.clone(), resource.clone(), 8, Some("a note".into()), &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![]);
-        let res = lower(&user, &member2, &company, id.clone(), resource.clone(), 8, Some("a note".into()), &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now, |company: Company| {
-            lower(&user, &member, &company, id.clone(), resource.clone(), 8, Some("a note".into()), &now)
-        });
 
         // a company that doesn't own a resource can't lower it
         let mut resource3 = resource.clone();
