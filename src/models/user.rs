@@ -66,9 +66,8 @@ mod tests {
         access::{Permission, Role},
         models::{
             user::UserID,
-            testutils::make_user,
         },
-        util,
+        util::{self, test::*},
     };
 
     #[test]

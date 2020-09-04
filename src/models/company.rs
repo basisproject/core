@@ -201,9 +201,8 @@ mod tests {
         models::{
             process::ProcessID,
             resource::ResourceID,
-            testutils::{make_company, make_process, make_resource},
         },
-        util,
+        util::{self, test::*},
     };
     use om2::{Measure, Unit};
     use rust_decimal_macros::*;

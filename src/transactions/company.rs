@@ -70,6 +70,9 @@ pub fn create<T: Into<String>>(caller: &User, id: CompanyID, company_name: T, co
 pub fn update(caller: &User, member: Option<&Member>, mut subject: Company, name: Option<String>, email: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyAdminUpdate)
         .or_else(|_| member.ok_or(Error::InsufficientPrivileges)?.access_check(caller.id(), subject.id(), CompanyPermission::CompanyUpdate))?;
+    if subject.is_deleted() {
+        Err(Error::ObjectIsInactive("company".into()))?;
+    }
     if let Some(name) = name {
         subject.inner_mut().set_name(name);
     }
@@ -98,28 +101,31 @@ pub fn delete(caller: &User, member: Option<&Member>, mut subject: Company, now:
 mod tests {
     use super::*;
     use crate::{
-        access::Role,
         models::{
             Op,
             lib::agent::Agent,
             user::UserID,
-            testutils::make_user,
         },
-        util,
+        util::{self, test::{self, *}},
     };
 
     #[test]
     fn can_create() {
         let id = CompanyID::create();
-        let founder_id = MemberID::create();
-        let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
         let now = util::time::now();
-        let user = make_user(&UserID::create(), Some(vec![Role::User]), &now);
-        // just makin' some widgets, huh? that's cool. hey, I made a widget once,
-        // it was actually pretty fun. hey if you're free later maybe we could
-        // make some widgets togethe...oh, you're busy? oh ok, that's cool, no
-        // problem. hey, maybe next time.
-        let mods = create(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
+        let state = TestState::standard(vec![], &now);
+        let founder_id = state.member().id().clone();
+        let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
+
+        let testfn = |state: &TestState<Company, Company>| {
+            // just makin' some widgets, huh? that's cool. hey, I made a widget once,
+            // it was actually pretty fun. hey if you're free later maybe we could
+            // make some widgets togethe...oh, you're busy? oh ok, that's cool, no
+            // problem. hey, maybe next time.
+            create(state.user(), id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now)
+        };
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 2);
 
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
@@ -131,7 +137,7 @@ mod tests {
         assert_eq!(company.created(), &now);
         assert_eq!(company.updated(), &now);
         assert_eq!(founder.id(), &founder_id);
-        assert_eq!(founder.inner().subject(), &user.agent_id());
+        assert_eq!(founder.inner().subject(), &state.user().agent_id());
         assert_eq!(founder.inner().object(), &id.clone().into());
         assert_eq!(founder.occupation_id(), Some(&occupation_id));
         assert_eq!(founder.permissions(), &vec![CompanyPermission::All]);
@@ -143,63 +149,94 @@ mod tests {
     #[test]
     fn can_update() {
         let id = CompanyID::create();
-        let founder_id = MemberID::create();
-        let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
         let now = util::time::now();
-        let mut user = make_user(&UserID::create(), Some(vec![Role::User]), &now);
-        let mods = create(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
+        let mut state = TestState::standard(vec![], &now);
+        let founder_id = state.member().id().clone();
+        let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
+
+        let mods = create(state.user(), id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
         let founder = mods[1].clone().expect_op::<Member>(Op::Create).unwrap();
+        state.member = Some(founder);
+        state.company = Some(company);
 
-        user.set_roles(vec![Role::User]);
         let now2 = util::time::now();
-        let mods = update(&user, Some(&founder), company.clone(), Some("Cool Widgets Ltd".into()), None, Some(false), &now2).unwrap().into_vec();
+        let testfn_inner = |state: &TestState<Company, Company>, member: Option<&Member>| {
+            update(state.user(), member, state.company().clone(), Some("Cool Widgets Ltd".into()), None, Some(false), &now2)
+        };
+        let testfn = |state: &TestState<Company, Company>| {
+            testfn_inner(state, Some(state.member()))
+        };
+        test::permissions_checks(&state, &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
+
         let company2 = mods[0].clone().expect_op::<Company>(Op::Update).unwrap();
-        assert_eq!(company2.id(), company.id());
+        assert_eq!(company2.id(), state.company().id());
         assert_eq!(company2.inner().name(), "Cool Widgets Ltd");
         assert_eq!(company2.email(), "jerry@widgets.expert");
         assert_eq!(company2.active(), &false);
         assert_eq!(company2.created(), &now);
         assert_eq!(company2.updated(), &now2);
 
-        let res = update(&user, None, company.clone(), Some("Cool Widgets Ltd".into()), None, Some(false), &now2);
+        let res = testfn_inner(&state, None);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let user = make_user(&UserID::create(), None, &now);
-        let res = update(&user, Some(&founder), company.clone(), Some("Cool Widgets Ltd".into()), None, Some(false), &now2);
+        let mut state2 = state.clone();
+        state2.user_mut().set_id(UserID::create());
+        let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
     #[test]
     fn can_delete() {
         let id = CompanyID::create();
-        let founder_id = MemberID::create();
-        let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
         let now = util::time::now();
-        let mut user = make_user(&UserID::create(), Some(vec![Role::User]), &now);
-        let mods = create(&user, id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
+        let mut state = TestState::standard(vec![], &now);
+        let founder_id = state.member().id().clone();
+        let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
+
+        let mods = create(state.user(), id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
         let founder = mods[1].clone().expect_op::<Member>(Op::Create).unwrap();
+        state.company = Some(company);
+        state.member = Some(founder);
 
-        user.set_roles(vec![Role::User]);
         let now2 = util::time::now();
-        let mods = delete(&user, Some(&founder), company.clone(), &now2).unwrap().into_vec();
+        let testfn_inner = |state: &TestState<Company, Company>, member: Option<&Member>| {
+            // note we prefer the model here, and fallback onto the company. the
+            // reason is that we want to use the company for our tests until we
+            // get to the double-delete test, which operates on the model itself
+            // (which is a general assumption but generally works well).
+            delete(state.user(), member, state.model.clone().unwrap_or(state.company().clone()), &now2)
+        };
+        let testfn = |state: &TestState<Company, Company>| {
+            testfn_inner(&state, Some(state.member()))
+        };
+        test::permissions_checks(&state, &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
         let company2 = mods[0].clone().expect_op::<Company>(Op::Delete).unwrap();
         assert_eq!(company2.created(), &now);
         assert_eq!(company2.updated(), &now);
         assert_eq!(company2.deleted(), &Some(now2));
 
-        let res = delete(&user, None, company.clone(), &now2);
+        let res = testfn_inner(&state, None);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let user2 = make_user(&UserID::create(), None, &now);
-        let now3 = util::time::now();
-        let res = delete(&user2, Some(&founder), company.clone(), &now3);
+        let mut state2 = state.clone();
+        state2.user_mut().set_id(UserID::create());
+        let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        double_deleted_tester!(company, "company", |subject| delete(&user, Some(&founder), subject, &now2));
+        // set the model inot the state, which makes testfn use the model
+        // instead of the company for the `subject` param, making our test
+        // actually mean something.
+        let mut state2 = state.clone();
+        state2.model = Some(state.company().clone());
+        test::double_deleted_tester(&state2, "company", &testfn);
     }
 }
 

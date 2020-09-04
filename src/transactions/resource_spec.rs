@@ -104,25 +104,23 @@ mod tests {
     use super::*;
     use crate::{
         models::{
-            company::CompanyID,
-            member::MemberID,
-            occupation::OccupationID,
             resource_spec::{ResourceSpec, ResourceSpecID},
-            testutils::{deleted_company_tester, make_user, make_company, make_member_worker},
-            user::UserID,
         },
-        util,
+        util::{self, test::{self, *}},
     };
 
     #[test]
     fn can_create() {
         let now = util::time::now();
         let id = ResourceSpecID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
+        let state = TestState::standard(vec![CompanyPermission::ResourceSpecCreate], &now);
 
-        let mods = create(&user, &member, &company, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now).unwrap().into_vec();
+        let testfn = |state: &TestState<ResourceSpec, ResourceSpec>| {
+            create(state.user(), state.member(), state.company(), id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let recspec = mods[0].clone().expect_op::<ResourceSpec>(Op::Create).unwrap();
@@ -132,43 +130,29 @@ mod tests {
         assert_eq!(recspec.inner().name(), "Beans");
         assert_eq!(recspec.inner().note(), &Some("yummy".into()));
         assert_eq!(recspec.inner().resource_classified_as(), &vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()]);
-        assert_eq!(recspec.company_id(), company.id());
+        assert_eq!(recspec.company_id(), state.company().id());
         assert_eq!(recspec.active(), &true);
         assert_eq!(recspec.created(), &now);
         assert_eq!(recspec.updated(), &now);
         assert_eq!(recspec.deleted(), &None);
-
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![CompanyPermission::ResourceSpecDelete]);
-        let res = create(&user, &member2, &company, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = create(&user2, &member, &company, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now, |company: Company| {
-            create(&user, &member, &company, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now)
-        });
     }
 
     #[test]
     fn can_update() {
         let now = util::time::now();
         let id = ResourceSpecID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
-        let mods = create(&user, &member, &company, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now).unwrap().into_vec();
+        let mut state = TestState::standard(vec![CompanyPermission::ResourceSpecCreate, CompanyPermission::ResourceSpecUpdate], &now);
+        let mods = create(state.user(), state.member(), state.company(), id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now).unwrap().into_vec();
         let recspec = mods[0].clone().expect_op::<ResourceSpec>(Op::Create).unwrap();
+        state.model = Some(recspec);
 
-        let res = update(&user, &member, &company, recspec.clone(), Some("best widget".into()), None, None, Some(Unit::WattHour), None, Some(false), &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        member.set_permissions(vec![CompanyPermission::ResourceSpecUpdate]);
         let now2 = util::time::now();
-        let mods = update(&user, &member, &company, recspec.clone(), Some("best widget".into()), None, None, Some(Unit::WattHour), None, Some(false), &now2).unwrap().into_vec();
+        let testfn = |state: &TestState<ResourceSpec, ResourceSpec>| {
+            update(state.user(), state.member(), state.company(), state.model().clone(), Some("best widget".into()), None, None, Some(Unit::WattHour), None, Some(false), &now2)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let recspec2 = mods[0].clone().expect_op::<ResourceSpec>(Op::Update).unwrap();
@@ -178,38 +162,30 @@ mod tests {
         assert_eq!(recspec2.inner().name(), "best widget");
         assert_eq!(recspec2.inner().note(), &Some("yummy".into()));
         assert_eq!(recspec2.inner().resource_classified_as(), &vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()]);
-        assert_eq!(recspec2.company_id(), company.id());
+        assert_eq!(recspec2.company_id(), state.company().id());
         assert_eq!(recspec2.active(), &false);
         assert_eq!(recspec2.created(), &now);
         assert_eq!(recspec2.updated(), &now2);
         assert_eq!(recspec2.deleted(), &None);
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = update(&user2, &member, &company, recspec.clone(), Some("best widget".into()), None, None, Some(Unit::WattHour), None, Some(false), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now2, |company: Company| {
-            update(&user, &member, &company, recspec.clone(), Some("best widget".into()), None, None, Some(Unit::WattHour), None, Some(false), &now2)
-        });
     }
 
     #[test]
     fn can_delete() {
         let now = util::time::now();
         let id = ResourceSpecID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ResourceSpecCreate], &now);
-        let mods = create(&user, &member, &company, id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now).unwrap().into_vec();
+        let mut state = TestState::standard(vec![CompanyPermission::ResourceSpecCreate, CompanyPermission::ResourceSpecDelete], &now);
+        let mods = create(state.user(), state.member(), state.company(), id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now).unwrap().into_vec();
         let recspec = mods[0].clone().expect_op::<ResourceSpec>(Op::Create).unwrap();
+        state.model = Some(recspec);
 
         let now2 = util::time::now();
-        let res = delete(&user, &member, &company, recspec.clone(), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
+        let testfn = |state: &TestState<ResourceSpec, ResourceSpec>| {
+            delete(state.user(), state.member(), state.company(), state.model().clone(), &now2)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+        test::double_deleted_tester(&state, "resource_spec", &testfn);
 
-        member.set_permissions(vec![CompanyPermission::ResourceSpecDelete]);
-        let mods = delete(&user, &member, &company, recspec.clone(), &now2).unwrap().into_vec();
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let recspec2 = mods[0].clone().expect_op::<ResourceSpec>(Op::Delete).unwrap();
@@ -218,22 +194,11 @@ mod tests {
         assert_eq!(recspec2.inner().default_unit_of_resource(), &Some(Unit::Kilogram));
         assert_eq!(recspec2.inner().name(), "Beans");
         assert_eq!(recspec2.inner().resource_classified_as(), &vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()]);
-        assert_eq!(recspec2.company_id(), company.id());
+        assert_eq!(recspec2.company_id(), state.company().id());
         assert_eq!(recspec2.active(), &true);
         assert_eq!(recspec2.created(), &now);
         assert_eq!(recspec2.updated(), &now);
         assert_eq!(recspec2.deleted(), &Some(now2.clone()));
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = delete(&user2, &member, &company, recspec.clone(), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now2, |company: Company| {
-            delete(&user, &member, &company, recspec.clone(), &now2)
-        });
-
-        double_deleted_tester!(recspec, "resource_spec", |subject| delete(&user, &member, &company, subject, &now2));
     }
 }
 

@@ -74,30 +74,33 @@ mod tests {
             Op,
 
             occupation::Occupation,
-            user::UserID,
-            testutils::make_user,
         },
-        util,
+        util::{self, test::{self, *}},
     };
 
     #[test]
     fn can_create() {
         let id = OccupationID::create();
         let now = util::time::now();
-        let user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
-        let mods = create(&user, id.clone(), "machinist", "builds things", true, &now).unwrap().into_vec();
+        let mut state = TestState::standard(vec![], &now);
+        state.user_mut().set_roles(vec![Role::SuperAdmin]);
+
+        let testfn = |state: &TestState<Occupation, Occupation>| {
+            create(state.user(), id.clone(), "machinist", "builds things", true, &now)
+        };
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
-        let model = mods[0].clone().expect_op::<Occupation>(Op::Create).unwrap();
-        assert_eq!(model.id(), &id);
-        assert_eq!(model.inner().role_label(), "machinist");
-        assert_eq!(model.inner().note(), &Some("builds things".into()));
+        let occupation = mods[0].clone().expect_op::<Occupation>(Op::Create).unwrap();
+        assert_eq!(occupation.id(), &id);
+        assert_eq!(occupation.inner().role_label(), "machinist");
+        assert_eq!(occupation.inner().note(), &Some("builds things".into()));
+        assert_eq!(occupation.active(), &true);
 
-        let id = OccupationID::create();
-        let now = util::time::now();
-        let user = make_user(&UserID::create(), Some(vec![Role::User]), &now);
-
-        let res = create(&user, id.clone(), "dog psychic", "i sense that you are angry.", true, &now);
+        let mut state2 = state.clone();
+        state2.user_mut().set_roles(vec![Role::User]);
+        let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
@@ -105,25 +108,30 @@ mod tests {
     fn can_update() {
         let id = OccupationID::create();
         let now = util::time::now();
-        let user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
-        let mods = create(&user, id.clone(), "bone spurs in chief", "glorious leader", true, &now).unwrap().into_vec();
+        let mut state = TestState::standard(vec![], &now);
+        state.user_mut().set_roles(vec![Role::SuperAdmin]);
 
-        let subject = mods[0].clone().expect_op::<Occupation>(Op::Create).unwrap();
-        assert_eq!(subject.inner().role_label(), "bone spurs in chief");
-        assert_eq!(subject.active(), &true);
+        let mods = create(state.user(), id.clone(), "bone spurs in chief", "glorious leader", true, &now).unwrap().into_vec();
+        let occupation = mods[0].clone().expect_op::<Occupation>(Op::Create).unwrap();
+        state.model = Some(occupation);
 
         let now2 = util::time::now();
-        // not truly an update but ok
-        let mods = update(&user, subject.clone(), Some("coward".into()), None, None, &now2).unwrap().into_vec();
-        let subject2 = mods[0].clone().expect_op::<Occupation>(Op::Update).unwrap();
-        assert_eq!(subject.created(), subject2.created());
-        assert_eq!(subject2.created(), &now);
-        assert_eq!(subject2.updated(), &now2);
-        assert_eq!(subject2.inner().role_label(), "coward");
-        assert_eq!(subject2.inner().note(), &Some("glorious leader".into()));
+        let testfn = |state: &TestState<Occupation, Occupation>| {
+            update(state.user(), state.model().clone(), Some("coward".into()), None, None, &now2)
+        };
 
-        let user = make_user(&UserID::create(), None, &now);
-        let res = update(&user, subject.clone(), Some("the best president the best president the best president president unpresidented FALSE ACQUISITIONS".into()), None, None, &now2);
+        // not truly an update but ok
+        let mods = testfn(&state).unwrap().into_vec();
+        let occupation2 = mods[0].clone().expect_op::<Occupation>(Op::Update).unwrap();
+        assert_eq!(state.model().created(), occupation2.created());
+        assert_eq!(occupation2.created(), &now);
+        assert_eq!(occupation2.updated(), &now2);
+        assert_eq!(occupation2.inner().role_label(), "coward");
+        assert_eq!(occupation2.inner().note(), &Some("glorious leader".into()));
+
+        let mut state2 = state.clone();
+        state2.user_mut().set_roles(vec![Role::User]);
+        let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
@@ -131,20 +139,30 @@ mod tests {
     fn can_delete() {
         let id = OccupationID::create();
         let now = util::time::now();
-        let user = make_user(&UserID::create(), Some(vec![Role::SuperAdmin]), &now);
-        let mods = create(&user, id.clone(), "the best president", "false acquisitions", true, &now).unwrap().into_vec();
-        let subject = mods[0].clone().expect_op::<Occupation>(Op::Create).unwrap();
-        let mods = delete(&user, subject.clone(), &now).unwrap().into_vec();
+        let mut state = TestState::standard(vec![], &now);
+        state.user_mut().set_roles(vec![Role::SuperAdmin]);
+
+        let mods = create(state.user(), id.clone(), "the best president", "false acquisitions", true, &now).unwrap().into_vec();
+        let occupation = mods[0].clone().expect_op::<Occupation>(Op::Create).unwrap();
+        state.model = Some(occupation);
+
+        let now2 = util::time::now();
+        let testfn = |state: &TestState<Occupation, Occupation>| {
+            delete(state.user(), state.model().clone(), &now2)
+        };
+        test::double_deleted_tester(&state, "occupation", &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
+        let occupation2 = mods[0].clone().expect_op::<Occupation>(Op::Delete).unwrap();
+        assert_eq!(occupation2.id(), &id);
+        assert_eq!(occupation2.created(), &now);
+        assert_eq!(occupation2.deleted(), &Some(now2));
 
-        let subject2 = mods[0].clone().expect_op::<Occupation>(Op::Delete).unwrap();
-        assert_eq!(subject2.id(), &id);
-
-        let user2 = make_user(&UserID::create(), None, &now);
-        let res = delete(&user2, subject2, &now);
+        let mut state2 = state.clone();
+        state2.user_mut().set_roles(vec![Role::User]);
+        let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        double_deleted_tester!(subject, "occupation", |subject| delete(&user, subject, &now));
     }
 }
 

@@ -90,30 +90,24 @@ mod tests {
         models::{
             lib::agent::Agent,
             company::CompanyID,
-            member::MemberID,
-            occupation::OccupationID,
-            testutils::{make_user, make_company, make_member_worker},
-            user::UserID,
         },
-        util::{self, test},
+        util::{self, test::{self, *}},
     };
 
     #[test]
     fn can_create() {
         let now = util::time::now();
         let id = AgreementID::create();
-        let company_to = make_company(&CompanyID::create(), "sam's widgets", &now);
+        let state = TestState::standard(vec![CompanyPermission::AgreementCreate], &now);
         let company_from = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&MemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate], &now);
-        let participants = vec![company_to.agent_id(), company_from.agent_id()];
+        let participants = vec![state.company().agent_id(), company_from.agent_id()];
 
-        let testfn = |user, member, company, _: Option<Agreement>| {
-            create(&user, &member, &company, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now)
+        let testfn = |state: &TestState<Agreement, Agreement>| {
+            create(state.user(), state.member(), state.company(), id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now)
         };
-        test::standard_transaction_tests(user.clone(), member.clone(), company_to.clone(), None, testfn.clone());
+        test::standard_transaction_tests(&state, &testfn);
 
-        let mods = testfn(user.clone(), member.clone(), company_to.clone(), None).unwrap().into_vec();
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let agreement = mods[0].clone().expect_op::<Agreement>(Op::Create).unwrap();
@@ -132,22 +126,20 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = AgreementID::create();
-        let company_to = make_company(&CompanyID::create(), "sam's widgets", &now);
+        let state = TestState::standard(vec![CompanyPermission::AgreementCreate, CompanyPermission::AgreementUpdate], &now);
         let company_from = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&MemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate, CompanyPermission::AgreementUpdate], &now);
-        let participants = vec![company_to.agent_id(), company_from.agent_id()];
+        let participants = vec![state.company().agent_id(), company_from.agent_id()];
 
-        let mods = create(&user, &member, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
+        let mods = create(state.user(), state.member(), state.company(), id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
         let agreement1 = mods[0].clone().expect_op::<Agreement>(Op::Create).unwrap();
         let now2 = util::time::now();
 
-        let testfn = |user, member, company, _: Option<Agreement>| {
-            update(&user, &member, &company, agreement1.clone(), Some(vec![company_from.agent_id()]), Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2)
+        let testfn = |state: &TestState<Agreement, Agreement>| {
+            update(state.user(), state.member(), state.company(), agreement1.clone(), Some(vec![company_from.agent_id()]), Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2)
         };
-        test::standard_transaction_tests(user.clone(), member.clone(), company_to.clone(), None, testfn.clone());
+        test::standard_transaction_tests(&state, &testfn);
 
-        let mods = update(&user, &member, &company_to, agreement1.clone(), Some(vec![company_from.agent_id()]), Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2).unwrap().into_vec();
+        let mods = testfn(&state).unwrap().into_vec();
         let agreement2 = mods[0].clone().expect_op::<Agreement>(Op::Update).unwrap();
 
         assert_eq!(agreement2.id(), agreement1.id());

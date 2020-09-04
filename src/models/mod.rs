@@ -190,13 +190,13 @@ mod tests {
             process::Process,
             user::{User, UserID},
         },
-        util,
+        util::{self, test::*},
     };
 
     #[test]
     fn modifications() {
         let now = util::time::now();
-        let user = testutils::make_user(&UserID::new("slappy"), None, &now);
+        let user = make_user(&UserID::new("slappy"), None, &now);
         let mut modifications = Modifications::new_single(Op::Create, user.clone());
         modifications.push(Op::Update, user);
 
@@ -222,190 +222,6 @@ mod tests {
         assert_eq!(res, Err(Error::OpMismatch));
         let res = mods[0].clone().expect_op::<Process>(Op::Update);
         assert_eq!(res, Err(Error::OpMismatch));
-    }
-}
-
-#[macro_use]
-#[cfg(test)]
-pub(crate) mod testutils {
-    //! Some model-making utilities to make unit testing easier. The full
-    //! end-to-end tests will happen in the integration tests.
-
-    use super::*;
-    use chrono::{DateTime, Utc};
-    use crate::{
-        access::Role,
-        costs::Costs,
-        models::{
-            agreement::{Agreement, AgreementID},
-            company::{Company, CompanyID, Permission as CompanyPermission},
-            member::*,
-            lib::{
-                agent::AgentID,
-            },
-            occupation::OccupationID,
-            process::{Process, ProcessID},
-            process_spec::{ProcessSpec, ProcessSpecID},
-            resource::{Resource, ResourceID},
-            resource_spec::{ResourceSpec, ResourceSpecID},
-            user::{User, UserID},
-        },
-    };
-    use om2::Measure;
-    use vf_rs::vf;
-
-    pub fn make_agreement<T: Into<String>>(id: &AgreementID, participants: &Vec<AgentID>, name: T, note: T, now: &DateTime<Utc>) -> Agreement {
-        Agreement::builder()
-            .id(id.clone())
-            .inner(
-                vf::Agreement::builder()
-                    .created(now.clone())
-                    .name(Some(name.into()))
-                    .note(Some(note.into()))
-                    .build().unwrap()
-            )
-            .participants(participants.clone())
-            .active(true)
-            .created(now.clone())
-            .updated(now.clone())
-            .build().unwrap()
-    }
-
-    pub fn make_company<T: Into<String>>(id: &CompanyID, name: T, now: &DateTime<Utc>) -> Company {
-        Company::builder()
-            .id(id.clone())
-            .inner(vf::Agent::builder().name(name).build().unwrap())
-            .email("jerry@widgets.biz")
-            .active(true)
-            .created(now.clone())
-            .updated(now.clone())
-            .build().unwrap()
-    }
-
-    pub fn make_member_worker(member_id: &MemberID, user_id: &UserID, company_id: &CompanyID, occupation_id: &OccupationID, permissions: Vec<CompanyPermission>, now: &DateTime<Utc>) -> Member {
-        Member::builder()
-            .id(member_id.clone())
-            .inner(
-                vf::AgentRelationship::builder()
-                    .subject(user_id.clone())
-                    .object(company_id.clone())
-                    .relationship(())
-                    .build().unwrap()
-            )
-            .class(MemberClass::Worker(MemberWorker::new(occupation_id.clone(), None)))
-            .permissions(permissions)
-            .active(true)
-            .created(now.clone())
-            .updated(now.clone())
-            .build().unwrap()
-    }
-
-    pub fn make_process<T: Into<String>>(id: &ProcessID, company_id: &CompanyID, name: T, costs: &Costs, now: &DateTime<Utc>) -> Process {
-        Process::builder()
-            .id(id.clone())
-            .inner(vf::Process::builder().name(name).build().unwrap())
-            .company_id(company_id.clone())
-            .costs(costs.clone())
-            .active(true)
-            .created(now.clone())
-            .updated(now.clone())
-            .build().unwrap()
-    }
-
-    pub fn make_process_spec<T: Into<String>>(id: &ProcessSpecID, company_id: &CompanyID, name: T, active: bool, now: &DateTime<Utc>) -> ProcessSpec {
-        ProcessSpec::builder()
-            .id(id.clone())
-            .inner(
-                vf::ProcessSpecification::builder()
-                    .name(name)
-                    .build().unwrap()
-            )
-            .company_id(company_id.clone())
-            .active(active)
-            .created(now.clone())
-            .updated(now.clone())
-            .build().unwrap()
-    }
-
-    pub fn make_resource(id: &ResourceID, company_id: &CompanyID, quantity: &Measure, costs: &Costs, now: &DateTime<Utc>) -> Resource {
-        Resource::builder()
-            .id(id.clone())
-            .inner(
-                vf::EconomicResource::builder()
-                    .accounting_quantity(Some(quantity.clone()))
-                    .onhand_quantity(Some(quantity.clone()))
-                    .primary_accountable(Some(company_id.clone().into()))
-                    .conforms_to("6969")
-                    .build().unwrap()
-            )
-            .in_custody_of(company_id.clone())
-            .costs(costs.clone())
-            .created(now.clone())
-            .updated(now.clone())
-            .build().unwrap()
-    }
-
-    pub fn make_resource_spec<T: Into<String>>(id: &ResourceSpecID, company_id: &CompanyID, name: T, now: &DateTime<Utc>) -> ResourceSpec {
-        ResourceSpec::builder()
-            .id(id.clone())
-            .inner(
-                vf::ResourceSpecification::builder()
-                    .name(name)
-                    .build().unwrap()
-            )
-            .company_id(company_id.clone())
-            .created(now.clone())
-            .updated(now.clone())
-            .build().unwrap()
-    }
-
-    pub fn make_user(user_id: &UserID, roles: Option<Vec<Role>>, now: &DateTime<Utc>) -> User {
-        User::builder()
-            .id(user_id.clone())
-            .roles(roles.unwrap_or(vec![Role::User]))
-            .email("surely@hotmail.com")   // don't call me shirley
-            .name("buzzin' frog")
-            .active(true)
-            .created(now.clone())
-            .updated(now.clone())
-            .build().unwrap()
-    }
-
-    pub fn deleted_company_tester<F>(company: Company, now: &DateTime<Utc>, testfn: F)
-        where F: Fn(Company) -> Result<Modifications>
-    {
-        let mut company1 = company.clone();
-        company1.set_deleted(None);
-        company1.set_active(true);
-        let res = testfn(company1);
-        assert!(res.is_ok());
-
-        let mut company2 = company.clone();
-        company2.set_deleted(Some(now.clone()));
-        company2.set_active(true);
-        let res = testfn(company2);
-        assert_eq!(res, Err(Error::ObjectIsInactive("company".into())));
-
-        let mut company3 = company.clone();
-        company3.set_deleted(None);
-        company3.set_active(false);
-        let res = testfn(company3);
-        assert_eq!(res, Err(Error::ObjectIsInactive("company".into())));
-
-        let mut company4 = company.clone();
-        company4.set_deleted(Some(now.clone()));
-        company4.set_active(false);
-        let res = testfn(company4);
-        assert_eq!(res, Err(Error::ObjectIsInactive("company".into())));
-    }
-
-    macro_rules! double_deleted_tester {
-        ($model:ident, $ty:expr, $deletefn:expr) => {
-            let mut model2 = $model.clone();
-            model2.set_deleted(Some(crate::util::time::now()));
-            let res: crate::error::Result<crate::models::Modifications> = $deletefn(model2);
-            assert_eq!(res, Err(crate::error::Error::ObjectIsDeleted($ty.into())));
-        }
     }
 }
 

@@ -72,9 +72,8 @@ mod tests {
     use crate::{
         models::{
             company::CompanyID,
-            testutils::make_resource,
         },
-        util,
+        util::{self, test::*},
     };
     use om2::{Measure, Unit};
     use rust_decimal_macros::*;

@@ -274,9 +274,8 @@ mod test {
         models::{
             company::{CompanyID, Permission as CompanyPermission},
             user::UserID,
-            testutils::make_member_worker,
         },
-        util,
+        util::{self, test::*},
     };
     use std::convert::TryInto;
     use super::*;

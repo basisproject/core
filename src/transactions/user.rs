@@ -38,7 +38,7 @@ pub fn create<T: Into<String>>(id: UserID, email: T, name: T, active: bool, now:
 }
 
 /// Create a new user with a specific set of permissions using a current user as
-/// the originator. Effective, an admin create. Requires the 
+/// the originator. Effectively an admin create. Requires the 
 /// `Permission::UserCreate` permission.
 pub fn create_permissioned<T: Into<String>>(caller: &User, id: UserID, roles: Vec<Role>, email: T, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::UserAdminCreate)?;
@@ -96,9 +96,8 @@ mod tests {
         access::Role,
         models::{
             user::User,
-            testutils::{make_user},
         },
-        util,
+        util::{self, test::{self, *}},
     };
 
     #[test]
@@ -119,21 +118,25 @@ mod tests {
     fn can_create_permissioned() {
         let id = UserID::create();
         let now = util::time::now();
+        let mut state = TestState::standard(vec![], &now);
         let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
-        let mods = create_permissioned(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_vec();
-        assert_eq!(mods.len(), 1);
+        state.user = Some(user);
 
+        let testfn = |state: &TestState<User, User>| {
+            create_permissioned(state.user(), id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now)
+        };
+
+        let mods = testfn(&state).unwrap().into_vec();
+        assert_eq!(mods.len(), 1);
         let model = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
         assert_eq!(model.id(), &id);
         assert_eq!(model.email(), "zing@lyonbros.com");
         assert_eq!(model.name(), "leonard");
         assert_eq!(model.active(), &true);
 
-        let id = UserID::create();
-        let now = util::time::now();
-        let user = make_user(&id, Some(vec![Role::User]), &now);
-
-        let res = create_permissioned(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now);
+        let mut state2 = state.clone();
+        state2.user_mut().set_roles(vec![Role::User]);
+        let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
@@ -141,27 +144,41 @@ mod tests {
     fn can_update() {
         let id = UserID::create();
         let now = util::time::now();
+        let mut state = TestState::standard(vec![], &now);
         let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
         let mods = create_permissioned(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_vec();
+        let new_user = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
+        state.user = Some(user);
+        state.model = Some(new_user);
 
-        let subject = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
-        assert_eq!(subject.email(), "zing@lyonbros.com");
-        assert_eq!(subject.name(), "leonard");
-        assert_eq!(subject.active(), &true);
+        let now2 = util::time::now();
+        let testfn_inner = |state: &TestState<User, User>, active: Option<bool>| {
+            update(state.user(), state.model().clone(), Some("obvious_day@camp.stupid".into()), None, active, &now2)
+        };
+        let testfn = |state: &TestState<User, User>| {
+            testfn_inner(state, None)
+        };
 
-        let mods = update(&user, subject, Some("obvious_day@camp.stupid".into()), None, None, &now).unwrap().into_vec();
-        let subject2 = mods[0].clone().expect_op::<User>(Op::Update).unwrap();
-        assert_eq!(subject2.email(), "obvious_day@camp.stupid");
-        assert_eq!(subject2.name(), "leonard");
-        assert_eq!(subject2.active(), &true);
+        let mods = testfn(&state).unwrap().into_vec();
+        let user2 = mods[0].clone().expect_op::<User>(Op::Update).unwrap();
+        assert_eq!(user2.email(), "obvious_day@camp.stupid");
+        assert_eq!(user2.name(), "leonard");
+        assert_eq!(user2.active(), &true);
+        assert_eq!(user2.updated(), &now2);
 
-        let mods = update(&subject2.clone(), subject2, None, None, Some(false), &now).unwrap().into_vec();
-        let subject3 = mods[0].clone().expect_op::<User>(Op::Update).unwrap();
-        assert_eq!(subject3.email(), "obvious_day@camp.stupid");
-        assert_eq!(subject3.name(), "leonard");
-        assert_eq!(subject3.active(), &false);
+        let mut state2 = state.clone();
+        state2.user = Some(user2.clone());
+        state2.model = Some(user2);
+        let mods = testfn_inner(&state2, Some(false)).unwrap().into_vec();
+        let user3 = mods[0].clone().expect_op::<User>(Op::Update).unwrap();
+        assert_eq!(user3.email(), "obvious_day@camp.stupid");
+        assert_eq!(user3.name(), "leonard");
+        assert_eq!(user3.active(), &false);
+        assert_eq!(user3.updated(), &now2);
 
-        let res = update(&subject3.clone(), subject3, None, None, Some(false), &now);
+        let mut state3 = state.clone();
+        state3.user = Some(user3.clone());
+        let res = testfn(&state3);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
@@ -169,26 +186,37 @@ mod tests {
     fn can_set_roles() {
         let id = UserID::create();
         let now = util::time::now();
-        let mut user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
-        user.set_active(false);
+        let mut state = TestState::standard(vec![], &now);
+        let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
+        state.user = Some(user.clone());
+        state.model = Some(user);
 
-        // inactive users should not be able to run mods
-        let res = set_roles(&user, user.clone(), vec![Role::IdentityAdmin], &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
+        let now2 = util::time::now();
+        let testfn = |state: &TestState<User, User>| {
+            set_roles(state.user(), state.model().clone(), vec![Role::User], &now2)
+        };
 
-        // set back to active and continue lol
-        user.set_active(true);
-        let mods = set_roles(&user, user.clone(), vec![Role::User], &now).unwrap().into_vec();
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
-        let user = mods[0].clone().expect_op::<User>(Op::Update).unwrap();
-        assert_eq!(user.id(), &id);
-        assert_eq!(user.roles(), &vec![Role::User]);
+        let user2 = mods[0].clone().expect_op::<User>(Op::Update).unwrap();
+        assert_eq!(user2.id(), &id);
+        assert_eq!(user2.roles(), &vec![Role::User]);
+        assert_eq!(user2.updated(), &now2);
 
         // the user changed their roles to not allow setting roles, so when they
         // try to set their roles back to identity admin it shuould fail lol
         // sucker.
-        let res = set_roles(&user, user.clone(), vec![Role::IdentityAdmin], &now);
+        let mut state2 = state.clone();
+        state2.user = Some(user2.clone());
+        state2.model = Some(user2);
+        let res = testfn(&state2);
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        // inactive users should not be able to run mods
+        let mut state3 = state.clone();
+        state3.user_mut().set_active(false);
+        let res = testfn(&state3);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
@@ -196,17 +224,26 @@ mod tests {
     fn can_delete() {
         let id = UserID::create();
         let now = util::time::now();
+        let mut state = TestState::standard(vec![], &now);
         let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
-        let mods = delete(&user, user.clone(), &now).unwrap().into_vec();
+        state.user = Some(user.clone());
+        state.model = Some(user);
+
+        let testfn = |state: &TestState<User, User>| {
+            delete(state.user(), state.model().clone(), &now)
+        };
+        test::double_deleted_tester(&state, "user", &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
+        let user2 = mods[0].clone().expect_op::<User>(Op::Delete).unwrap();
+        assert_eq!(user2.deleted(), &Some(now.clone()));
 
-        let deleted = mods[0].clone().expect_op::<User>(Op::Delete).unwrap();
-        assert_eq!(deleted.deleted(), &Some(now.clone()));
-
-        let res = delete(&deleted.clone(), deleted, &now);
+        let mut state2 = state.clone();
+        state2.user = Some(user2.clone());
+        state2.model = Some(user2);
+        let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        double_deleted_tester!(user, "user", |subject| delete(&user, subject, &now));
     }
 }
 
