@@ -159,14 +159,23 @@ pub(crate) fn permissions_checks<M1, M2, F>(state: &TestState<M1, M2>, testfn: &
           M2: Model,
           F: Fn(&TestState<M1, M2>) -> Result<Modifications> + Clone,
 {
+    // test that a member with no permissions cannot perform this action
     let mut state1 = state.clone();
     state1.member_mut().set_permissions(vec![]);
     let res = testfn(&state1);
     assert_eq!(res, Err(Error::InsufficientPrivileges));
 
+    // test that a user with no permissions cannot perform this action
     let mut state2 = state.clone();
     state2.user_mut().set_roles(vec![]);
     let res = testfn(&state1);
+    assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+    // test that when a user's id and member's agent id don't match we cannot
+    // perform this action
+    let mut state3 = state.clone();
+    state3.user_mut().set_id(UserID::new("gee-i-hope-nobody-else-uses-this-exact-id-in-a-test-lol"));
+    let res = testfn(&state3);
     assert_eq!(res, Err(Error::InsufficientPrivileges));
 }
 
