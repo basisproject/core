@@ -16,7 +16,7 @@ use crate::{
         member::{Compensation, Member, MemberID, MemberClass},
         lib::{
             agent::Agent,
-            basis_model::{ActiveState, Deletable},
+            basis_model::Model,
         },
         occupation::OccupationID,
         user::User,
@@ -57,9 +57,15 @@ pub fn create<T: Agent>(caller: &User, member: &Member, id: MemberID, agent_from
 }
 
 /// Update a member.
-pub fn update(caller: &User, member: &Member, mut subject: Member, occupation_id: Option<OccupationID>, agreement: Option<Url>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Member, occupation_id: Option<OccupationID>, agreement: Option<Url>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateMembers)?;
-    member.access_check(caller.id(), &subject.company_id()?, CompanyPermission::MemberUpdate)?;
+    member.access_check(caller.id(), company.id(), CompanyPermission::MemberUpdate)?;
+    if company.id() != &subject.company_id()? {
+        Err(Error::InsufficientPrivileges)?;
+    }
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
+    }
 
     if let Some(occupation_id) = occupation_id {
         match subject.class_mut() {
@@ -80,9 +86,15 @@ pub fn update(caller: &User, member: &Member, mut subject: Member, occupation_id
 }
 
 /// Set a member's company permissions.
-pub fn set_permissions(caller: &User, member: &Member, mut subject: Member, permissions: Vec<CompanyPermission>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn set_permissions(caller: &User, member: &Member, company: &Company, mut subject: Member, permissions: Vec<CompanyPermission>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateMembers)?;
-    member.access_check(caller.id(), &subject.company_id()?, CompanyPermission::MemberSetPermissions)?;
+    member.access_check(caller.id(), company.id(), CompanyPermission::MemberSetPermissions)?;
+    if company.id() != &subject.company_id()? {
+        Err(Error::InsufficientPrivileges)?;
+    }
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
+    }
 
     subject.set_permissions(permissions);
     subject.set_updated(now.clone());
@@ -90,9 +102,15 @@ pub fn set_permissions(caller: &User, member: &Member, mut subject: Member, perm
 }
 
 /// Set a member's compensation.
-pub fn set_compensation(caller: &User, member: &Member, mut subject: Member, compensation: Compensation, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn set_compensation(caller: &User, member: &Member, company: &Company, mut subject: Member, compensation: Compensation, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateMembers)?;
-    member.access_check(caller.id(), &subject.company_id()?, CompanyPermission::MemberSetCompensation)?;
+    member.access_check(caller.id(), company.id(), CompanyPermission::MemberSetCompensation)?;
+    if company.id() != &subject.company_id()? {
+        Err(Error::InsufficientPrivileges)?;
+    }
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
+    }
 
     match subject.class_mut() {
         MemberClass::Worker(worker) => {
@@ -105,12 +123,19 @@ pub fn set_compensation(caller: &User, member: &Member, mut subject: Member, com
 }
 
 /// Delete a member.
-pub fn delete(caller: &User, member: &Member, mut subject: Member, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: Member, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateMembers)?;
-    member.access_check(caller.id(), &subject.company_id()?, CompanyPermission::MemberDelete)?;
+    member.access_check(caller.id(), company.id(), CompanyPermission::MemberDelete)?;
+    if company.id() != &subject.company_id()? {
+        Err(Error::InsufficientPrivileges)?;
+    }
+    if !company.is_active() {
+        Err(Error::ObjectIsInactive("company".into()))?;
+    }
     if subject.is_deleted() {
         Err(Error::ObjectIsDeleted("member".into()))?;
     }
+
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
@@ -120,17 +145,15 @@ mod tests {
     use super::*;
     use crate::{
         models::{
-            account::AccountID,
-            company::CompanyID,
             member::*,
+            account::AccountID,
             lib::{
                 agent::Agent,
-                basis_model::ActiveState,
+                basis_model::Model,
             },
             user::UserID,
-            testutils::{deleted_company_tester, make_user, make_company, make_member_worker},
         },
-        util,
+        util::{self, test::{self, *}},
     };
     use rust_decimal_macros::*;
     use om2::{Measure, Unit};
@@ -139,20 +162,24 @@ mod tests {
     fn can_create() {
         let now = util::time::now();
         let id = MemberID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
+        let mut state = TestState::standard(vec![CompanyPermission::MemberCreate], &now);
         let occupation_id = OccupationID::create();
         let agreement: Url = "https://mydoc.com/work_agreement_1".parse().unwrap();
-        let user = make_user(&UserID::create(), None, &now);
         let new_user = make_user(&UserID::create(), None, &now);
-        let existing_member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::MemberCreate], &now);
         let new_class = MemberClass::Worker(MemberWorker::new(occupation_id.clone(), None));
+        state.model = Some(new_user);
 
-        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), new_class.clone(), vec![], Some(agreement.clone()), true, &now).unwrap().into_vec();
+        let testfn = |state: &TestState<User, Member>| {
+            create(state.user(), state.member(), id.clone(), state.model().clone(), state.company().clone(), new_class.clone(), vec![], Some(agreement.clone()), true, &now)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
         let member = mods[0].clone().expect_op::<Member>(Op::Create).unwrap();
         assert_eq!(member.id(), &id);
-        assert_eq!(member.inner().subject(), &new_user.agent_id());
-        assert_eq!(member.inner().object(), &company.agent_id());
+        assert_eq!(member.inner().subject(), &state.model().agent_id());
+        assert_eq!(member.inner().object(), &state.company().agent_id());
         assert_eq!(member.occupation_id().unwrap(), &occupation_id);
         assert_eq!(member.permissions().len(), 0);
         assert_eq!(member.agreement(), &Some(agreement.clone()));
@@ -163,21 +190,9 @@ mod tests {
         assert_eq!(member.is_active(), true);
         assert_eq!(member.is_deleted(), false);
 
-        let user2 = make_user(user.id(), Some(vec![]), &now);
-        let res = create(&user2, &existing_member, id.clone(), new_user.clone(), company.clone(), new_class.clone(), vec![], Some(agreement.clone()), true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let user3 = make_user(&UserID::create(), None, &now);
-        let res = create(&user3, &existing_member, id.clone(), new_user.clone(), company.clone(), new_class.clone(), vec![], Some(agreement.clone()), true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now, |company: Company| {
-            create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), new_class.clone(), vec![], Some(agreement.clone()), true, &now)
-        });
-
-        let mut new_user2 = new_user.clone();
-        new_user2.set_deleted(Some(now.clone()));
-        let res = create(&user, &existing_member, id.clone(), new_user2.clone(), company.clone(), new_class.clone(), vec![], Some(agreement.clone()), true, &now);
+        let mut state2 = state.clone();
+        state2.model_mut().set_deleted(Some(now.clone()));
+        let res = testfn(&state2);
         assert_eq!(res, Err(Error::ObjectIsInactive("agent".into())));
     }
 
@@ -185,49 +200,49 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = MemberID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
+        let mut state = TestState::standard(vec![CompanyPermission::MemberCreate, CompanyPermission::MemberUpdate], &now);
         let occupation_id = OccupationID::create();
         let agreement: Url = "https://mydoc.com/work_agreement_1".parse().unwrap();
-        let user = make_user(&UserID::create(), None, &now);
         let new_user = make_user(&UserID::create(), None, &now);
-        let mut existing_member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::MemberCreate], &now);
         let new_class = MemberClass::Worker(MemberWorker::new(occupation_id.clone(), None));
-
-        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), new_class.clone(), vec![], None, true, &now).unwrap().into_vec();
+        let mods = create(state.user(), state.member(), id.clone(), new_user.clone(), state.company().clone(), new_class.clone(), vec![], None, true, &now).unwrap().into_vec();
         let member = mods[0].clone().expect_op::<Member>(Op::Create).unwrap();
+        state.model = Some(member);
 
-        // fails because existing_member doesn't have update perm
         let now2 = util::time::now();
         let new_occupation = OccupationID::create();
-        let res = update(&user, &existing_member, member.clone(), Some(new_occupation.clone()), None, None, &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
+        let testfn = |state: &TestState<Member, Member>| {
+            update(state.user(), state.member(), state.company(), state.model().clone(), Some(new_occupation.clone()), Some(agreement.clone()), None, &now2)
+        };
 
-        existing_member.set_permissions(vec![CompanyPermission::MemberUpdate]);
-        let mods = update(&user, &existing_member, member.clone(), Some(new_occupation.clone()), Some(agreement.clone()), None, &now2).unwrap().into_vec();
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
-
         let member2 = mods[0].clone().expect_op::<Member>(Op::Update).unwrap();
-        assert_eq!(member.id(), member2.id());
-        assert_eq!(member.created(), member2.created());
-        assert!(member.updated() != member2.updated());
+        assert_eq!(state.model().id(), member2.id());
+        assert_eq!(state.model().created(), member2.created());
+        assert!(state.model().updated() != member2.updated());
         assert_eq!(member2.updated(), &now2);
-        assert!(member.agreement() != member2.agreement());
+        assert!(state.model().agreement() != member2.agreement());
         assert_eq!(member2.agreement(), &Some(agreement.clone()));
         assert_eq!(member2.active(), &true);
         assert_eq!(member2.occupation_id().unwrap(), &new_occupation);
 
-        let res = update(&user, &member, member.clone(), Some(new_occupation.clone()), Some(agreement.clone()), None, &now2);
+        let mut state2 = state.clone();
+        state2.member = state.model.clone();
+        let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let res = update(&new_user, &existing_member, member.clone(), Some(new_occupation.clone()), Some(agreement.clone()), None, &now2);
+        let mut state3 = state.clone();
+        state3.user = Some(new_user.clone());
+        let res = testfn(&state3);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut member3 = member2.clone();
-        member3.set_class(MemberClass::User(MemberUser::new()));
-        let res = update(&user, &existing_member, member3.clone(), Some(new_occupation.clone()), Some(agreement.clone()), None, &now2);
+        let mut state4 = state.clone();
+        state4.model_mut().set_class(MemberClass::User(MemberUser::new()));
+        let res = testfn(&state4);
         assert_eq!(res, Err(Error::MemberMustBeWorker));
-        member3.set_class(MemberClass::Company(MemberCompany::new()));
-        let res = update(&user, &existing_member, member3.clone(), Some(new_occupation.clone()), Some(agreement.clone()), None, &now2);
+        state4.model_mut().set_class(MemberClass::Company(MemberCompany::new()));
+        let res = testfn(&state4);
         assert_eq!(res, Err(Error::MemberMustBeWorker));
     }
 
@@ -235,41 +250,34 @@ mod tests {
     fn can_set_permissions() {
         let now = util::time::now();
         let id = MemberID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
+        let mut state = TestState::standard(vec![CompanyPermission::MemberCreate, CompanyPermission::MemberSetPermissions], &now);
         let occupation_id = OccupationID::create();
-        let user = make_user(&UserID::create(), None, &now);
         let new_user = make_user(&UserID::create(), None, &now);
-        let mut existing_member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::MemberCreate], &now);
         let new_class = MemberClass::Worker(MemberWorker::new(occupation_id.clone(), None));
-
-        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), new_class.clone(), vec![], None, true, &now).unwrap().into_vec();
+        let mods = create(state.user(), state.member(), id.clone(), new_user.clone(), state.company().clone(), new_class.clone(), vec![], None, true, &now).unwrap().into_vec();
         let member = mods[0].clone().expect_op::<Member>(Op::Create).unwrap();
+        state.model = Some(member);
 
-        // fails because existing_member doesn't have set_perms perm
         let now2 = util::time::now();
-        let res = set_permissions(&user, &existing_member, member.clone(), vec![CompanyPermission::ResourceSpecCreate], &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
+        let testfn = |state: &TestState<Member, Member>| {
+            set_permissions(state.user(), state.member(), state.company(), state.model().clone(), vec![CompanyPermission::ResourceSpecCreate], &now2)
+        };
+        test::standard_transaction_tests(&state, &testfn);
 
-        existing_member.set_permissions(vec![CompanyPermission::MemberSetPermissions]);
-        let mods = set_permissions(&user, &existing_member, member.clone(), vec![CompanyPermission::ResourceSpecCreate], &now2).unwrap().into_vec();
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
         let member2 = mods[0].clone().expect_op::<Member>(Op::Update).unwrap();
         assert_eq!(member2.permissions(), &vec![CompanyPermission::ResourceSpecCreate]);
-        assert!(!member.can(&CompanyPermission::ResourceSpecCreate));
+        assert!(!state.model().can(&CompanyPermission::ResourceSpecCreate));
         assert!(member2.can(&CompanyPermission::ResourceSpecCreate));
         assert_eq!(member2.updated(), &now2);
 
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = set_permissions(&user2, &existing_member, member.clone(), vec![CompanyPermission::ResourceSpecCreate], &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut member3 = member2.clone();
-        member3.set_class(MemberClass::User(MemberUser::new()));
-        let res = set_permissions(&user, &existing_member, member3.clone(), vec![CompanyPermission::ResourceSpecCreate], &now2);
+        let mut state2 = state.clone();
+        state2.model_mut().set_class(MemberClass::User(MemberUser::new()));
+        let res = testfn(&state2);
         assert!(res.is_ok());
-        member3.set_class(MemberClass::Company(MemberCompany::new()));
-        let res = set_permissions(&user, &existing_member, member3.clone(), vec![CompanyPermission::ResourceSpecCreate], &now2);
+        state2.model_mut().set_class(MemberClass::Company(MemberCompany::new()));
+        let res = testfn(&state2);
         assert!(res.is_ok());
     }
 
@@ -277,42 +285,35 @@ mod tests {
     fn can_set_compensation() {
         let now = util::time::now();
         let id = MemberID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
+        let mut state = TestState::standard(vec![CompanyPermission::MemberCreate, CompanyPermission::MemberSetCompensation], &now);
         let occupation_id = OccupationID::create();
-        let user = make_user(&UserID::create(), None, &now);
         let new_user = make_user(&UserID::create(), None, &now);
-        let mut existing_member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::MemberCreate], &now);
         let new_class = MemberClass::Worker(MemberWorker::new(occupation_id.clone(), None));
-
-        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), new_class.clone(), vec![], None, true, &now).unwrap().into_vec();
+        let mods = create(state.user(), state.member(), id.clone(), new_user.clone(), state.company().clone(), new_class.clone(), vec![], None, true, &now).unwrap().into_vec();
         let member = mods[0].clone().expect_op::<Member>(Op::Create).unwrap();
+        state.model = Some(member);
 
         let compensation = Compensation::new_hourly(32 as u32, AccountID::create());
         let now2 = util::time::now();
-        // fails because existing_member doesn't have set_perms perm
-        let res = set_compensation(&user, &existing_member, member.clone(), compensation.clone(), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
+        let testfn = |state: &TestState<Member, Member>| {
+            set_compensation(state.user(), state.member(), state.company(), state.model().clone(), compensation.clone(), &now2)
+        };
+        test::standard_transaction_tests(&state, &testfn);
 
-        existing_member.set_permissions(vec![CompanyPermission::MemberSetCompensation]);
-        let mods = set_compensation(&user, &existing_member, member.clone(), compensation.clone(), &now2).unwrap().into_vec();
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
         let member2 = mods[0].clone().expect_op::<Member>(Op::Update).unwrap();
-        assert_eq!(member.compensation(), None);
+        assert_eq!(state.model().compensation(), None);
         assert_eq!(member2.compensation().unwrap().wage(), &Measure::new(dec!(32), Unit::Hour));
         assert_eq!(member2.compensation().unwrap(), &compensation);
         assert_eq!(member2.updated(), &now2);
 
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = set_compensation(&user2, &existing_member, member.clone(), compensation.clone(), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut member3 = member2.clone();
-        member3.set_class(MemberClass::User(MemberUser::new()));
-        let res = set_compensation(&user, &existing_member, member3.clone(), compensation.clone(), &now2);
+        let mut state2 = state.clone();
+        state2.model_mut().set_class(MemberClass::User(MemberUser::new()));
+        let res = testfn(&state2);
         assert_eq!(res, Err(Error::MemberMustBeWorker));
-        member3.set_class(MemberClass::Company(MemberCompany::new()));
-        let res = set_compensation(&user, &existing_member, member3.clone(), compensation.clone(), &now2);
+        state2.model_mut().set_class(MemberClass::Company(MemberCompany::new()));
+        let res = testfn(&state2);
         assert_eq!(res, Err(Error::MemberMustBeWorker));
     }
 
@@ -320,40 +321,28 @@ mod tests {
     fn can_delete() {
         let now = util::time::now();
         let id = MemberID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
+        let mut state = TestState::standard(vec![CompanyPermission::MemberCreate, CompanyPermission::MemberDelete], &now);
         let occupation_id = OccupationID::create();
-        let user = make_user(&UserID::create(), None, &now);
         let new_user = make_user(&UserID::create(), None, &now);
-        let mut existing_member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::MemberCreate], &now);
         let new_class = MemberClass::Worker(MemberWorker::new(occupation_id.clone(), None));
-
-        let mods = create(&user, &existing_member, id.clone(), new_user.clone(), company.clone(), new_class.clone(), vec![], None, true, &now).unwrap().into_vec();
+        let mods = create(state.user(), state.member(), id.clone(), new_user.clone(), state.company().clone(), new_class.clone(), vec![], None, true, &now).unwrap().into_vec();
         let member = mods[0].clone().expect_op::<Member>(Op::Create).unwrap();
+        state.model = Some(member);
 
         let now2 = util::time::now();
-        // fails because existing_member doesn't have memberdelete perms
-        let res = delete(&user, &existing_member, member.clone(), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
+        let testfn = |state: &TestState<Member, Member>| {
+            delete(state.user(), state.member(), state.company(), state.model().clone(), &now2)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+        test::double_deleted_tester(&state, "member", &testfn);
 
-        existing_member.set_permissions(vec![CompanyPermission::MemberDelete]);
-        let mods = delete(&user, &existing_member, member.clone(), &now2).unwrap().into_vec();
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
-
         let member2 = mods[0].clone().expect_op::<Member>(Op::Delete).unwrap();
         assert_eq!(member2.deleted(), &Some(now2.clone()));
         assert!(member2.is_deleted());
         assert!(member2.active());
         assert!(!member2.is_active());
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = delete(&user2, &existing_member, member.clone(), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut member3 = member.clone();
-        member3.set_deleted(Some(now2.clone()));
-        let res = delete(&user, &existing_member, member3.clone(), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("member".into())));
     }
 }
 

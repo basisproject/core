@@ -10,7 +10,7 @@ use crate::{
     models::{
         lib::{
             agent::{Agent, AgentID},
-            basis_model::ActiveState,
+            basis_model::Model,
         },
     },
     error::{Error, Result},
@@ -66,9 +66,8 @@ mod tests {
         access::{Permission, Role},
         models::{
             user::UserID,
-            testutils::make_user,
         },
-        util,
+        util::{self, test::*},
     };
 
     #[test]

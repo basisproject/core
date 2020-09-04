@@ -1,18 +1,20 @@
 /// A trait that all model IDs implement.
 pub trait ModelID: Into<String> + From<String> + Clone + PartialEq + Eq + std::hash::Hash {}
 
-/// A trait that describes an object that can be deleted.
-pub trait Deletable {
-    /// Checks whether or not this object has been deleted.
+/// A trait that all models implement which handles common functionality
+pub trait Model: Clone + PartialEq {
+    /// Checks whether or not this model has been deleted.
     fn is_deleted(&self) -> bool;
-}
 
-/// A trait that describes and object that can be in an (de)actived state.
-pub trait ActiveState: Deletable {
-    /// Determine if this model is active. This also reads the `deleted` field
-    /// and will return false if the model has been deleted, so this method is
-    /// the canonical place to check if the model can be used.
+    /// Determine if this model is active. This checks both the `active` and
+    /// `deleted` fields for the model.
     fn is_active(&self) -> bool;
+
+    /// Set the model's deleted value
+    fn set_deleted(&mut self, deleted: Option<chrono::DateTime<chrono::Utc>>);
+
+    /// Set the model's active value
+    fn set_active(&mut self, active: bool);
 }
 
 macro_rules! basis_model {
@@ -75,7 +77,6 @@ macro_rules! basis_model {
 
         pub(crate) mod inner {
             use super::*;
-            use crate::models::lib::basis_model::Deletable;
 
             basis_model_inner! {
                 $(#[$struct_meta])*
@@ -109,15 +110,22 @@ macro_rules! basis_model {
                 }
             }
 
-            impl crate::models::lib::basis_model::Deletable for $model {
+
+            impl crate::models::lib::basis_model::Model for $model {
                 fn is_deleted(&self) -> bool {
                     self.deleted.is_some()
                 }
-            }
 
-            impl crate::models::lib::basis_model::ActiveState for $model {
                 fn is_active(&self) -> bool {
                     self.active && !self.is_deleted()
+                }
+
+                fn set_deleted(&mut self, deleted: Option<chrono::DateTime<chrono::Utc>>) {
+                    $model::set_deleted(self, deleted);
+                }
+
+                fn set_active(&mut self, active: bool) {
+                    $model::set_active(self, active);
                 }
             }
 

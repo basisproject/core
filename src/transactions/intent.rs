@@ -20,7 +20,7 @@ use crate::{
         member::Member,
         lib::{
             agent::{Agent, AgentID},
-            basis_model::{ActiveState, Deletable},
+            basis_model::Model,
         },
         intent::{Intent, IntentID},
         resource::ResourceID,
@@ -201,12 +201,8 @@ mod tests {
     use crate::{
         models::{
             company::CompanyID,
-            member::MemberID,
-            occupation::OccupationID,
-            testutils::{deleted_company_tester, make_user, make_company, make_member_worker},
-            user::UserID,
         },
-        util,
+        util::{self, test::{self, *}},
     };
     use om2::Unit;
 
@@ -214,15 +210,18 @@ mod tests {
     fn can_create() {
         let now = util::time::now();
         let id = IntentID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate], &now);
+        let state = TestState::standard(vec![CompanyPermission::IntentCreate], &now);
         let costs = Costs::new_with_labor("widgetmaker", 42);
-        let loc = SpatialThing::builder()
-            .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
-            .build().unwrap();
 
-        let mods = create(&user, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
+        let testfn_inner = |state: &TestState<Intent, Intent>, provider: Option<AgentID>, receiver: Option<AgentID>| {
+            create(state.user(), state.member(), state.company(), id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(state.loc().clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![state.company().agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), provider, receiver, None, Some(ResourceID::new("widget1")), None, true, &now)
+        };
+        let testfn = |state: &TestState<Intent, Intent>| {
+            testfn_inner(state, Some(state.company().agent_id()), None)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let intent = mods[0].clone().expect_op::<Intent>(Op::Create).unwrap();
@@ -230,7 +229,7 @@ mod tests {
         assert_eq!(intent.move_costs(), &Some(costs.clone()));
         assert_eq!(intent.inner().action(), &vf::Action::Transfer);
         assert_eq!(intent.inner().agreed_in(), &None);
-        assert_eq!(intent.inner().at_location(), &Some(loc.clone()));
+        assert_eq!(intent.inner().at_location(), &Some(state.loc().clone()));
         assert_eq!(intent.inner().available_quantity(), &Some(Measure::new(10, Unit::One)));
         assert_eq!(intent.inner().due(), &None);
         assert_eq!(intent.inner().effort_quantity(), &None);
@@ -238,10 +237,10 @@ mod tests {
         assert_eq!(intent.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(intent.inner().has_end(), &None);
         assert_eq!(intent.inner().has_point_in_time(), &None);
-        assert_eq!(intent.inner().in_scope_of(), &vec![company.agent_id()]);
+        assert_eq!(intent.inner().in_scope_of(), &vec![state.company().agent_id()]);
         assert_eq!(intent.inner().name(), &Some("buy my widget".into()));
         assert_eq!(intent.inner().note(), &Some("gee willickers i hope someone buys my widget".into()));
-        assert_eq!(intent.inner().provider(), &Some(company.agent_id()));
+        assert_eq!(intent.inner().provider(), &Some(state.company().agent_id()));
         assert_eq!(intent.inner().receiver(), &None);
         assert_eq!(intent.inner().resource_conforms_to(), &None);
         assert_eq!(intent.inner().resource_inventoried_as(), &Some(ResourceID::new("widget1")));
@@ -251,28 +250,14 @@ mod tests {
         assert_eq!(intent.updated(), &now);
         assert_eq!(intent.deleted(), &None);
 
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![CompanyPermission::ProcessDelete]);
-        let res = create(&user, &member2, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
+        let mut state2 = state.clone();
+        state2.company_mut().set_id(CompanyID::new("bill's company"));
+        let res = testfn_inner(&state2, Some(state.company().agent_id()), None);
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
+        let res = testfn_inner(&state2, None, Some(state.company().agent_id()));
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = create(&user2, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now, |company: Company| {
-            create(&user, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now)
-        });
-
-        let mut company3 = company.clone();
-        company3.set_id(CompanyID::new("bill's company"));
-        let res = create(&user, &member, &company3, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-        let res = create(&user, &member, &company3, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), None, Some(company.agent_id()), None, Some(ResourceID::new("widget1")), None, true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let res = create(&user, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), None, None, None, Some(ResourceID::new("widget1")), None, true, &now);
+        let res = testfn_inner(&state, None, None);
         assert_eq!(res, Err(Error::MissingFields(vec!["provider".into(), "receiver".into()])));
     }
 
@@ -280,68 +265,59 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = IntentID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate, CompanyPermission::IntentUpdate], &now);
+        let mut state = TestState::standard(vec![CompanyPermission::IntentCreate, CompanyPermission::IntentUpdate], &now);
         let costs1 = Costs::new_with_labor("widgetmaker", 42);
         let costs2 = Costs::new_with_labor("widgetmaker", 41);
-        let loc = SpatialThing::builder()
-            .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
-            .build().unwrap();
 
-        let mods = create(&user, &member, &company, id.clone(), Some(costs1.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
-        let intent1 = mods[0].clone().expect_op::<Intent>(Op::Create).unwrap();
+        let mods = create(state.user(), state.member(), state.company(), id.clone(), Some(costs1.clone()), OrderAction::Transfer, None, Some(state.loc().clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![state.company().agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(state.company().agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
+        let intent = mods[0].clone().expect_op::<Intent>(Op::Create).unwrap();
+        state.model = Some(intent);
+
         let now2 = util::time::now();
-        let mods = update(&user, &member, &company, intent1.clone(), Some(Some(costs2.clone())), None, None, Some(None), None, None, None, None, None, None, None, Some(vec![]), Some(Some("buy widget".into())), None, None, None, None, None, None, Some(false), &now2).unwrap().into_vec();
+        let testfn_inner = |state: &TestState<Intent, Intent>, provider: Option<Option<AgentID>>, receiver: Option<Option<AgentID>>| {
+            update(state.user(), state.member(), state.company(), state.model().clone(), Some(Some(costs2.clone())), None, None, Some(None), None, None, None, None, None, None, None, Some(vec![]), Some(Some("buy widget".into())), None, provider, receiver, None, None, None, Some(false), &now2)
+        };
+        let testfn = |state: &TestState<Intent, Intent>| {
+            testfn_inner(state, None, None)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         let intent2 = mods[0].clone().expect_op::<Intent>(Op::Update).unwrap();
 
-        assert_eq!(intent2.id(), intent1.id());
+        assert_eq!(intent2.id(), state.model().id());
         assert_eq!(intent2.move_costs(), &Some(costs2.clone()));
-        assert_eq!(intent2.inner().action(), intent1.inner().action());
+        assert_eq!(intent2.inner().action(), state.model().inner().action());
         assert_eq!(intent2.inner().agreed_in(), intent2.inner().agreed_in());
         assert_eq!(intent2.inner().at_location(), &None);
-        assert_eq!(intent2.inner().available_quantity(), intent1.inner().available_quantity());
-        assert_eq!(intent2.inner().due(), intent1.inner().due());
-        assert_eq!(intent2.inner().effort_quantity(), intent1.inner().effort_quantity());
-        assert_eq!(intent2.inner().finished(), intent1.inner().finished());
-        assert_eq!(intent2.inner().has_beginning(), intent1.inner().has_beginning());
-        assert_eq!(intent2.inner().has_end(), intent1.inner().has_end());
-        assert_eq!(intent2.inner().has_point_in_time(), intent1.inner().has_point_in_time());
+        assert_eq!(intent2.inner().available_quantity(), state.model().inner().available_quantity());
+        assert_eq!(intent2.inner().due(), state.model().inner().due());
+        assert_eq!(intent2.inner().effort_quantity(), state.model().inner().effort_quantity());
+        assert_eq!(intent2.inner().finished(), state.model().inner().finished());
+        assert_eq!(intent2.inner().has_beginning(), state.model().inner().has_beginning());
+        assert_eq!(intent2.inner().has_end(), state.model().inner().has_end());
+        assert_eq!(intent2.inner().has_point_in_time(), state.model().inner().has_point_in_time());
         assert_eq!(intent2.inner().in_scope_of(), &vec![]);
         assert_eq!(intent2.inner().name(), &Some("buy widget".into()));
-        assert_eq!(intent2.inner().note(), intent1.inner().note());
-        assert_eq!(intent2.inner().provider(), intent1.inner().provider());
-        assert_eq!(intent2.inner().receiver(), intent1.inner().receiver());
-        assert_eq!(intent2.inner().resource_conforms_to(), intent1.inner().resource_conforms_to());
-        assert_eq!(intent2.inner().resource_inventoried_as(), intent1.inner().resource_inventoried_as());
-        assert_eq!(intent2.inner().resource_quantity(), intent1.inner().resource_quantity());
+        assert_eq!(intent2.inner().note(), state.model().inner().note());
+        assert_eq!(intent2.inner().provider(), state.model().inner().provider());
+        assert_eq!(intent2.inner().receiver(), state.model().inner().receiver());
+        assert_eq!(intent2.inner().resource_conforms_to(), state.model().inner().resource_conforms_to());
+        assert_eq!(intent2.inner().resource_inventoried_as(), state.model().inner().resource_inventoried_as());
+        assert_eq!(intent2.inner().resource_quantity(), state.model().inner().resource_quantity());
         assert_eq!(intent2.active(), &false);
         assert_eq!(intent2.created(), &now);
         assert_eq!(intent2.updated(), &now2);
         assert_eq!(intent2.deleted(), &None);
 
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![CompanyPermission::ProcessDelete]);
-        let res = update(&user, &member2, &company, intent1.clone(), Some(Some(costs2.clone())), None, None, Some(None), None, None, None, None, None, None, None, Some(vec![]), Some(Some("buy widget".into())), None, None, None, None, None, None, Some(false), &now2);
+        let mut state2 = state.clone();
+        state2.company_mut().set_id(CompanyID::new("bill's company"));
+        let res = testfn_inner(&state2, Some(Some(CompanyID::new("widgetzzz plus").into())), None);
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
+        let res = testfn_inner(&state2, None, Some(Some(CompanyID::new("widgetzzz plus").into())));
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = update(&user2, &member, &company, intent1.clone(), Some(Some(costs2.clone())), None, None, Some(None), None, None, None, None, None, None, None, Some(vec![]), Some(Some("buy widget".into())), None, None, None, None, None, None, Some(false), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now2, |company: Company| {
-            update(&user, &member, &company, intent1.clone(), Some(Some(costs2.clone())), None, None, Some(None), None, None, None, None, None, None, None, Some(vec![]), Some(Some("buy widget".into())), None, None, None, None, None, None, Some(false), &now2)
-        });
-
-        let mut company3 = company.clone();
-        company3.set_id(CompanyID::new("bill's company"));
-        let res = update(&user, &member, &company3, intent1.clone(), Some(Some(costs2.clone())), None, None, Some(None), None, None, None, None, None, None, None, Some(vec![]), Some(Some("buy widget".into())), None, Some(Some(CompanyID::new("widgetzzz plus").into())), None, None, None, None, Some(false), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-        let res = update(&user, &member, &company3, intent1.clone(), Some(Some(costs2.clone())), None, None, Some(None), None, None, None, None, None, None, None, Some(vec![]), Some(Some("buy widget".into())), None, None, Some(Some(CompanyID::new("widgetzzz plus").into())), None, None, None, Some(false), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let res = update(&user, &member, &company, intent1.clone(), Some(Some(costs2.clone())), None, None, Some(None), None, None, None, None, None, None, None, Some(vec![]), Some(Some("buy widget".into())), None, Some(None), Some(None), None, None, None, Some(false), &now2);
+        let res = testfn_inner(&state, Some(None), Some(None));
         assert_eq!(res, Err(Error::MissingFields(vec!["provider".into(), "receiver".into()])));
     }
 
@@ -349,65 +325,31 @@ mod tests {
     fn can_delete() {
         let now = util::time::now();
         let id = IntentID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::IntentCreate, CompanyPermission::IntentDelete], &now);
+        let mut state = TestState::standard(vec![CompanyPermission::IntentCreate, CompanyPermission::IntentDelete], &now);
         let costs = Costs::new_with_labor("widgetmaker", 42);
-        let loc = SpatialThing::builder()
-            .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
-            .build().unwrap();
 
-        let mods = create(&user, &member, &company, id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(loc.clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![company.agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(company.agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
-        let intent1 = mods[0].clone().expect_op::<Intent>(Op::Create).unwrap();
+        let mods = create(state.user(), state.member(), state.company(), id.clone(), Some(costs.clone()), OrderAction::Transfer, None, Some(state.loc().clone()), Some(Measure::new(10, Unit::One)), None, None, Some(false), Some(now.clone()), None, None, vec![state.company().agent_id()], Some("buy my widget".into()), Some("gee willickers i hope someone buys my widget".into()), Some(state.company().agent_id()), None, None, Some(ResourceID::new("widget1")), None, true, &now).unwrap().into_vec();
+        let intent = mods[0].clone().expect_op::<Intent>(Op::Create).unwrap();
+        state.model = Some(intent);
 
         let now2 = util::time::now();
-        let mods = delete(&user, &member, &company, intent1.clone(), &now2).unwrap().into_vec();
+        let testfn = |state: &TestState<Intent, Intent>| {
+            delete(state.user(), state.member(), state.company(), state.model().clone(), &now2)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+        test::double_deleted_tester(&state, "intent", &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let intent2 = mods[0].clone().expect_op::<Intent>(Op::Delete).unwrap();
-        assert_eq!(intent2.id(), intent1.id());
-        assert_eq!(intent2.move_costs(), intent1.move_costs());
-        assert_eq!(intent2.inner().action(), intent1.inner().action());
-        assert_eq!(intent2.inner().agreed_in(), intent2.inner().agreed_in());
-        assert_eq!(intent2.inner().at_location(), intent1.inner().at_location());
-        assert_eq!(intent2.inner().available_quantity(), intent1.inner().available_quantity());
-        assert_eq!(intent2.inner().due(), intent1.inner().due());
-        assert_eq!(intent2.inner().effort_quantity(), intent1.inner().effort_quantity());
-        assert_eq!(intent2.inner().finished(), intent1.inner().finished());
-        assert_eq!(intent2.inner().has_beginning(), intent1.inner().has_beginning());
-        assert_eq!(intent2.inner().has_end(), intent1.inner().has_end());
-        assert_eq!(intent2.inner().has_point_in_time(), intent1.inner().has_point_in_time());
-        assert_eq!(intent2.inner().in_scope_of(), intent1.inner().in_scope_of());
-        assert_eq!(intent2.inner().name(), intent1.inner().name());
-        assert_eq!(intent2.inner().note(), intent1.inner().note());
-        assert_eq!(intent2.inner().provider(), intent1.inner().provider());
-        assert_eq!(intent2.inner().receiver(), intent1.inner().receiver());
-        assert_eq!(intent2.inner().resource_conforms_to(), intent1.inner().resource_conforms_to());
-        assert_eq!(intent2.inner().resource_inventoried_as(), intent1.inner().resource_inventoried_as());
-        assert_eq!(intent2.inner().resource_quantity(), intent1.inner().resource_quantity());
-        assert_eq!(intent2.active(), intent1.active());
-        assert_eq!(intent2.created(), intent1.created());
-        assert_eq!(intent2.updated(), intent1.updated());
+        assert_eq!(intent2.id(), state.model().id());
+        assert_eq!(intent2.move_costs(), state.model().move_costs());
+        assert_eq!(intent2.inner(), state.model().inner());
+        assert_eq!(intent2.active(), state.model().active());
+        assert_eq!(intent2.created(), state.model().created());
+        assert_eq!(intent2.updated(), state.model().updated());
         assert_eq!(intent2.deleted(), &Some(now2));
-
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![CompanyPermission::ProcessDelete]);
-        let res = delete(&user, &member2, &company, intent1.clone(), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = delete(&user2, &member, &company, intent1.clone(), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now2, |company: Company| {
-            delete(&user, &member, &company, intent1.clone(), &now2)
-        });
-
-        let mut intent3 = intent1.clone();
-        intent3.set_deleted(Some(now2.clone()));
-        let res = delete(&user, &member, &company, intent3.clone(), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("intent".into())));
     }
 }
 

@@ -52,9 +52,8 @@ mod tests {
     use crate::{
         models::{
             company::CompanyID,
-            testutils::make_process,
         },
-        util,
+        util::{self, test::*},
     };
     use rust_decimal_macros::*;
 

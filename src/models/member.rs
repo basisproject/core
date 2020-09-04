@@ -28,7 +28,7 @@ use crate::{
         company::{CompanyID, Permission},
         lib::{
             agent::{Agent, AgentID},
-            basis_model::ActiveState,
+            basis_model::Model,
         },
         occupation::OccupationID,
         user::UserID,
@@ -274,9 +274,8 @@ mod test {
         models::{
             company::{CompanyID, Permission as CompanyPermission},
             user::UserID,
-            testutils::make_member_worker,
         },
-        util,
+        util::{self, test::*},
     };
     use std::convert::TryInto;
     use super::*;

@@ -16,7 +16,7 @@ use crate::{
         Modifications,
         lib::{
             agent::AgentID,
-            basis_model::ActiveState,
+            basis_model::Model,
         },
         agreement::{Agreement, AgreementID},
         company::{Company, Permission as CompanyPermission},
@@ -90,25 +90,24 @@ mod tests {
         models::{
             lib::agent::Agent,
             company::CompanyID,
-            member::MemberID,
-            occupation::OccupationID,
-            testutils::{deleted_company_tester, make_user, make_company, make_member_worker},
-            user::UserID,
         },
-        util,
+        util::{self, test::{self, *}},
     };
 
     #[test]
     fn can_create() {
         let now = util::time::now();
         let id = AgreementID::create();
-        let company_to = make_company(&CompanyID::create(), "sam's widgets", &now);
+        let state = TestState::standard(vec![CompanyPermission::AgreementCreate], &now);
         let company_from = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&MemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate], &now);
-        let participants = vec![company_to.agent_id(), company_from.agent_id()];
+        let participants = vec![state.company().agent_id(), company_from.agent_id()];
 
-        let mods = create(&user, &member, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
+        let testfn = |state: &TestState<Agreement, Agreement>| {
+            create(state.user(), state.member(), state.company(), id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let agreement = mods[0].clone().expect_op::<Agreement>(Op::Create).unwrap();
@@ -121,36 +120,26 @@ mod tests {
         assert_eq!(agreement.created(), &now);
         assert_eq!(agreement.updated(), &now);
         assert_eq!(agreement.deleted(), &None);
-
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![CompanyPermission::AgreementUpdate]);
-        let res = create(&user, &member2, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = create(&user2, &member, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company_to.clone(), &now, |company: Company| {
-            create(&user, &member, &company, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now)
-        });
     }
 
     #[test]
     fn can_update() {
         let now = util::time::now();
         let id = AgreementID::create();
-        let company_to = make_company(&CompanyID::create(), "sam's widgets", &now);
+        let state = TestState::standard(vec![CompanyPermission::AgreementCreate, CompanyPermission::AgreementUpdate], &now);
         let company_from = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&MemberID::create(), user.id(), company_to.id(), &OccupationID::create(), vec![CompanyPermission::AgreementCreate, CompanyPermission::AgreementUpdate], &now);
-        let participants = vec![company_to.agent_id(), company_from.agent_id()];
+        let participants = vec![state.company().agent_id(), company_from.agent_id()];
 
-        let mods = create(&user, &member, &company_to, id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
+        let mods = create(state.user(), state.member(), state.company(), id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
         let agreement1 = mods[0].clone().expect_op::<Agreement>(Op::Create).unwrap();
         let now2 = util::time::now();
-        let mods = update(&user, &member, &company_to, agreement1.clone(), Some(vec![company_from.agent_id()]), Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2).unwrap().into_vec();
+
+        let testfn = |state: &TestState<Agreement, Agreement>| {
+            update(state.user(), state.member(), state.company(), agreement1.clone(), Some(vec![company_from.agent_id()]), Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         let agreement2 = mods[0].clone().expect_op::<Agreement>(Op::Update).unwrap();
 
         assert_eq!(agreement2.id(), agreement1.id());
@@ -162,20 +151,6 @@ mod tests {
         assert_eq!(agreement2.created(), agreement1.created());
         assert_eq!(agreement2.updated(), &now2);
         assert_eq!(agreement2.deleted(), &None);
-
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![CompanyPermission::AgreementCreate]);
-        let res = update(&user, &member2, &company_to, agreement1.clone(), None, Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = update(&user2, &member, &company_to, agreement1.clone(), None, Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company_to.clone(), &now2, |company: Company| {
-            update(&user, &member, &company, agreement1.clone(), None, Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2)
-        });
     }
 }
 

@@ -14,7 +14,7 @@ use crate::{
         event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
         member::Member,
-        lib::basis_model::ActiveState,
+        lib::basis_model::Model,
         process::Process,
         user::User,
     },
@@ -106,11 +106,9 @@ mod tests {
             member::*,
             event::{Event, EventID, EventError},
             lib::agent::Agent,
-            occupation::OccupationID,
             process::ProcessID,
-            testutils::{deleted_company_tester, make_user, make_company, make_member_worker, make_process},
-            user::UserID,
         },
+        util::test::{self, *},
     };
     use rust_decimal_macros::*;
 
@@ -119,107 +117,89 @@ mod tests {
         let now: DateTime<Utc> = "2018-06-06T00:00:00Z".parse().unwrap();
         let now2: DateTime<Utc> = "2018-06-06T06:52:00Z".parse().unwrap();
         let id = EventID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let occupation_id = OccupationID::new("machinist");
-        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &occupation_id, vec![CompanyPermission::Work], &now);
-        let worker = member.clone();
-        let process = make_process(&ProcessID::create(), company.id(), "make widgets", &Costs::new_with_labor(occupation_id.clone(), dec!(177.5)), &now);
+        let mut state = TestState::standard(vec![CompanyPermission::Work], &now);
+        let occupation_id = state.member().occupation_id().unwrap().clone();
+        let worker = state.member().clone();
+        let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &Costs::new_with_labor(occupation_id.clone(), dec!(177.5)), &now);
+        state.model = Some(worker);
+        state.model2 = Some(process);
 
-        let mods = work(&user, &member, &company, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2).unwrap().into_vec();
+        let testfn = |state: &TestState<Member, Process>| {
+            work(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 2);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
+
         assert_eq!(event.id(), &id);
-        assert_eq!(event.inner().agreed_in(), member.agreement());
+        assert_eq!(event.inner().agreed_in(), state.member().agreement());
         assert_eq!(event.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(event.inner().has_end(), &Some(now2.clone()));
-        assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
+        assert_eq!(event.inner().input_of(), &Some(state.model2().id().clone()));
         assert_eq!(event.inner().note(), &Some("just doing some work".into()));
-        assert_eq!(event.inner().provider().clone(), worker.agent_id());
-        assert_eq!(event.inner().receiver().clone(), company.agent_id());
+        assert_eq!(event.inner().provider().clone(), state.model().agent_id());
+        assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor(occupation_id.clone(), dec!(78.4))));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now2);
         assert_eq!(event.updated(), &now2);
+
         let mut costs2 = Costs::new();
         costs2.track_labor(occupation_id.clone(), dec!(177.5) + dec!(78.4));
         costs2.track_labor_hours(occupation_id.clone(), dec!(6.8666666666666666666666666666));
         let process2 = mods[1].clone().expect_op::<Process>(Op::Update).unwrap();
-        assert_eq!(process2.id(), process.id());
-        assert_eq!(process2.company_id(), company.id());
+        assert_eq!(process2.id(), state.model2().id());
+        assert_eq!(process2.company_id(), state.company().id());
         assert_eq!(process2.inner().name(), "make widgets");
         assert_eq!(process2.costs(), &costs2);
-
-        let user2 = make_user(&UserID::create(), Some(vec![]), &now);
-        let res = work(&user2, &member, &company, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![]);
-        let res = work(&user, &member2, &company, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now, |company: Company| {
-            work(&user, &member, &company, id.clone(), worker.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2)
-        });
 
         // test worker != member
-        let mut worker2 = worker.clone();
-        worker2.set_id(MemberID::create());
-        let res = work(&user, &member, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
+        let mut state2 = state.clone();
+        state2.model_mut().set_id(MemberID::create());
+        let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![CompanyPermission::WorkAdmin]);
-        let mods = work(&user, &member2, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), None, &now2).unwrap().into_vec();
+        state2.member_mut().set_permissions(vec![CompanyPermission::WorkAdmin]);
+        let mods = testfn(&state2).unwrap().into_vec();
         assert_eq!(mods.len(), 2);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
+
         assert_eq!(event.id(), &id);
-        assert_eq!(event.inner().agreed_in(), member2.agreement());
+        assert_eq!(event.inner().agreed_in(), state2.member().agreement());
         assert_eq!(event.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(event.inner().has_end(), &Some(now2.clone()));
-        assert_eq!(event.inner().input_of(), &Some(process.id().clone()));
-        assert_eq!(event.inner().note(), &None);
-        assert_eq!(event.inner().provider().clone(), worker2.agent_id());
-        assert_eq!(event.inner().receiver().clone(), company.agent_id());
+        assert_eq!(event.inner().input_of(), &Some(state.model2().id().clone()));
+        assert_eq!(event.inner().note(), &Some("just doing some work".into()));
+        assert_eq!(event.inner().provider().clone(), state2.model().agent_id());
+        assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
         assert_eq!(event.move_costs(), &Some(Costs::new_with_labor(occupation_id.clone(), dec!(78.4))));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now2);
         assert_eq!(event.updated(), &now2);
+
         let mut costs2 = Costs::new();
         costs2.track_labor(occupation_id.clone(), dec!(177.5) + dec!(78.4));
         costs2.track_labor_hours(occupation_id.clone(), dec!(6.8666666666666666666666666666));
         let process2 = mods[1].clone().expect_op::<Process>(Op::Update).unwrap();
-        assert_eq!(process2.id(), process.id());
-        assert_eq!(process2.company_id(), company.id());
+
+        assert_eq!(process2.id(), state.model2().id());
+        assert_eq!(process2.company_id(), state.company().id());
         assert_eq!(process2.inner().name(), "make widgets");
         assert_eq!(process2.costs(), &costs2);
 
-        let user2 = make_user(&UserID::create(), Some(vec![]), &now);
-        let res = work(&user2, &member2, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut member3 = member2.clone();
-        member3.set_permissions(vec![]);
-        let res = work(&user, &member3, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now2, |company: Company| {
-            work(&user, &member2, &company, id.clone(), worker2.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2)
-        });
-
         // can't work into a process you don't own
-        let mut process3 = process.clone();
-        process3.set_company_id(CompanyID::new("zing"));
-        let res = work(&user, &member2, &company, id.clone(), worker2.clone(), process3.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
+        let mut state3 = state.clone();
+        state3.model2_mut().set_company_id(CompanyID::new("zing"));
+        let res = testfn(&state3);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
-        let mut worker3 = worker2.clone();
-        worker3.set_class(MemberClass::User(MemberUser::new()));
-        let res = work(&user, &member2, &company, id.clone(), worker3.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
+        let mut state4 = state.clone();
+        state4.model_mut().set_class(MemberClass::User(MemberUser::new()));
+        let res = testfn(&state4);
         assert_eq!(res, Err(Error::MemberMustBeWorker));
-        worker3.set_class(MemberClass::Company(MemberCompany::new()));
-        let res = work(&user, &member2, &company, id.clone(), worker3.clone(), process.clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2);
+        state4.model_mut().set_class(MemberClass::Company(MemberCompany::new()));
+        let res = testfn(&state4);
         assert_eq!(res, Err(Error::MemberMustBeWorker));
     }
 }

@@ -18,7 +18,7 @@ use crate::{
         Modifications,
         company::{Company, Permission as CompanyPermission},
         member::Member,
-        lib::basis_model::{ActiveState, Deletable},
+        lib::basis_model::Model,
         process_spec::{ProcessSpec, ProcessSpecID},
         user::User,
     },
@@ -89,130 +89,90 @@ mod tests {
     use super::*;
     use crate::{
         models::{
-            company::CompanyID,
-            member::MemberID,
-            occupation::OccupationID,
             process_spec::{ProcessSpec, ProcessSpecID},
-            testutils::{deleted_company_tester, make_user, make_company, make_member_worker},
-            user::UserID,
         },
-        util,
+        util::{self, test::{self, *}},
     };
 
     #[test]
     fn can_create() {
         let now = util::time::now();
         let id = ProcessSpecID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
+        let state = TestState::standard(vec![CompanyPermission::ProcessSpecCreate], &now);
 
-        let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_vec();
+        let testfn = |state: &TestState<ProcessSpec, ProcessSpec>| {
+            create(state.user(), state.member(), state.company(), id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now)
+        };
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let recspec = mods[0].clone().expect_op::<ProcessSpec>(Op::Create).unwrap();
         assert_eq!(recspec.id(), &id);
         assert_eq!(recspec.inner().name(), "SEIZE THE MEANS OF PRODUCTION");
         assert_eq!(recspec.inner().note(), &Some("our first process".into()));
-        assert_eq!(recspec.company_id(), company.id());
+        assert_eq!(recspec.company_id(), state.company().id());
         assert_eq!(recspec.active(), &true);
         assert_eq!(recspec.created(), &now);
         assert_eq!(recspec.updated(), &now);
         assert_eq!(recspec.deleted(), &None);
-
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![CompanyPermission::ProcessSpecDelete]);
-        let res = create(&user, &member2, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = create(&user2, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now, |company: Company| {
-            create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now)
-        });
     }
 
     #[test]
     fn can_update() {
         let now = util::time::now();
         let id = ProcessSpecID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
-        let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_vec();
-        let recspec = mods[0].clone().expect_op::<ProcessSpec>(Op::Create).unwrap();
+        let mut state = TestState::standard(vec![CompanyPermission::ProcessSpecCreate, CompanyPermission::ProcessSpecUpdate], &now);
+        let mods = create(state.user(), state.member(), state.company(), id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_vec();
+        let procspec = mods[0].clone().expect_op::<ProcessSpec>(Op::Create).unwrap();
+        state.model = Some(procspec);
 
-        let res = update(&user, &member, &company, recspec.clone(), Some("best widget".into()), None, Some(false), &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        member.set_permissions(vec![CompanyPermission::ProcessSpecUpdate]);
         let now2 = util::time::now();
-        let mods = update(&user, &member, &company, recspec.clone(), Some("best widget".into()), None, Some(false), &now2).unwrap().into_vec();
+        let testfn = |state: &TestState<ProcessSpec, ProcessSpec>| {
+            update(state.user(), state.member(), state.company(), state.model().clone(), Some("best widget".into()), None, Some(false), &now2)
+        };
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
-        let recspec2 = mods[0].clone().expect_op::<ProcessSpec>(Op::Update).unwrap();
-        assert_eq!(recspec2.id(), &id);
-        assert_eq!(recspec2.inner().name(), "best widget");
-        assert_eq!(recspec2.inner().note(), &Some("our first process".into()));
-        assert_eq!(recspec2.company_id(), company.id());
-        assert_eq!(recspec2.active(), &false);
-        assert_eq!(recspec2.created(), &now);
-        assert_eq!(recspec2.updated(), &now2);
-        assert_eq!(recspec2.deleted(), &None);
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = update(&user2, &member, &company, recspec.clone(), Some("best widget".into()), None, Some(false), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now2, |company: Company| {
-            update(&user, &member, &company, recspec.clone(), Some("best widget".into()), None, Some(false), &now2)
-        });
+        let procspec2 = mods[0].clone().expect_op::<ProcessSpec>(Op::Update).unwrap();
+        assert_eq!(procspec2.id(), &id);
+        assert_eq!(procspec2.inner().name(), "best widget");
+        assert_eq!(procspec2.inner().note(), &Some("our first process".into()));
+        assert_eq!(procspec2.company_id(), state.company().id());
+        assert_eq!(procspec2.active(), &false);
+        assert_eq!(procspec2.created(), &now);
+        assert_eq!(procspec2.updated(), &now2);
+        assert_eq!(procspec2.deleted(), &None);
     }
 
     #[test]
     fn can_delete() {
         let now = util::time::now();
         let id = ProcessSpecID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessSpecCreate], &now);
-        let mods = create(&user, &member, &company, id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_vec();
+        let mut state = TestState::standard(vec![CompanyPermission::ProcessSpecCreate, CompanyPermission::ProcessSpecDelete], &now);
+        let mods = create(state.user(), state.member(), state.company(), id.clone(), "SEIZE THE MEANS OF PRODUCTION", "our first process", true, &now).unwrap().into_vec();
         let procspec = mods[0].clone().expect_op::<ProcessSpec>(Op::Create).unwrap();
+        state.model = Some(procspec);
 
         let now2 = util::time::now();
-        let res = delete(&user, &member, &company, procspec.clone(), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
+        let testfn = |state: &TestState<ProcessSpec, ProcessSpec>| {
+            delete(state.user(), state.member(), state.company(), state.model().clone(), &now2)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+        test::double_deleted_tester(&state, "process_spec", &testfn);
 
-        member.set_permissions(vec![CompanyPermission::ProcessSpecDelete]);
-        let mods = delete(&user, &member, &company, procspec.clone(), &now2).unwrap().into_vec();
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let procspec2 = mods[0].clone().expect_op::<ProcessSpec>(Op::Delete).unwrap();
         assert_eq!(procspec2.id(), &id);
         assert_eq!(procspec2.inner().name(), "SEIZE THE MEANS OF PRODUCTION");
-        assert_eq!(procspec2.company_id(), company.id());
+        assert_eq!(procspec2.company_id(), state.company().id());
         assert_eq!(procspec2.active(), &true);
         assert_eq!(procspec2.created(), &now);
         assert_eq!(procspec2.updated(), &now);
         assert_eq!(procspec2.deleted(), &Some(now2.clone()));
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = delete(&user2, &member, &company, procspec.clone(), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now2, |company: Company| {
-            delete(&user, &member, &company, procspec.clone(), &now2)
-        });
-
-        let mut procspec3 = procspec.clone();
-        procspec3.set_deleted(Some(now2.clone()));
-        let res = delete(&user, &member, &company, procspec3.clone(), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("process_spec".into())));
     }
 }
 

@@ -17,7 +17,7 @@ use crate::{
         member::Member,
         lib::{
             agent::Agent,
-            basis_model::ActiveState,
+            basis_model::Model,
         },
         process::Process,
         user::User,
@@ -89,15 +89,12 @@ mod tests {
         models::{
             agreement::AgreementID,
             company::CompanyID,
-            member::MemberID,
             event::{EventID, EventError},
             lib::agent::Agent,
             occupation::OccupationID,
             process::{Process, ProcessID},
-            testutils::{deleted_company_tester, make_agreement, make_user, make_company, make_member_worker, make_process},
-            user::UserID,
         },
-        util,
+        util::{self, test::{self, *}},
     };
     use rust_decimal_macros::*;
 
@@ -105,22 +102,29 @@ mod tests {
     fn can_deliver_service() {
         let now = util::time::now();
         let id = EventID::create();
-        let company_from = make_company(&CompanyID::create(), "jerry's planks", &now);
+        let mut state = TestState::standard(vec![CompanyPermission::DeliverService], &now);
+        let company_from = state.company().clone();
         let company_to = make_company(&CompanyID::create(), "jinkey's skateboards", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 1234", "gotta make some planks", &now);
         let agreed_in: Url = "https://legalzoom.com/my-dad-is-suing-your-dad-the-agreement".parse().unwrap();
-        let user = make_user(&UserID::create(), None, &now);
         let occupation_id = OccupationID::new("lawyer");
-        let member = make_member_worker(&MemberID::create(), user.id(), company_from.id(), &occupation_id, vec![], &now);
         let process_from = make_process(&ProcessID::create(), company_from.id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), dec!(177.25)), &now);
         let process_to = make_process(&ProcessID::create(), company_to.id(), "employee legal agreement drafting", &Costs::new_with_labor(occupation_id.clone(), dec!(804)), &now);
+        state.model = Some(process_from);
+        state.model2 = Some(process_to);
 
-        let res = deliver_service(&user, &member, &company_from, &company_to, &agreement, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), None, None, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
+        let testfn_inner = |state: &TestState<Process, Process>, company_from: &Company, company_to: &Company, agreement: &Agreement| {
+            deliver_service(state.user(), state.member(), company_from, company_to, agreement, id.clone(), state.model().clone(), state.model2().clone(), Costs::new_with_labor("lawyer", 100), Some(agreed_in.clone()), Some("making planks lol".into()), &now)
+        };
+        let testfn_from = |state: &TestState<Process, Process>| {
+            testfn_inner(state, state.company(), &company_to, &agreement)
+        };
+        let testfn_to = |state: &TestState<Process, Process>| {
+            testfn_inner(state, &company_from, state.company(), &agreement)
+        };
+        test::standard_transaction_tests(&state, &testfn_from);
 
-        let mut member = member.clone();
-        member.set_permissions(vec![CompanyPermission::DeliverService]);
-        let mods = deliver_service(&user, &member, &company_from, &company_to, &agreement, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), Some(agreed_in.clone()), Some("making planks lol".into()), &now).unwrap().into_vec();
+        let mods = testfn_from(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 3);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         let process_from2 = mods[1].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -129,9 +133,9 @@ mod tests {
         assert_eq!(event.id(), &id);
         assert_eq!(event.inner().agreed_in(), &Some(agreed_in.clone()));
         assert_eq!(event.inner().has_point_in_time(), &Some(now.clone()));
-        assert_eq!(event.inner().input_of(), &Some(process_to.id().clone()));
+        assert_eq!(event.inner().input_of(), &Some(state.model2().id().clone()));
         assert_eq!(event.inner().note(), &Some("making planks lol".into()));
-        assert_eq!(event.inner().output_of(), &Some(process_from.id().clone()));
+        assert_eq!(event.inner().output_of(), &Some(state.model().id().clone()));
         assert_eq!(event.inner().provider().clone(), company_from.agent_id());
         assert_eq!(event.inner().realization_of(), &Some(agreement.id().clone()));
         assert_eq!(event.inner().receiver().clone(), company_to.agent_id());
@@ -143,49 +147,37 @@ mod tests {
 
         let mut costs2 = Costs::new();
         costs2.track_labor("lawyer", dec!(177.25) - dec!(100));
-        assert_eq!(process_from2.id(), process_from.id());
+        assert_eq!(process_from2.id(), state.model().id());
         assert_eq!(process_from2.company_id(), company_from.id());
         assert_eq!(process_from2.costs(), &costs2);
 
         let mut costs2 = Costs::new();
         costs2.track_labor("lawyer", dec!(804) + dec!(100));
-        assert_eq!(process_to2.id(), process_to.id());
+        assert_eq!(process_to2.id(), state.model2().id());
         assert_eq!(process_to2.company_id(), company_to.id());
         assert_eq!(process_to2.costs(), &costs2);
 
-        let user2 = make_user(&UserID::create(), Some(vec![]), &now);
-        let res = deliver_service(&user2, &member, &company_from, &company_to, &agreement, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), None, None, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![]);
-        let res = deliver_service(&user, &member2, &company_from, &company_to, &agreement, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), None, None, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company_from.clone(), &now, |company_from: Company| {
-            deliver_service(&user, &member, &company_from, &company_to, &agreement, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), None, None, &now)
-        });
-        deleted_company_tester(company_to.clone(), &now, |company_to: Company| {
-            deliver_service(&user, &member, &company_from, &company_to, &agreement, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), None, None, &now)
-        });
-
         // can't move costs from a process you don't own
-        let mut process_from3 = process_from.clone();
-        process_from3.set_company_id(CompanyID::new("zing").into());
-        let res = deliver_service(&user, &member, &company_from, &company_to, &agreement, id.clone(), process_from3.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), None, None, &now);
+        let mut state2 = state.clone();
+        state2.model_mut().set_company_id(CompanyID::new("zing").into());
+        let res = testfn_from(&state2);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         // can't move costs into a process company_to doesnt own
-        let mut process_to3 = process_to.clone();
-        process_to3.set_company_id(CompanyID::new("zing").into());
-        let res = deliver_service(&user, &member, &company_from, &company_to, &agreement, id.clone(), process_from.clone(), process_to3.clone(), Costs::new_with_labor("lawyer", 100), None, None, &now);
+        let mut state3 = state.clone();
+        state3.model2_mut().set_company_id(CompanyID::new("zing").into());
+        let res = testfn_from(&state3);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         // can't add an event unless both parties are participants in the agreement
         let mut agreement2 = agreement.clone();
         agreement2.set_participants(vec![company_to.agent_id()]);
-        let res = deliver_service(&user, &member, &company_from, &company_to, &agreement2, id.clone(), process_from.clone(), process_to.clone(), Costs::new_with_labor("lawyer", 100), None, None, &now);
+        let res = testfn_inner(&state, &company_from, &company_to, &agreement2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut state5 = state.clone();
+        state5.company = Some(company_to.clone());
+        test::deleted_company_tester(&state5, &testfn_to);
     }
 }
 

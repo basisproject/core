@@ -30,7 +30,7 @@ use crate::{
         member::{Member},
         lib::{
             agent::{Agent, AgentID},
-            basis_model::ActiveState,
+            basis_model::Model,
         },
         process::{Process, ProcessID},
         resource::{Resource, ResourceID},

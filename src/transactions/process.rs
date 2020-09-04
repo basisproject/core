@@ -29,7 +29,7 @@ use crate::{
         member::Member,
         lib::{
             agent::AgentID,
-            basis_model::{ActiveState, Deletable},
+            basis_model::Model,
         },
         process::{Process, ProcessID},
         process_spec::ProcessSpecID,
@@ -127,27 +127,25 @@ mod tests {
     use super::*;
     use crate::{
         models::{
-            company::CompanyID,
-            member::MemberID,
             lib::agent::Agent,
-            occupation::OccupationID,
             process_spec::ProcessSpecID,
-            testutils::{deleted_company_tester, make_user, make_company, make_member_worker, make_process_spec},
-            user::UserID,
         },
-        util,
+        util::{self, test::{self, *}},
     };
 
     #[test]
     fn can_create() {
         let now = util::time::now();
         let id = ProcessID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
-        let spec = make_process_spec(&ProcessSpecID::create(), company.id(), "Make Gazelle Freestyle", true, &now);
+        let state = TestState::standard(vec![CompanyPermission::ProcessCreate], &now);
+        let spec = make_process_spec(&ProcessSpecID::create(), state.company().id(), "Make Gazelle Freestyle", true, &now);
 
-        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
+        let testfn = |state: &TestState<Process, Process>| {
+            create(state.user(), state.member(), state.company(), id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Create).unwrap();
@@ -159,45 +157,32 @@ mod tests {
         assert_eq!(process.inner().in_scope_of(), &vec![]);
         assert_eq!(process.inner().name(), "Gazelle Freestyle Marathon");
         assert_eq!(process.inner().note(), &Some("tony making me build five of these stupid things".into()));
-        assert_eq!(process.company_id(), company.id());
+        assert_eq!(process.company_id(), state.company().id());
         assert!(process.costs().is_zero());
         assert_eq!(process.active(), &true);
         assert_eq!(process.created(), &now);
         assert_eq!(process.updated(), &now);
         assert_eq!(process.deleted(), &None);
-
-        let mut member2 = member.clone();
-        member2.set_permissions(vec![CompanyPermission::ProcessDelete]);
-        let res = create(&user, &member2, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = create(&user2, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now, |company: Company| {
-            create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now)
-        });
     }
 
     #[test]
     fn can_update() {
         let now = util::time::now();
         let id = ProcessID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
-        let spec = make_process_spec(&ProcessSpecID::create(), company.id(), "Make Gazelle Freestyle", true, &now);
-        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
+        let mut state = TestState::standard(vec![CompanyPermission::ProcessCreate, CompanyPermission::ProcessUpdate], &now);
+        let spec = make_process_spec(&ProcessSpecID::create(), state.company().id(), "Make Gazelle Freestyle", true, &now);
+
+        let mods = create(state.user(), state.member(), state.company(), id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
         let process = mods[0].clone().expect_op::<Process>(Op::Create).unwrap();
+        state.model = Some(process);
 
-        let res = update(&user, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now.clone()), Some(vec![company.agent_id()]), Some(false), &now);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        member.set_permissions(vec![CompanyPermission::ProcessUpdate]);
         let now2 = util::time::now();
-        let mods = update(&user, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.agent_id()]), Some(false), &now2).unwrap().into_vec();
+        let testfn = |state: &TestState<Process, Process>| {
+            update(state.user(), state.member(), state.company(), state.model().clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![state.company().agent_id()]), Some(false), &now2)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let process2 = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
@@ -206,43 +191,36 @@ mod tests {
         assert_eq!(process2.inner().classified_as(), &vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()]);
         assert_eq!(process2.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(process2.inner().has_end(), &Some(now2.clone()));
-        assert_eq!(process2.inner().in_scope_of(), &vec![company.agent_id()]);
+        assert_eq!(process2.inner().in_scope_of(), &vec![state.company().agent_id()]);
         assert_eq!(process2.inner().name(), "Make a GaZeLLe fReeStYlE");
         assert_eq!(process2.inner().note(), &Some("tony making me build five of these stupid things".into()));
-        assert_eq!(process2.company_id(), company.id());
+        assert_eq!(process2.company_id(), state.company().id());
         assert!(process2.costs().is_zero());
         assert_eq!(process2.active(), &false);
         assert_eq!(process2.created(), &now);
         assert_eq!(process2.updated(), &now2);
         assert_eq!(process2.deleted(), &None);
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = update(&user2, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.agent_id()]), Some(false), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now2, |company: Company| {
-            update(&user, &member, &company, process.clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![company.agent_id()]), Some(false), &now2)
-        });
     }
 
     #[test]
     fn can_delete() {
         let now = util::time::now();
         let id = ProcessID::create();
-        let company = make_company(&CompanyID::create(), "jerry's widgets", &now);
-        let user = make_user(&UserID::create(), None, &now);
-        let mut member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), vec![CompanyPermission::ProcessCreate], &now);
-        let spec = make_process_spec(&ProcessSpecID::create(), company.id(), "Make Gazelle Freestyle", true, &now);
-        let mods = create(&user, &member, &company, id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
+        let mut state = TestState::standard(vec![CompanyPermission::CommitmentCreate, CompanyPermission::ProcessCreate, CompanyPermission::ProcessDelete], &now);
+        let spec = make_process_spec(&ProcessSpecID::create(), state.company().id(), "Make Gazelle Freestyle", true, &now);
+
+        let mods = create(state.user(), state.member(), state.company(), id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
         let process = mods[0].clone().expect_op::<Process>(Op::Create).unwrap();
+        state.model = Some(process);
 
         let now2 = util::time::now();
-        let res = delete(&user, &member, &company, process.clone(), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
+        let testfn = |state: &TestState<Process, Process>| {
+            delete(state.user(), state.member(), state.company(), state.model().clone(), &now2)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+        test::double_deleted_tester(&state, "process", &testfn);
 
-        member.set_permissions(vec![CompanyPermission::ProcessDelete]);
-        let mods = delete(&user, &member, &company, process.clone(), &now2).unwrap().into_vec();
+        let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
         let process2 = mods[0].clone().expect_op::<Process>(Op::Delete).unwrap();
@@ -254,26 +232,12 @@ mod tests {
         assert_eq!(process2.inner().in_scope_of(), &vec![]);
         assert_eq!(process2.inner().name(), "Gazelle Freestyle Marathon");
         assert_eq!(process2.inner().note(), &Some("tony making me build five of these stupid things".into()));
-        assert_eq!(process2.company_id(), company.id());
+        assert_eq!(process2.company_id(), state.company().id());
         assert!(process2.costs().is_zero());
         assert_eq!(process2.active(), &true);
         assert_eq!(process2.created(), &now);
         assert_eq!(process2.updated(), &now);
         assert_eq!(process2.deleted(), &Some(now2.clone()));
-
-        let mut user2 = user.clone();
-        user2.set_roles(vec![]);
-        let res = delete(&user2, &member, &company, process.clone(), &now2);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
-
-        deleted_company_tester(company.clone(), &now2, |company: Company| {
-            delete(&user, &member, &company, process.clone(), &now2)
-        });
-
-        let mut process3 = process.clone();
-        process3.set_deleted(Some(now2.clone()));
-        let res = delete(&user, &member, &company, process3.clone(), &now2);
-        assert_eq!(res, Err(Error::ObjectIsDeleted("process".into())));
     }
 }
 
