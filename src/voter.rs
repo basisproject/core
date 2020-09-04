@@ -1,6 +1,6 @@
-//! The voter module assists in creating user objects that effectively have
-//! network super powers. The idea is that this user can be wielded by whatever
-//! system implements the core to represent votes either systemicall or within
+//! The voter module allows creating user objects that effectively have network
+//! super powers. The idea is that this user can be wielded by whatever system
+//! implements the core to represent votes either systemically or within
 //! specific companies.
 //!
 //! The idea here is to provide an interface for democracy without the core
