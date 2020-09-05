@@ -1,4 +1,4 @@
-//! The voter module allows creating user objects that effectively have network
+//! The vote module allows creating user objects that effectively have network
 //! super powers. The idea is that this user can be wielded by whatever system
 //! implements the core to represent votes either systemically or within
 //! specific companies.
@@ -13,16 +13,16 @@
 //!         Agent,
 //!         company::{CompanyID, Permission as CompanyPermission},
 //!     },
-//!     voter::Voter,
+//!     system::vote::Vote,
 //! };
 //! use chrono::Utc;
 //!
-//! let systemic_voter = Voter::systemic(&Utc::now()).unwrap();
+//! let systemic_voter = Vote::systemic(&Utc::now()).unwrap();
 //! assert_eq!(systemic_voter.user().roles(), &vec![Role::SuperAdmin]);
 //! assert_eq!(systemic_voter.member(), &None);
 //!
 //! let company_id = CompanyID::new("hairy larry's scrumptious dairies");
-//! let company_voter = Voter::company(&company_id, &Utc::now()).unwrap();
+//! let company_voter = Vote::company(&company_id, &Utc::now()).unwrap();
 //! assert_eq!(company_voter.user().roles(), &vec![Role::User]);
 //! assert_eq!(company_voter.member().as_ref().unwrap().inner().subject(), &company_voter.user().agent_id());
 //! assert_eq!(company_voter.member().as_ref().unwrap().inner().object(), &company_id.clone().into());
@@ -49,14 +49,14 @@ use vf_rs::vf;
 /// then we need both a user and a member object created for us.
 #[derive(Clone, Debug, PartialEq, Getters)]
 #[getset(get = "pub")]
-pub struct Voter {
+pub struct Vote {
     /// Holds our voting user
     user: User,
     /// Holds our voting member, if we have one
     member: Option<Member>,
 }
 
-impl Voter {
+impl Vote {
     /// Utility function to make a new user with a given role.
     fn make_voter(role: Role, now: &DateTime<Utc>) -> Result<User> {
         let id = UserID::create();
@@ -64,7 +64,7 @@ impl Voter {
             .id(id.clone())
             .roles(vec![role])
             .email(format!("vote-{}@basisproject.net", id.as_str()))
-            .name(format!("Voter {}", id.as_str()))
+            .name(format!("Vote {}", id.as_str()))
             .active(true)
             .created(now.clone())
             .updated(now.clone())
@@ -80,7 +80,7 @@ impl Voter {
     /// super admin abilities.
     ///
     /// If you want to vote to run a transaction for a specific company, see
-    /// the `Voter::company()` method.
+    /// the `Vote::company()` method.
     pub fn systemic(now: &DateTime<Utc>) -> Result<Self> {
         let user = Self::make_voter(Role::SuperAdmin, now)?;
         Ok(Self {
@@ -132,7 +132,7 @@ mod tests {
     #[test]
     fn systemic() {
         let now = util::time::now();
-        let voter = Voter::systemic(&now).unwrap();
+        let voter = Vote::systemic(&now).unwrap();
         assert_eq!(voter.user().roles(), &vec![Role::SuperAdmin]);
         assert_eq!(voter.user().active(), &true);
         assert_eq!(voter.user().created(), &now);
@@ -144,7 +144,7 @@ mod tests {
     fn company() {
         let now = util::time::now();
         let company_id = CompanyID::new("hairy larry's scrumptious dairies");
-        let voter = Voter::company(&company_id, &now).unwrap();
+        let voter = Vote::company(&company_id, &now).unwrap();
         let user = voter.user().clone();
         assert_eq!(user.roles(), &vec![Role::User]);
         assert_eq!(user.active(), &true);
