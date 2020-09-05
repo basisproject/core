@@ -36,6 +36,8 @@ use std::convert::TryFrom;
 #[macro_use]
 pub(crate) mod lib;
 
+pub use lib::agent::{Agent, AgentID};
+
 // load all of our pub mod <model>; ... lines
 load_models!{ pub mod }
 
