@@ -19,15 +19,37 @@ use crate::{
         Modifications,
         company::{Company, CompanyID, Permission as CompanyPermission},
         lib::basis_model::Model,
-        member::{Member, MemberID, MemberClass, MemberWorker},
-        occupation::OccupationID,
+        member::{Member, MemberID, MemberClass},
         user::User,
     },
 };
 use vf_rs::vf;
 
+/// An object that is passed into a `company::create()` transaction that
+/// describes the founding member of the company.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Founder {
+    /// The ID of the member we're creating
+    id: MemberID,
+    /// Founder member class
+    class: MemberClass,
+    /// Whether the founcing member is active on creation or not
+    active: bool,
+}
+
+impl Founder {
+    /// Create a new founder
+    pub fn new(founder_id: MemberID, founder_class: MemberClass, active: bool) -> Self {
+        Founder {
+            id: founder_id,
+            class: founder_class,
+            active,
+        }
+    }
+}
+
 /// Creates a new private company
-pub fn create<T: Into<String>>(caller: &User, id: CompanyID, company_name: T, company_email: T, company_active: bool, founder_id: MemberID, founder_occupation_id: OccupationID, founder_active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create<T: Into<String>>(caller: &User, id: CompanyID, company_name: T, company_email: T, company_active: bool, founder: Founder, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyCreate)?;
     let company = Company::builder()
         .id(id.clone())
@@ -43,6 +65,7 @@ pub fn create<T: Into<String>>(caller: &User, id: CompanyID, company_name: T, co
         .updated(now.clone())
         .build()
         .map_err(|e| Error::BuilderFailed(e))?;
+    let Founder { id: founder_id, class: founder_class, active: founder_active } = founder;
     let founder = Member::builder()
         .id(founder_id)
         .inner(
@@ -53,7 +76,7 @@ pub fn create<T: Into<String>>(caller: &User, id: CompanyID, company_name: T, co
                 .build()
                 .map_err(|e| Error::BuilderFailed(e))?
         )
-        .class(MemberClass::Worker(MemberWorker::new(founder_occupation_id, None)))
+        .class(founder_class)
         .permissions(vec![CompanyPermission::All])
         .active(founder_active)
         .created(now.clone())
@@ -104,6 +127,8 @@ mod tests {
         models::{
             Op,
             lib::agent::Agent,
+            member::{MemberClass, MemberWorker},
+            occupation::OccupationID,
             user::UserID,
         },
         util::{self, test::{self, *}},
@@ -114,36 +139,36 @@ mod tests {
         let id = CompanyID::create();
         let now = util::time::now();
         let state = TestState::standard(vec![], &now);
-        let founder_id = state.member().id().clone();
         let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
+        let founder = Founder::new(state.member().id().clone(), MemberClass::Worker(MemberWorker::new(occupation_id.clone(), None)), true);
 
         let testfn = |state: &TestState<Company, Company>| {
             // just makin' some widgets, huh? that's cool. hey, I made a widget once,
             // it was actually pretty fun. hey if you're free later maybe we could
             // make some widgets togethe...oh, you're busy? oh ok, that's cool, no
             // problem. hey, maybe next time.
-            create(state.user(), id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now)
+            create(state.user(), id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder.clone(), &now)
         };
 
         let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 2);
 
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
-        let founder = mods[1].clone().expect_op::<Member>(Op::Create).unwrap();
+        let member = mods[1].clone().expect_op::<Member>(Op::Create).unwrap();
         assert_eq!(company.id(), &id);
         assert_eq!(company.inner().name(), "jerry's widgets");
         assert_eq!(company.email(), "jerry@widgets.expert");
         assert_eq!(company.active(), &true);
         assert_eq!(company.created(), &now);
         assert_eq!(company.updated(), &now);
-        assert_eq!(founder.id(), &founder_id);
-        assert_eq!(founder.inner().subject(), &state.user().agent_id());
-        assert_eq!(founder.inner().object(), &id.clone().into());
-        assert_eq!(founder.occupation_id(), Some(&occupation_id));
-        assert_eq!(founder.permissions(), &vec![CompanyPermission::All]);
-        assert_eq!(founder.active(), &true);
-        assert_eq!(founder.created(), &now);
-        assert_eq!(founder.updated(), &now);
+        assert_eq!(member.id(), &founder.id);
+        assert_eq!(member.inner().subject(), &state.user().agent_id());
+        assert_eq!(member.inner().object(), &id.clone().into());
+        assert_eq!(member.occupation_id(), Some(&occupation_id));
+        assert_eq!(member.permissions(), &vec![CompanyPermission::All]);
+        assert_eq!(member.active(), &true);
+        assert_eq!(member.created(), &now);
+        assert_eq!(member.updated(), &now);
     }
 
     #[test]
@@ -151,10 +176,10 @@ mod tests {
         let id = CompanyID::create();
         let now = util::time::now();
         let mut state = TestState::standard(vec![], &now);
-        let founder_id = state.member().id().clone();
         let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
+        let founder = Founder::new(state.member().id().clone(), MemberClass::Worker(MemberWorker::new(occupation_id, None)), true);
 
-        let mods = create(state.user(), id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
+        let mods = create(state.user(), id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder.clone(), &now).unwrap().into_vec();
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
         let founder = mods[1].clone().expect_op::<Member>(Op::Create).unwrap();
         state.member = Some(founder);
@@ -194,14 +219,13 @@ mod tests {
         let id = CompanyID::create();
         let now = util::time::now();
         let mut state = TestState::standard(vec![], &now);
-        let founder_id = state.member().id().clone();
         let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
-
-        let mods = create(state.user(), id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder_id.clone(), occupation_id.clone(), true, &now).unwrap().into_vec();
+        let founder = Founder::new(state.member().id().clone(), MemberClass::Worker(MemberWorker::new(occupation_id, None)), true);
+        let mods = create(state.user(), id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder, &now).unwrap().into_vec();
         let company = mods[0].clone().expect_op::<Company>(Op::Create).unwrap();
-        let founder = mods[1].clone().expect_op::<Member>(Op::Create).unwrap();
+        let member = mods[1].clone().expect_op::<Member>(Op::Create).unwrap();
         state.company = Some(company);
-        state.member = Some(founder);
+        state.member = Some(member);
 
         let now2 = util::time::now();
         let testfn_inner = |state: &TestState<Company, Company>, member: Option<&Member>| {
