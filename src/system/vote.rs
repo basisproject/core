@@ -12,18 +12,26 @@
 //!     models::{
 //!         Agent,
 //!         company::{CompanyID, Permission as CompanyPermission},
+//!         member::MemberID,
+//!         user::UserID,
 //!     },
 //!     system::vote::Vote,
 //! };
 //! use chrono::Utc;
 //!
-//! let systemic_voter = Vote::systemic(&Utc::now()).unwrap();
+//! let user_id = UserID::create();
+//! let systemic_voter = Vote::systemic(user_id.clone(), &Utc::now()).unwrap();
+//! assert_eq!(systemic_voter.user().id(), &user_id);
 //! assert_eq!(systemic_voter.user().roles(), &vec![Role::SuperAdmin]);
 //! assert_eq!(systemic_voter.member(), &None);
 //!
+//! let user_id = UserID::create();
+//! let member_id = MemberID::create();
 //! let company_id = CompanyID::new("hairy larry's scrumptious dairies");
-//! let company_voter = Vote::company(&company_id, &Utc::now()).unwrap();
+//! let company_voter = Vote::company(user_id.clone(), member_id.clone(), &company_id, &Utc::now()).unwrap();
+//! assert_eq!(company_voter.user().id(), &user_id);
 //! assert_eq!(company_voter.user().roles(), &vec![Role::User]);
+//! assert_eq!(company_voter.member().as_ref().unwrap().id(), &member_id);
 //! assert_eq!(company_voter.member().as_ref().unwrap().inner().subject(), &company_voter.user().agent_id());
 //! assert_eq!(company_voter.member().as_ref().unwrap().inner().object(), &company_id.clone().into());
 //! assert_eq!(company_voter.member().as_ref().unwrap().permissions(), &vec![CompanyPermission::All]);
@@ -58,13 +66,12 @@ pub struct Vote {
 
 impl Vote {
     /// Utility function to make a new user with a given role.
-    fn make_voter(role: Role, now: &DateTime<Utc>) -> Result<User> {
-        let id = UserID::create();
+    fn make_voter(id: UserID, role: Role, now: &DateTime<Utc>) -> Result<User> {
         User::builder()
-            .id(id.clone())
             .roles(vec![role])
             .email(format!("vote-{}@basisproject.net", id.as_str()))
             .name(format!("Vote {}", id.as_str()))
+            .id(id)
             .active(true)
             .created(now.clone())
             .updated(now.clone())
@@ -81,8 +88,8 @@ impl Vote {
     ///
     /// If you want to vote to run a transaction for a specific company, see
     /// the `Vote::company()` method.
-    pub fn systemic(now: &DateTime<Utc>) -> Result<Self> {
-        let user = Self::make_voter(Role::SuperAdmin, now)?;
+    pub fn systemic(user_id: UserID, now: &DateTime<Utc>) -> Result<Self> {
+        let user = Self::make_voter(user_id, Role::SuperAdmin, now)?;
         Ok(Self {
             user,
             member: None,
@@ -93,12 +100,11 @@ impl Vote {
     ///
     /// This is specifically for voting to run a transaction internal to a
     /// company. This member is given company-wide admin abilities.
-    pub fn company(company_id: &CompanyID, now: &DateTime<Utc>) -> Result<Self> {
-        let user = Self::make_voter(Role::User, now)?;
-        let id = MemberID::create();
+    pub fn company(user_id: UserID, member_id: MemberID, company_id: &CompanyID, now: &DateTime<Utc>) -> Result<Self> {
+        let user = Self::make_voter(user_id, Role::User, now)?;
         let company_agent_id: AgentID = company_id.clone().into();
         let member = Member::builder()
-            .id(id)
+            .id(member_id)
             .inner(
                 vf::AgentRelationship::builder()
                     .subject(user.agent_id())
@@ -131,8 +137,10 @@ mod tests {
 
     #[test]
     fn systemic() {
+        let user_id = UserID::create();
         let now = util::time::now();
-        let voter = Vote::systemic(&now).unwrap();
+        let voter = Vote::systemic(user_id.clone(), &now).unwrap();
+        assert_eq!(voter.user().id(), &user_id);
         assert_eq!(voter.user().roles(), &vec![Role::SuperAdmin]);
         assert_eq!(voter.user().active(), &true);
         assert_eq!(voter.user().created(), &now);
@@ -143,15 +151,19 @@ mod tests {
     #[test]
     fn company() {
         let now = util::time::now();
+        let user_id = UserID::create();
+        let member_id = MemberID::create();
         let company_id = CompanyID::new("hairy larry's scrumptious dairies");
-        let voter = Vote::company(&company_id, &now).unwrap();
+        let voter = Vote::company(user_id.clone(), member_id.clone(), &company_id, &now).unwrap();
         let user = voter.user().clone();
+        assert_eq!(user.id(), &user_id);
         assert_eq!(user.roles(), &vec![Role::User]);
         assert_eq!(user.active(), &true);
         assert_eq!(user.created(), &now);
         assert_eq!(user.updated(), &now);
 
         let member = voter.member().clone().unwrap();
+        assert_eq!(member.id(), &member_id);
         assert_eq!(member.inner().subject(), &user.agent_id());
         assert_eq!(member.inner().object(), &company_id.clone().into());
         match member.class() {
