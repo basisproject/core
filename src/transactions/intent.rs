@@ -1,5 +1,5 @@
 //! Intents are a way to signal either a want or an offer, and often lead to
-//! a `Commitment` which can be thought of as part an order between two agents.
+//! a `Commitment` between two agents.
 //!
 //! For instance, if you made a widget and you want someone to purchase it, you
 //! would create and publish an intent to `transfer` that widget.
