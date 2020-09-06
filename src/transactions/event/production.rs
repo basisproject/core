@@ -2,23 +2,22 @@
 //! `consume` actions are inputs to the productive process and `produce` is the
 //! output the creates a resource.
 
-use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
     costs::Costs,
     error::{Error, Result},
     models::{
-        Op,
-        Modifications,
-        event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
-        member::Member,
+        event::{Event, EventID, EventProcessState},
         lib::basis_model::Model,
+        member::Member,
         process::Process,
         resource::Resource,
         user::User,
+        Modifications, Op,
     },
 };
+use chrono::{DateTime, Utc};
 use om2::{Measure, NumericUnion};
 use vf_rs::vf;
 
@@ -31,7 +30,17 @@ use vf_rs::vf;
 /// Note that the resource *can* have a cost, and those costs can be moved by
 /// citing. For instance, if it took a year of research to derive a formula,
 /// the costs of that research would be imbued in the formula.
-pub fn cite(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn cite(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: EventID,
+    resource: Resource,
+    process: Process,
+    move_costs: Costs,
+    note: Option<String>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Cite)?;
     if !company.is_active() {
@@ -58,7 +67,7 @@ pub fn cite(caller: &User, member: &Member, company: &Company, id: EventID, reso
                 .receiver(company.id().clone())
                 .resource_inventoried_as(Some(resource_id))
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .move_costs(Some(move_costs))
         .active(true)
@@ -82,7 +91,18 @@ pub fn cite(caller: &User, member: &Member, company: &Company, id: EventID, reso
 /// If you make widgets out of steel, then steel is the resource, and the
 /// process would be the fabrication that "consumes" steel (with the output,
 /// ie `produce`, of a widget).
-pub fn consume<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, move_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn consume<T: Into<NumericUnion>>(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: EventID,
+    resource: Resource,
+    process: Process,
+    move_costs: Costs,
+    move_measure: T,
+    note: Option<String>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Consume)?;
     if !company.is_active() {
@@ -115,7 +135,7 @@ pub fn consume<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &
                 .resource_inventoried_as(Some(resource_id))
                 .resource_quantity(Some(measure))
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .move_costs(Some(move_costs))
         .active(true)
@@ -133,13 +153,23 @@ pub fn consume<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &
     Ok(mods)
 }
 
-
 /// Produce a resource, transferring some or all of the costs of the originating
 /// process into the resulting resource.
 ///
 /// For instance, a process might `consume` steel and have a `work` input and
 /// then `produce` a widget.
-pub fn produce<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, produce_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn produce<T: Into<NumericUnion>>(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: EventID,
+    process: Process,
+    resource: Resource,
+    move_costs: Costs,
+    produce_measure: T,
+    note: Option<String>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Produce)?;
     if !company.is_active() {
@@ -172,7 +202,7 @@ pub fn produce<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &
                 .resource_inventoried_as(Some(resource_id))
                 .resource_quantity(Some(measure))
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .move_costs(Some(move_costs))
         .active(true)
@@ -209,7 +239,18 @@ pub fn produce<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &
 /// If you're trying to express some resource being "used up" (for instance
 /// screws being used to build a chair) then you'll probably want `consume`
 /// instead of `use`.
-pub fn useeee(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, process: Process, move_costs: Costs, effort_quantity: Option<Measure>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn useeee(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: EventID,
+    resource: Resource,
+    process: Process,
+    move_costs: Costs,
+    effort_quantity: Option<Measure>,
+    note: Option<String>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Use)?;
     if !company.is_active() {
@@ -237,7 +278,7 @@ pub fn useeee(caller: &User, member: &Member, company: &Company, id: EventID, re
                 .receiver(company.id().clone())
                 .resource_inventoried_as(Some(resource_id))
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .move_costs(Some(move_costs))
         .active(true)
@@ -267,7 +308,10 @@ mod tests {
             process::ProcessID,
             resource::ResourceID,
         },
-        util::{self, test::{self, *}},
+        util::{
+            self,
+            test::{self, *},
+        },
     };
     use om2::Unit;
     use rust_decimal_macros::*;
@@ -281,13 +325,35 @@ mod tests {
         let mut costs = Costs::new();
         costs.track_labor(occupation_id.clone(), dec!(42.2));
         costs.track_labor("homemaker", dec!(13.6));
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
-        let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &costs, &now);
+        let resource = make_resource(
+            &ResourceID::new("widget"),
+            state.company().id(),
+            &Measure::new(dec!(15), Unit::One),
+            &Costs::new_with_labor("homemaker", 157),
+            &now,
+        );
+        let process = make_process(
+            &ProcessID::create(),
+            state.company().id(),
+            "make widgets",
+            &costs,
+            &now,
+        );
         state.model = Some(resource);
         state.model2 = Some(process);
 
         let testfn = |state: &TestState<Resource, Process>| {
-            cite(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Costs::new_with_labor("homemaker", 23), Some("memo".into()), &now)
+            cite(
+                state.user(),
+                state.member(),
+                state.company(),
+                id.clone(),
+                state.model().clone(),
+                state.model2().clone(),
+                Costs::new_with_labor("homemaker", 23),
+                Some("memo".into()),
+                &now,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -304,7 +370,10 @@ mod tests {
         assert_eq!(event.inner().note(), &Some("memo".into()));
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
+        assert_eq!(
+            event.move_costs(),
+            &Some(Costs::new_with_labor("homemaker", 23))
+        );
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
@@ -312,8 +381,14 @@ mod tests {
         let mut costs3 = Costs::new();
         costs3.track_labor("homemaker", dec!(157) - dec!(23));
         assert_eq!(resource2.id(), state.model().id());
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
+        assert_eq!(
+            resource2.inner().accounting_quantity(),
+            &Some(Measure::new(dec!(15), Unit::One))
+        );
+        assert_eq!(
+            resource2.inner().onhand_quantity(),
+            &Some(Measure::new(dec!(15), Unit::One))
+        );
         assert_eq!(resource2.costs(), &costs3);
 
         let mut costs2 = Costs::new();
@@ -332,13 +407,18 @@ mod tests {
 
         // a company that doesn't own a resource can't consume it
         let mut state3 = state.clone();
-        state3.model_mut().inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
+        state3
+            .model_mut()
+            .inner_mut()
+            .set_primary_accountable(Some(CompanyID::new("ziggy").into()));
         let res = testfn(&state3);
         assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
 
         // a company that doesn't have posession of a resource can't consume it
         let mut state4 = state.clone();
-        state4.model_mut().set_in_custody_of(CompanyID::new("ziggy").into());
+        state4
+            .model_mut()
+            .set_in_custody_of(CompanyID::new("ziggy").into());
         let res = testfn(&state4);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
@@ -352,13 +432,36 @@ mod tests {
         let mut costs = Costs::new();
         costs.track_labor(occupation_id.clone(), dec!(42.2));
         costs.track_labor("homemaker", dec!(13.6));
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
-        let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &costs, &now);
+        let resource = make_resource(
+            &ResourceID::new("widget"),
+            state.company().id(),
+            &Measure::new(dec!(15), Unit::One),
+            &Costs::new_with_labor("homemaker", 157),
+            &now,
+        );
+        let process = make_process(
+            &ProcessID::create(),
+            state.company().id(),
+            "make widgets",
+            &costs,
+            &now,
+        );
         state.model = Some(resource);
         state.model2 = Some(process);
 
         let testfn = |state: &TestState<Resource, Process>| {
-            consume(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now)
+            consume(
+                state.user(),
+                state.member(),
+                state.company(),
+                id.clone(),
+                state.model().clone(),
+                state.model2().clone(),
+                Costs::new_with_labor("homemaker", 23),
+                8,
+                Some("memo".into()),
+                &now,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -375,7 +478,10 @@ mod tests {
         assert_eq!(event.inner().note(), &Some("memo".into()));
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
+        assert_eq!(
+            event.move_costs(),
+            &Some(Costs::new_with_labor("homemaker", 23))
+        );
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
@@ -391,8 +497,14 @@ mod tests {
         let mut costs3 = Costs::new();
         costs3.track_labor("homemaker", dec!(157) - dec!(23));
         assert_eq!(resource2.id(), state.model().id());
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(7), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(7), Unit::One)));
+        assert_eq!(
+            resource2.inner().accounting_quantity(),
+            &Some(Measure::new(dec!(7), Unit::One))
+        );
+        assert_eq!(
+            resource2.inner().onhand_quantity(),
+            &Some(Measure::new(dec!(7), Unit::One))
+        );
         assert_eq!(resource2.costs(), &costs3);
 
         // can't consume into a process you don't own
@@ -403,13 +515,18 @@ mod tests {
 
         // a company that doesn't own a resource can't consume it
         let mut state3 = state.clone();
-        state3.model_mut().inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
+        state3
+            .model_mut()
+            .inner_mut()
+            .set_primary_accountable(Some(CompanyID::new("ziggy").into()));
         let res = testfn(&state3);
         assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
 
         // a company that doesn't have posession of a resource can't consume it
         let mut state4 = state.clone();
-        state4.model_mut().set_in_custody_of(CompanyID::new("ziggy").into());
+        state4
+            .model_mut()
+            .set_in_custody_of(CompanyID::new("ziggy").into());
         let res = testfn(&state4);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
@@ -423,13 +540,36 @@ mod tests {
         let mut costs = Costs::new();
         costs.track_labor(occupation_id.clone(), dec!(42.2));
         costs.track_labor("homemaker", dec!(89.3));
-        let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &costs, &now);
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        let process = make_process(
+            &ProcessID::create(),
+            state.company().id(),
+            "make widgets",
+            &costs,
+            &now,
+        );
+        let resource = make_resource(
+            &ResourceID::new("widget"),
+            state.company().id(),
+            &Measure::new(dec!(15), Unit::One),
+            &Costs::new_with_labor("homemaker", 157),
+            &now,
+        );
         state.model = Some(process);
         state.model2 = Some(resource);
 
         let testfn = |state: &TestState<Process, Resource>| {
-            produce(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now)
+            produce(
+                state.user(),
+                state.member(),
+                state.company(),
+                id.clone(),
+                state.model().clone(),
+                state.model2().clone(),
+                Costs::new_with_labor("homemaker", 23),
+                8,
+                Some("memo".into()),
+                &now,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -447,7 +587,10 @@ mod tests {
         assert_eq!(event.inner().output_of(), &Some(state.model().id().clone()));
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
+        assert_eq!(
+            event.move_costs(),
+            &Some(Costs::new_with_labor("homemaker", 23))
+        );
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
@@ -463,8 +606,14 @@ mod tests {
         let mut costs3 = Costs::new();
         costs3.track_labor("homemaker", dec!(157) + dec!(23));
         assert_eq!(resource2.id(), state.model2().id());
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(23), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(23), Unit::One)));
+        assert_eq!(
+            resource2.inner().accounting_quantity(),
+            &Some(Measure::new(dec!(23), Unit::One))
+        );
+        assert_eq!(
+            resource2.inner().onhand_quantity(),
+            &Some(Measure::new(dec!(23), Unit::One))
+        );
         assert_eq!(resource2.costs(), &costs3);
 
         // can't produce from a process you don't own
@@ -475,13 +624,18 @@ mod tests {
 
         // a company that doesn't own a resource can't consume it
         let mut state3 = state.clone();
-        state3.model2_mut().inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
+        state3
+            .model2_mut()
+            .inner_mut()
+            .set_primary_accountable(Some(CompanyID::new("ziggy").into()));
         let res = testfn(&state3);
         assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
 
         // a company that doesn't have posession of a resource can't consume it
         let mut state4 = state.clone();
-        state4.model2_mut().set_in_custody_of(CompanyID::new("ziggy").into());
+        state4
+            .model2_mut()
+            .set_in_custody_of(CompanyID::new("ziggy").into());
         let res = testfn(&state4);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
@@ -495,13 +649,36 @@ mod tests {
         let mut costs = Costs::new();
         costs.track_labor(occupation_id.clone(), dec!(42.2));
         costs.track_labor("homemaker", dec!(13.6));
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
-        let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &costs, &now);
+        let resource = make_resource(
+            &ResourceID::new("widget"),
+            state.company().id(),
+            &Measure::new(dec!(15), Unit::One),
+            &Costs::new_with_labor("homemaker", 157),
+            &now,
+        );
+        let process = make_process(
+            &ProcessID::create(),
+            state.company().id(),
+            "make widgets",
+            &costs,
+            &now,
+        );
         state.model = Some(resource);
         state.model2 = Some(process);
 
         let testfn = |state: &TestState<Resource, Process>| {
-            useeee(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), Some("memo".into()), &now)
+            useeee(
+                state.user(),
+                state.member(),
+                state.company(),
+                id.clone(),
+                state.model().clone(),
+                state.model2().clone(),
+                Costs::new_with_labor("homemaker", dec!(0.3)),
+                Some(Measure::new(8, Unit::Hour)),
+                Some("memo".into()),
+                &now,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -518,7 +695,10 @@ mod tests {
         assert_eq!(event.inner().note(), &Some("memo".into()));
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", dec!(0.3))));
+        assert_eq!(
+            event.move_costs(),
+            &Some(Costs::new_with_labor("homemaker", dec!(0.3)))
+        );
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
@@ -534,8 +714,14 @@ mod tests {
         let mut costs3 = Costs::new();
         costs3.track_labor("homemaker", dec!(157) - dec!(0.3));
         assert_eq!(resource2.id(), state.model().id());
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
+        assert_eq!(
+            resource2.inner().accounting_quantity(),
+            &Some(Measure::new(dec!(15), Unit::One))
+        );
+        assert_eq!(
+            resource2.inner().onhand_quantity(),
+            &Some(Measure::new(dec!(15), Unit::One))
+        );
         assert_eq!(resource2.costs(), &costs3);
 
         // can't useeee into a process you don't own
@@ -546,15 +732,19 @@ mod tests {
 
         // a company that doesn't own a resource can't use it
         let mut state3 = state.clone();
-        state3.model_mut().inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
+        state3
+            .model_mut()
+            .inner_mut()
+            .set_primary_accountable(Some(CompanyID::new("ziggy").into()));
         let res = testfn(&state3);
         assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
 
         // a company that doesn't have posession of a resource can't use it
         let mut state4 = state.clone();
-        state4.model_mut().set_in_custody_of(CompanyID::new("ziggy").into());
+        state4
+            .model_mut()
+            .set_in_custody_of(CompanyID::new("ziggy").into());
         let res = testfn(&state4);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 }
-

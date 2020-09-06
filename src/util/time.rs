@@ -11,4 +11,3 @@ pub fn is_leap_year(year: i64) -> bool {
 pub fn now() -> DateTime<Utc> {
     Utc::now()
 }
-

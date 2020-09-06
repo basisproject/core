@@ -17,30 +17,40 @@
 //! [1]: ../process_spec/index.html
 //! [2]: ../../models/process/index.html
 
-use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
     costs::Costs,
     error::{Error, Result},
     models::{
-        Op,
-        Modifications,
         company::{Company, Permission as CompanyPermission},
+        lib::{agent::AgentID, basis_model::Model},
         member::Member,
-        lib::{
-            agent::AgentID,
-            basis_model::Model,
-        },
         process::{Process, ProcessID},
         process_spec::ProcessSpecID,
         user::User,
+        Modifications, Op,
     },
 };
+use chrono::{DateTime, Utc};
 use url::Url;
 use vf_rs::vf;
 
 /// Create a new process
-pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company, id: ProcessID, spec_id: ProcessSpecID, name: T, note: T, classifications: Vec<Url>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, in_scope_of: Vec<AgentID>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create<T: Into<String>>(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: ProcessID,
+    spec_id: ProcessSpecID,
+    name: T,
+    note: T,
+    classifications: Vec<Url>,
+    has_beginning: Option<DateTime<Utc>>,
+    has_end: Option<DateTime<Utc>>,
+    in_scope_of: Vec<AgentID>,
+    active: bool,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateProcesses)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessCreate)?;
     if !company.is_active() {
@@ -58,7 +68,7 @@ pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company
                 .name(name)
                 .note(Some(note.into()))
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .company_id(company.id().clone())
         .costs(Costs::new())
@@ -71,7 +81,21 @@ pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company
 }
 
 /// Update a process
-pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Process, name: Option<String>, note: Option<String>, classifications: Option<Vec<Url>>, finished: Option<bool>, has_beginning: Option<DateTime<Utc>>, has_end: Option<DateTime<Utc>>, in_scope_of: Option<Vec<AgentID>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    mut subject: Process,
+    name: Option<String>,
+    note: Option<String>,
+    classifications: Option<Vec<Url>>,
+    finished: Option<bool>,
+    has_beginning: Option<DateTime<Utc>>,
+    has_end: Option<DateTime<Utc>>,
+    in_scope_of: Option<Vec<AgentID>>,
+    active: Option<bool>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateProcesses)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessUpdate)?;
     if !company.is_active() {
@@ -106,7 +130,13 @@ pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Pr
 }
 
 /// Delete a process
-pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: Process, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    mut subject: Process,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateProcesses)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ProcessDelete)?;
     if !company.is_active() {
@@ -126,11 +156,11 @@ pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: Pr
 mod tests {
     use super::*;
     use crate::{
-        models::{
-            lib::agent::Agent,
-            process_spec::ProcessSpecID,
+        models::{lib::agent::Agent, process_spec::ProcessSpecID},
+        util::{
+            self,
+            test::{self, *},
         },
-        util::{self, test::{self, *}},
     };
 
     #[test]
@@ -138,10 +168,30 @@ mod tests {
         let now = util::time::now();
         let id = ProcessID::create();
         let state = TestState::standard(vec![CompanyPermission::ProcessCreate], &now);
-        let spec = make_process_spec(&ProcessSpecID::create(), state.company().id(), "Make Gazelle Freestyle", true, &now);
+        let spec = make_process_spec(
+            &ProcessSpecID::create(),
+            state.company().id(),
+            "Make Gazelle Freestyle",
+            true,
+            &now,
+        );
 
         let testfn = |state: &TestState<Process, Process>| {
-            create(state.user(), state.member(), state.company(), id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now)
+            create(
+                state.user(),
+                state.member(),
+                state.company(),
+                id.clone(),
+                spec.id().clone(),
+                "Gazelle Freestyle Marathon",
+                "tony making me build five of these stupid things",
+                vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()],
+                Some(now.clone()),
+                None,
+                vec![],
+                true,
+                &now,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -151,12 +201,18 @@ mod tests {
         let process = mods[0].clone().expect_op::<Process>(Op::Create).unwrap();
         assert_eq!(process.id(), &id);
         assert_eq!(process.inner().based_on(), &Some(spec.id().clone()));
-        assert_eq!(process.inner().classified_as(), &vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()]);
+        assert_eq!(
+            process.inner().classified_as(),
+            &vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()]
+        );
         assert_eq!(process.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(process.inner().has_end(), &None);
         assert_eq!(process.inner().in_scope_of(), &vec![]);
         assert_eq!(process.inner().name(), "Gazelle Freestyle Marathon");
-        assert_eq!(process.inner().note(), &Some("tony making me build five of these stupid things".into()));
+        assert_eq!(
+            process.inner().note(),
+            &Some("tony making me build five of these stupid things".into())
+        );
         assert_eq!(process.company_id(), state.company().id());
         assert!(process.costs().is_zero());
         assert_eq!(process.active(), &true);
@@ -169,16 +225,58 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = ProcessID::create();
-        let mut state = TestState::standard(vec![CompanyPermission::ProcessCreate, CompanyPermission::ProcessUpdate], &now);
-        let spec = make_process_spec(&ProcessSpecID::create(), state.company().id(), "Make Gazelle Freestyle", true, &now);
+        let mut state = TestState::standard(
+            vec![
+                CompanyPermission::ProcessCreate,
+                CompanyPermission::ProcessUpdate,
+            ],
+            &now,
+        );
+        let spec = make_process_spec(
+            &ProcessSpecID::create(),
+            state.company().id(),
+            "Make Gazelle Freestyle",
+            true,
+            &now,
+        );
 
-        let mods = create(state.user(), state.member(), state.company(), id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
+        let mods = create(
+            state.user(),
+            state.member(),
+            state.company(),
+            id.clone(),
+            spec.id().clone(),
+            "Gazelle Freestyle Marathon",
+            "tony making me build five of these stupid things",
+            vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()],
+            Some(now.clone()),
+            None,
+            vec![],
+            true,
+            &now,
+        )
+        .unwrap()
+        .into_vec();
         let process = mods[0].clone().expect_op::<Process>(Op::Create).unwrap();
         state.model = Some(process);
 
         let now2 = util::time::now();
         let testfn = |state: &TestState<Process, Process>| {
-            update(state.user(), state.member(), state.company(), state.model().clone(), Some("Make a GaZeLLe fReeStYlE".into()), None, None, Some(true), None, Some(now2.clone()), Some(vec![state.company().agent_id()]), Some(false), &now2)
+            update(
+                state.user(),
+                state.member(),
+                state.company(),
+                state.model().clone(),
+                Some("Make a GaZeLLe fReeStYlE".into()),
+                None,
+                None,
+                Some(true),
+                None,
+                Some(now2.clone()),
+                Some(vec![state.company().agent_id()]),
+                Some(false),
+                &now2,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -188,12 +286,21 @@ mod tests {
         let process2 = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
         assert_eq!(process2.id(), &id);
         assert_eq!(process2.inner().based_on(), &Some(spec.id().clone()));
-        assert_eq!(process2.inner().classified_as(), &vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()]);
+        assert_eq!(
+            process2.inner().classified_as(),
+            &vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()]
+        );
         assert_eq!(process2.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(process2.inner().has_end(), &Some(now2.clone()));
-        assert_eq!(process2.inner().in_scope_of(), &vec![state.company().agent_id()]);
+        assert_eq!(
+            process2.inner().in_scope_of(),
+            &vec![state.company().agent_id()]
+        );
         assert_eq!(process2.inner().name(), "Make a GaZeLLe fReeStYlE");
-        assert_eq!(process2.inner().note(), &Some("tony making me build five of these stupid things".into()));
+        assert_eq!(
+            process2.inner().note(),
+            &Some("tony making me build five of these stupid things".into())
+        );
         assert_eq!(process2.company_id(), state.company().id());
         assert!(process2.costs().is_zero());
         assert_eq!(process2.active(), &false);
@@ -206,16 +313,51 @@ mod tests {
     fn can_delete() {
         let now = util::time::now();
         let id = ProcessID::create();
-        let mut state = TestState::standard(vec![CompanyPermission::CommitmentCreate, CompanyPermission::ProcessCreate, CompanyPermission::ProcessDelete], &now);
-        let spec = make_process_spec(&ProcessSpecID::create(), state.company().id(), "Make Gazelle Freestyle", true, &now);
+        let mut state = TestState::standard(
+            vec![
+                CompanyPermission::CommitmentCreate,
+                CompanyPermission::ProcessCreate,
+                CompanyPermission::ProcessDelete,
+            ],
+            &now,
+        );
+        let spec = make_process_spec(
+            &ProcessSpecID::create(),
+            state.company().id(),
+            "Make Gazelle Freestyle",
+            true,
+            &now,
+        );
 
-        let mods = create(state.user(), state.member(), state.company(), id.clone(), spec.id().clone(), "Gazelle Freestyle Marathon", "tony making me build five of these stupid things", vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()], Some(now.clone()), None, vec![], true, &now).unwrap().into_vec();
+        let mods = create(
+            state.user(),
+            state.member(),
+            state.company(),
+            id.clone(),
+            spec.id().clone(),
+            "Gazelle Freestyle Marathon",
+            "tony making me build five of these stupid things",
+            vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()],
+            Some(now.clone()),
+            None,
+            vec![],
+            true,
+            &now,
+        )
+        .unwrap()
+        .into_vec();
         let process = mods[0].clone().expect_op::<Process>(Op::Create).unwrap();
         state.model = Some(process);
 
         let now2 = util::time::now();
         let testfn = |state: &TestState<Process, Process>| {
-            delete(state.user(), state.member(), state.company(), state.model().clone(), &now2)
+            delete(
+                state.user(),
+                state.member(),
+                state.company(),
+                state.model().clone(),
+                &now2,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
         test::double_deleted_tester(&state, "process", &testfn);
@@ -226,12 +368,18 @@ mod tests {
         let process2 = mods[0].clone().expect_op::<Process>(Op::Delete).unwrap();
         assert_eq!(process2.id(), &id);
         assert_eq!(process2.inner().based_on(), &Some(spec.id().clone()));
-        assert_eq!(process2.inner().classified_as(), &vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()]);
+        assert_eq!(
+            process2.inner().classified_as(),
+            &vec!["https://www.wikidata.org/wiki/Q1141557".parse().unwrap()]
+        );
         assert_eq!(process2.inner().has_beginning(), &Some(now.clone()));
         assert_eq!(process2.inner().has_end(), &None);
         assert_eq!(process2.inner().in_scope_of(), &vec![]);
         assert_eq!(process2.inner().name(), "Gazelle Freestyle Marathon");
-        assert_eq!(process2.inner().note(), &Some("tony making me build five of these stupid things".into()));
+        assert_eq!(
+            process2.inner().note(),
+            &Some("tony making me build five of these stupid things".into())
+        );
         assert_eq!(process2.company_id(), state.company().id());
         assert!(process2.costs().is_zero());
         assert_eq!(process2.active(), &true);
@@ -240,4 +388,3 @@ mod tests {
         assert_eq!(process2.deleted(), &Some(now2.clone()));
     }
 }
-

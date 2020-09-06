@@ -27,10 +27,8 @@
 //! [Modifications]: struct.Modifications.html
 //! [vf]: https://valueflo.ws/
 
-use crate::{
-    error::{Error, Result},
-};
-use serde::{Serialize, Deserialize};
+use crate::error::{Error, Result};
+use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
 #[macro_use]
@@ -39,10 +37,10 @@ pub(crate) mod lib;
 pub use lib::agent::{Agent, AgentID};
 
 // load all of our pub mod <model>; ... lines
-load_models!{ pub mod }
+load_models! { pub mod }
 
 // create an enum that contains all of our model types
-load_models!{ pub enum Model }
+load_models! { pub enum Model }
 
 /// A type for determining if a model should be created, updated, or deleted.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -226,4 +224,3 @@ mod tests {
         assert_eq!(res, Err(Error::OpMismatch));
     }
 }
-

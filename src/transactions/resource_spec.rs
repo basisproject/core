@@ -10,28 +10,43 @@
 //! [1]: ../resource/index.html
 //! [2]: ../../models/resource_spec/index.html
 
-use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
     error::{Error, Result},
     models::{
-        Op,
-        Modifications,
         company::{Company, Permission as CompanyPermission},
-        member::Member,
         lib::basis_model::Model,
+        member::Member,
         resource_spec::{ResourceSpec, ResourceSpecID},
         user::User,
+        Modifications, Op,
     },
 };
+use chrono::{DateTime, Utc};
 use om2::Unit;
 use url::Url;
 use vf_rs::vf;
 
 /// Create a new ResourceSpec
-pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company, id: ResourceSpecID, name: T, note: T, classifications: Vec<Url>, default_unit_of_effort: Option<Unit>, default_unit_of_resource: Option<Unit>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create<T: Into<String>>(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: ResourceSpecID,
+    name: T,
+    note: T,
+    classifications: Vec<Url>,
+    default_unit_of_effort: Option<Unit>,
+    default_unit_of_resource: Option<Unit>,
+    active: bool,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResourceSpecs)?;
-    member.access_check(caller.id(), company.id(), CompanyPermission::ResourceSpecCreate)?;
+    member.access_check(
+        caller.id(),
+        company.id(),
+        CompanyPermission::ResourceSpecCreate,
+    )?;
     if !company.is_active() {
         Err(Error::ObjectIsInactive("company".into()))?;
     }
@@ -45,7 +60,7 @@ pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company
                 .note(Some(note.into()))
                 .resource_classified_as(classifications)
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .company_id(company.id().clone())
         .active(active)
@@ -57,9 +72,25 @@ pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company
 }
 
 /// Update a resource spec
-pub fn update(caller: &User, member: &Member, company: &Company, mut subject: ResourceSpec, name: Option<String>, note: Option<String>, classifications: Option<Vec<Url>>, default_unit_of_effort: Option<Unit>, default_unit_of_resource: Option<Unit>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    mut subject: ResourceSpec,
+    name: Option<String>,
+    note: Option<String>,
+    classifications: Option<Vec<Url>>,
+    default_unit_of_effort: Option<Unit>,
+    default_unit_of_resource: Option<Unit>,
+    active: Option<bool>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResourceSpecs)?;
-    member.access_check(caller.id(), company.id(), CompanyPermission::ResourceSpecUpdate)?;
+    member.access_check(
+        caller.id(),
+        company.id(),
+        CompanyPermission::ResourceSpecUpdate,
+    )?;
     if !company.is_active() {
         Err(Error::ObjectIsInactive("company".into()))?;
     }
@@ -70,13 +101,19 @@ pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Re
         subject.inner_mut().set_note(Some(note));
     }
     if let Some(classifications) = classifications {
-        subject.inner_mut().set_resource_classified_as(classifications);
+        subject
+            .inner_mut()
+            .set_resource_classified_as(classifications);
     }
     if default_unit_of_effort.is_some() {
-        subject.inner_mut().set_default_unit_of_effort(default_unit_of_effort);
+        subject
+            .inner_mut()
+            .set_default_unit_of_effort(default_unit_of_effort);
     }
     if default_unit_of_resource.is_some() {
-        subject.inner_mut().set_default_unit_of_resource(default_unit_of_resource);
+        subject
+            .inner_mut()
+            .set_default_unit_of_resource(default_unit_of_resource);
     }
     if let Some(active) = active {
         subject.set_active(active);
@@ -86,9 +123,19 @@ pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Re
 }
 
 /// Delete a resource spec
-pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: ResourceSpec, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    mut subject: ResourceSpec,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResourceSpecs)?;
-    member.access_check(caller.id(), company.id(), CompanyPermission::ResourceSpecDelete)?;
+    member.access_check(
+        caller.id(),
+        company.id(),
+        CompanyPermission::ResourceSpecDelete,
+    )?;
     if !company.is_active() {
         Err(Error::ObjectIsInactive("company".into()))?;
     }
@@ -103,10 +150,11 @@ pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: Re
 mod tests {
     use super::*;
     use crate::{
-        models::{
-            resource_spec::{ResourceSpec, ResourceSpecID},
+        models::resource_spec::{ResourceSpec, ResourceSpecID},
+        util::{
+            self,
+            test::{self, *},
         },
-        util::{self, test::{self, *}},
     };
 
     #[test]
@@ -116,20 +164,41 @@ mod tests {
         let state = TestState::standard(vec![CompanyPermission::ResourceSpecCreate], &now);
 
         let testfn = |state: &TestState<ResourceSpec, ResourceSpec>| {
-            create(state.user(), state.member(), state.company(), id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now)
+            create(
+                state.user(),
+                state.member(),
+                state.company(),
+                id.clone(),
+                "Beans",
+                "yummy",
+                vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()],
+                Some(Unit::Hour),
+                Some(Unit::Kilogram),
+                true,
+                &now,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
         let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
-        let recspec = mods[0].clone().expect_op::<ResourceSpec>(Op::Create).unwrap();
+        let recspec = mods[0]
+            .clone()
+            .expect_op::<ResourceSpec>(Op::Create)
+            .unwrap();
         assert_eq!(recspec.id(), &id);
         assert_eq!(recspec.inner().default_unit_of_effort(), &Some(Unit::Hour));
-        assert_eq!(recspec.inner().default_unit_of_resource(), &Some(Unit::Kilogram));
+        assert_eq!(
+            recspec.inner().default_unit_of_resource(),
+            &Some(Unit::Kilogram)
+        );
         assert_eq!(recspec.inner().name(), "Beans");
         assert_eq!(recspec.inner().note(), &Some("yummy".into()));
-        assert_eq!(recspec.inner().resource_classified_as(), &vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()]);
+        assert_eq!(
+            recspec.inner().resource_classified_as(),
+            &vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()]
+        );
         assert_eq!(recspec.company_id(), state.company().id());
         assert_eq!(recspec.active(), &true);
         assert_eq!(recspec.created(), &now);
@@ -141,27 +210,74 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = ResourceSpecID::create();
-        let mut state = TestState::standard(vec![CompanyPermission::ResourceSpecCreate, CompanyPermission::ResourceSpecUpdate], &now);
-        let mods = create(state.user(), state.member(), state.company(), id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now).unwrap().into_vec();
-        let recspec = mods[0].clone().expect_op::<ResourceSpec>(Op::Create).unwrap();
+        let mut state = TestState::standard(
+            vec![
+                CompanyPermission::ResourceSpecCreate,
+                CompanyPermission::ResourceSpecUpdate,
+            ],
+            &now,
+        );
+        let mods = create(
+            state.user(),
+            state.member(),
+            state.company(),
+            id.clone(),
+            "Beans",
+            "yummy",
+            vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()],
+            Some(Unit::Hour),
+            Some(Unit::Kilogram),
+            true,
+            &now,
+        )
+        .unwrap()
+        .into_vec();
+        let recspec = mods[0]
+            .clone()
+            .expect_op::<ResourceSpec>(Op::Create)
+            .unwrap();
         state.model = Some(recspec);
 
         let now2 = util::time::now();
         let testfn = |state: &TestState<ResourceSpec, ResourceSpec>| {
-            update(state.user(), state.member(), state.company(), state.model().clone(), Some("best widget".into()), None, None, Some(Unit::WattHour), None, Some(false), &now2)
+            update(
+                state.user(),
+                state.member(),
+                state.company(),
+                state.model().clone(),
+                Some("best widget".into()),
+                None,
+                None,
+                Some(Unit::WattHour),
+                None,
+                Some(false),
+                &now2,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
         let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
-        let recspec2 = mods[0].clone().expect_op::<ResourceSpec>(Op::Update).unwrap();
+        let recspec2 = mods[0]
+            .clone()
+            .expect_op::<ResourceSpec>(Op::Update)
+            .unwrap();
         assert_eq!(recspec2.id(), &id);
-        assert_eq!(recspec2.inner().default_unit_of_effort(), &Some(Unit::WattHour));
-        assert_eq!(recspec2.inner().default_unit_of_resource(), &Some(Unit::Kilogram));
+        assert_eq!(
+            recspec2.inner().default_unit_of_effort(),
+            &Some(Unit::WattHour)
+        );
+        assert_eq!(
+            recspec2.inner().default_unit_of_resource(),
+            &Some(Unit::Kilogram)
+        );
         assert_eq!(recspec2.inner().name(), "best widget");
         assert_eq!(recspec2.inner().note(), &Some("yummy".into()));
-        assert_eq!(recspec2.inner().resource_classified_as(), &vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()]);
+        assert_eq!(
+            recspec2.inner().resource_classified_as(),
+            &vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()]
+        );
         assert_eq!(recspec2.company_id(), state.company().id());
         assert_eq!(recspec2.active(), &false);
         assert_eq!(recspec2.created(), &now);
@@ -173,14 +289,43 @@ mod tests {
     fn can_delete() {
         let now = util::time::now();
         let id = ResourceSpecID::create();
-        let mut state = TestState::standard(vec![CompanyPermission::ResourceSpecCreate, CompanyPermission::ResourceSpecDelete], &now);
-        let mods = create(state.user(), state.member(), state.company(), id.clone(), "Beans", "yummy", vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()], Some(Unit::Hour), Some(Unit::Kilogram), true, &now).unwrap().into_vec();
-        let recspec = mods[0].clone().expect_op::<ResourceSpec>(Op::Create).unwrap();
+        let mut state = TestState::standard(
+            vec![
+                CompanyPermission::ResourceSpecCreate,
+                CompanyPermission::ResourceSpecDelete,
+            ],
+            &now,
+        );
+        let mods = create(
+            state.user(),
+            state.member(),
+            state.company(),
+            id.clone(),
+            "Beans",
+            "yummy",
+            vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()],
+            Some(Unit::Hour),
+            Some(Unit::Kilogram),
+            true,
+            &now,
+        )
+        .unwrap()
+        .into_vec();
+        let recspec = mods[0]
+            .clone()
+            .expect_op::<ResourceSpec>(Op::Create)
+            .unwrap();
         state.model = Some(recspec);
 
         let now2 = util::time::now();
         let testfn = |state: &TestState<ResourceSpec, ResourceSpec>| {
-            delete(state.user(), state.member(), state.company(), state.model().clone(), &now2)
+            delete(
+                state.user(),
+                state.member(),
+                state.company(),
+                state.model().clone(),
+                &now2,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
         test::double_deleted_tester(&state, "resource_spec", &testfn);
@@ -188,12 +333,21 @@ mod tests {
         let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 1);
 
-        let recspec2 = mods[0].clone().expect_op::<ResourceSpec>(Op::Delete).unwrap();
+        let recspec2 = mods[0]
+            .clone()
+            .expect_op::<ResourceSpec>(Op::Delete)
+            .unwrap();
         assert_eq!(recspec2.id(), &id);
         assert_eq!(recspec2.inner().default_unit_of_effort(), &Some(Unit::Hour));
-        assert_eq!(recspec2.inner().default_unit_of_resource(), &Some(Unit::Kilogram));
+        assert_eq!(
+            recspec2.inner().default_unit_of_resource(),
+            &Some(Unit::Kilogram)
+        );
         assert_eq!(recspec2.inner().name(), "Beans");
-        assert_eq!(recspec2.inner().resource_classified_as(), &vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()]);
+        assert_eq!(
+            recspec2.inner().resource_classified_as(),
+            &vec!["https://www.wikidata.org/wiki/Q379813".parse().unwrap()]
+        );
         assert_eq!(recspec2.company_id(), state.company().id());
         assert_eq!(recspec2.active(), &true);
         assert_eq!(recspec2.created(), &now);
@@ -201,4 +355,3 @@ mod tests {
         assert_eq!(recspec2.deleted(), &Some(now2.clone()));
     }
 }
-

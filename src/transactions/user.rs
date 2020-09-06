@@ -4,20 +4,26 @@
 //!
 //! [1]: ../../models/user/index.html
 
-use chrono::{DateTime, Utc};
 use crate::{
     access::{self, Permission, Role},
     error::{Error, Result},
     models::{
-        Op,
-        Modifications,
         lib::basis_model::Model,
         user::{User, UserID},
+        Modifications, Op,
     },
 };
+use chrono::{DateTime, Utc};
 
 /// Create a user (private implementation, meant to be wrapped).
-fn create_inner<T: Into<String>>(id: UserID, roles: Vec<Role>, email: T, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+fn create_inner<T: Into<String>>(
+    id: UserID,
+    roles: Vec<Role>,
+    email: T,
+    name: T,
+    active: bool,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     let model = User::builder()
         .id(id)
         .roles(roles)
@@ -32,31 +38,52 @@ fn create_inner<T: Into<String>>(id: UserID, roles: Vec<Role>, email: T, name: T
 }
 
 /// Create a new user with a `Role::User` role. No permissions required.
-pub fn create<T: Into<String>>(id: UserID, email: T, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create<T: Into<String>>(
+    id: UserID,
+    email: T,
+    name: T,
+    active: bool,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     access::guest_check(Permission::UserCreate)?;
     create_inner(id, vec![Role::User], email, name, active, now)
 }
 
 /// Create a new user with a specific set of permissions using a current user as
-/// the originator. Effectively an admin create. Requires the 
+/// the originator. Effectively an admin create. Requires the
 /// `Permission::UserCreate` permission.
-pub fn create_permissioned<T: Into<String>>(caller: &User, id: UserID, roles: Vec<Role>, email: T, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create_permissioned<T: Into<String>>(
+    caller: &User,
+    id: UserID,
+    roles: Vec<Role>,
+    email: T,
+    name: T,
+    active: bool,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::UserAdminCreate)?;
     create_inner(id, roles, email, name, active, now)
 }
 
 /// Update a user object
-pub fn update(caller: &User, mut subject: User, email: Option<String>, name: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
-    caller.access_check(Permission::UserAdminUpdate)
+pub fn update(
+    caller: &User,
+    mut subject: User,
+    email: Option<String>,
+    name: Option<String>,
+    active: Option<bool>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
+    caller
+        .access_check(Permission::UserAdminUpdate)
         .or_else(|_| {
-            caller.access_check(Permission::UserUpdate)
-                .and_then(|_| {
-                    if caller.id() == subject.id() {
-                        Ok(())
-                    } else {
-                        Err(Error::InsufficientPrivileges)
-                    }
-                })
+            caller.access_check(Permission::UserUpdate).and_then(|_| {
+                if caller.id() == subject.id() {
+                    Ok(())
+                } else {
+                    Err(Error::InsufficientPrivileges)
+                }
+            })
         })?;
     if let Some(email) = email {
         subject.set_email(email);
@@ -72,7 +99,12 @@ pub fn update(caller: &User, mut subject: User, email: Option<String>, name: Opt
 }
 
 /// Update a user's roles
-pub fn set_roles(caller: &User, mut subject: User, roles: Vec<Role>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn set_roles(
+    caller: &User,
+    mut subject: User,
+    roles: Vec<Role>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::UserSetRoles)?;
     subject.set_roles(roles);
     subject.set_updated(now.clone());
@@ -94,17 +126,20 @@ mod tests {
     use super::*;
     use crate::{
         access::Role,
-        models::{
-            user::User,
+        models::user::User,
+        util::{
+            self,
+            test::{self, *},
         },
-        util::{self, test::{self, *}},
     };
 
     #[test]
     fn can_create() {
         let id = UserID::create();
         let now = util::time::now();
-        let mods = create(id.clone(), "zing@lyonbros.com", "leonard", true, &now).unwrap().into_vec();
+        let mods = create(id.clone(), "zing@lyonbros.com", "leonard", true, &now)
+            .unwrap()
+            .into_vec();
         assert_eq!(mods.len(), 1);
 
         let model = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
@@ -123,7 +158,15 @@ mod tests {
         state.user = Some(user);
 
         let testfn = |state: &TestState<User, User>| {
-            create_permissioned(state.user(), id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now)
+            create_permissioned(
+                state.user(),
+                id.clone(),
+                vec![Role::User],
+                "zing@lyonbros.com",
+                "leonard",
+                true,
+                &now,
+            )
         };
 
         let mods = testfn(&state).unwrap().into_vec();
@@ -146,18 +189,33 @@ mod tests {
         let now = util::time::now();
         let mut state = TestState::standard(vec![], &now);
         let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
-        let mods = create_permissioned(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_vec();
+        let mods = create_permissioned(
+            &user,
+            id.clone(),
+            vec![Role::User],
+            "zing@lyonbros.com",
+            "leonard",
+            true,
+            &now,
+        )
+        .unwrap()
+        .into_vec();
         let new_user = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
         state.user = Some(user);
         state.model = Some(new_user);
 
         let now2 = util::time::now();
         let testfn_inner = |state: &TestState<User, User>, active: Option<bool>| {
-            update(state.user(), state.model().clone(), Some("obvious_day@camp.stupid".into()), None, active, &now2)
+            update(
+                state.user(),
+                state.model().clone(),
+                Some("obvious_day@camp.stupid".into()),
+                None,
+                active,
+                &now2,
+            )
         };
-        let testfn = |state: &TestState<User, User>| {
-            testfn_inner(state, None)
-        };
+        let testfn = |state: &TestState<User, User>| testfn_inner(state, None);
 
         let mods = testfn(&state).unwrap().into_vec();
         let user2 = mods[0].clone().expect_op::<User>(Op::Update).unwrap();
@@ -229,9 +287,8 @@ mod tests {
         state.user = Some(user.clone());
         state.model = Some(user);
 
-        let testfn = |state: &TestState<User, User>| {
-            delete(state.user(), state.model().clone(), &now)
-        };
+        let testfn =
+            |state: &TestState<User, User>| delete(state.user(), state.model().clone(), &now);
         test::double_deleted_tester(&state, "user", &testfn);
 
         let mods = testfn(&state).unwrap().into_vec();
@@ -246,4 +303,3 @@ mod tests {
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 }
-

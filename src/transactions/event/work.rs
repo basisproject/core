@@ -3,22 +3,21 @@
 //! They also act as the systemic marker for paying company members. Record
 //! labor, get paid.
 
-use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
     costs::Costs,
     error::{Error, Result},
     models::{
-        Op,
-        Modifications,
-        event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
-        member::Member,
+        event::{Event, EventID, EventProcessState},
         lib::basis_model::Model,
+        member::Member,
         process::Process,
         user::User,
+        Modifications, Op,
     },
 };
+use chrono::{DateTime, Utc};
 use om2::{Measure, Unit};
 use rust_decimal::prelude::*;
 use vf_rs::vf;
@@ -34,7 +33,19 @@ use vf_rs::vf;
 ///
 /// Note that this creates a full work event with a defined start and end. This
 /// function cannot create pending work events.
-pub fn work(caller: &User, member: &Member, company: &Company, id: EventID, worker: Member, process: Process, wage_cost: Option<Decimal>, begin: DateTime<Utc>, end: DateTime<Utc>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn work(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: EventID,
+    worker: Member,
+    process: Process,
+    wage_cost: Option<Decimal>,
+    begin: DateTime<Utc>,
+    end: DateTime<Utc>,
+    note: Option<String>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     // if we're recording our own work event, we can just check the regular
     // `Work` permission, otherwise we need admin privs
@@ -52,7 +63,10 @@ pub fn work(caller: &User, member: &Member, company: &Company, id: EventID, work
         let hours = Decimal::from(milliseconds) / Decimal::from(1000 * 60 * 60);
         Measure::new(hours, Unit::Hour)
     };
-    let occupation_id = worker.occupation_id().ok_or(Error::MemberMustBeWorker)?.clone();
+    let occupation_id = worker
+        .occupation_id()
+        .ok_or(Error::MemberMustBeWorker)?
+        .clone();
     let costs = match wage_cost {
         Some(val) => Costs::new_with_labor(occupation_id, val),
         None => Costs::new(),
@@ -80,7 +94,7 @@ pub fn work(caller: &User, member: &Member, company: &Company, id: EventID, work
                 .provider(member_id)
                 .receiver(company.id().clone())
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .move_costs(Some(costs))
         .active(true)
@@ -103,9 +117,9 @@ mod tests {
     use crate::{
         models::{
             company::CompanyID,
-            member::*,
-            event::{Event, EventID, EventError},
+            event::{Event, EventError, EventID},
             lib::agent::Agent,
+            member::*,
             process::ProcessID,
         },
         util::test::{self, *},
@@ -120,12 +134,30 @@ mod tests {
         let mut state = TestState::standard(vec![CompanyPermission::Work], &now);
         let occupation_id = state.member().occupation_id().unwrap().clone();
         let worker = state.member().clone();
-        let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &Costs::new_with_labor(occupation_id.clone(), dec!(177.5)), &now);
+        let process = make_process(
+            &ProcessID::create(),
+            state.company().id(),
+            "make widgets",
+            &Costs::new_with_labor(occupation_id.clone(), dec!(177.5)),
+            &now,
+        );
         state.model = Some(worker);
         state.model2 = Some(process);
 
         let testfn = |state: &TestState<Member, Process>| {
-            work(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2)
+            work(
+                state.user(),
+                state.member(),
+                state.company(),
+                id.clone(),
+                state.model().clone(),
+                state.model2().clone(),
+                Some(dec!(78.4)),
+                now.clone(),
+                now2.clone(),
+                Some("just doing some work".into()),
+                &now2,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -141,7 +173,10 @@ mod tests {
         assert_eq!(event.inner().note(), &Some("just doing some work".into()));
         assert_eq!(event.inner().provider().clone(), state.model().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor(occupation_id.clone(), dec!(78.4))));
+        assert_eq!(
+            event.move_costs(),
+            &Some(Costs::new_with_labor(occupation_id.clone(), dec!(78.4)))
+        );
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now2);
         assert_eq!(event.updated(), &now2);
@@ -160,7 +195,9 @@ mod tests {
         state2.model_mut().set_id(MemberID::create());
         let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
-        state2.member_mut().set_permissions(vec![CompanyPermission::WorkAdmin]);
+        state2
+            .member_mut()
+            .set_permissions(vec![CompanyPermission::WorkAdmin]);
         let mods = testfn(&state2).unwrap().into_vec();
         assert_eq!(mods.len(), 2);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
@@ -173,7 +210,10 @@ mod tests {
         assert_eq!(event.inner().note(), &Some("just doing some work".into()));
         assert_eq!(event.inner().provider().clone(), state2.model().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor(occupation_id.clone(), dec!(78.4))));
+        assert_eq!(
+            event.move_costs(),
+            &Some(Costs::new_with_labor(occupation_id.clone(), dec!(78.4)))
+        );
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now2);
         assert_eq!(event.updated(), &now2);
@@ -195,12 +235,15 @@ mod tests {
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         let mut state4 = state.clone();
-        state4.model_mut().set_class(MemberClass::User(MemberUser::new()));
+        state4
+            .model_mut()
+            .set_class(MemberClass::User(MemberUser::new()));
         let res = testfn(&state4);
         assert_eq!(res, Err(Error::MemberMustBeWorker));
-        state4.model_mut().set_class(MemberClass::Company(MemberCompany::new()));
+        state4
+            .model_mut()
+            .set_class(MemberClass::Company(MemberCompany::new()));
         let res = testfn(&state4);
         assert_eq!(res, Err(Error::MemberMustBeWorker));
     }
 }
-

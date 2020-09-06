@@ -4,31 +4,41 @@
 //! company would use the actions in this module to describe the process and
 //! account for the costs along the way.
 
-use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
     costs::Costs,
     error::{Error, Result},
     models::{
-        Op,
-        Modifications,
-        event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
-        member::Member,
+        event::{Event, EventID, EventProcessState},
         lib::basis_model::Model,
+        member::Member,
         process::Process,
         resource::Resource,
         user::User,
+        Modifications, Op,
     },
 };
-use vf_rs::{vf, geo::SpatialThing};
+use chrono::{DateTime, Utc};
+use vf_rs::{geo::SpatialThing, vf};
 
 /// Signifies that a delivery has been dropped off at the desired location. Note
 /// that custody remains with the deliverer until a `transfer-custody` event is
 /// created.
 ///
 /// This operates on a whole resource.
-pub fn dropoff(caller: &User, member: &Member, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn dropoff(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: EventID,
+    process: Process,
+    resource: Resource,
+    move_costs: Costs,
+    new_location: Option<SpatialThing>,
+    note: Option<String>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Dropoff)?;
     if !company.is_active() {
@@ -56,7 +66,7 @@ pub fn dropoff(caller: &User, member: &Member, company: &Company, id: EventID, p
                 .receiver(company.id().clone())
                 .resource_inventoried_as(Some(resource_id))
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .move_costs(Some(move_costs))
         .active(true)
@@ -79,7 +89,16 @@ pub fn dropoff(caller: &User, member: &Member, company: &Company, id: EventID, p
 /// `transfer-custody` event).
 ///
 /// This operates on a whole resource.
-pub fn pickup(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, process: Process, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn pickup(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: EventID,
+    resource: Resource,
+    process: Process,
+    note: Option<String>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Pickup)?;
     if !company.is_active() {
@@ -106,7 +125,7 @@ pub fn pickup(caller: &User, member: &Member, company: &Company, id: EventID, re
                 .receiver(company.id().clone())
                 .resource_inventoried_as(Some(resource_id))
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .move_costs(Some(Costs::new()))
         .active(true)
@@ -136,7 +155,10 @@ mod tests {
             process::ProcessID,
             resource::ResourceID,
         },
-        util::{self, test::{self, *}},
+        util::{
+            self,
+            test::{self, *},
+        },
     };
     use om2::{Measure, Unit};
     use rust_decimal_macros::*;
@@ -148,13 +170,36 @@ mod tests {
         let mut state = TestState::standard(vec![CompanyPermission::Dropoff], &now);
         let occupation_id = OccupationID::new("trucker");
         let costs = Costs::new_with_labor(occupation_id.clone(), dec!(42.2));
-        let process = make_process(&ProcessID::create(), state.company().id(), "deliver widgets", &costs, &now);
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("machinist", 157), &now);
+        let process = make_process(
+            &ProcessID::create(),
+            state.company().id(),
+            "deliver widgets",
+            &costs,
+            &now,
+        );
+        let resource = make_resource(
+            &ResourceID::new("widget"),
+            state.company().id(),
+            &Measure::new(dec!(15), Unit::One),
+            &Costs::new_with_labor("machinist", 157),
+            &now,
+        );
         state.model = Some(process);
         state.model2 = Some(resource);
 
         let testfn = |state: &TestState<Process, Resource>| {
-            dropoff(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), state.model().costs().clone(), Some(state.loc().clone()), Some("memo".into()), &now)
+            dropoff(
+                state.user(),
+                state.member(),
+                state.company(),
+                id.clone(),
+                state.model().clone(),
+                state.model2().clone(),
+                state.model().costs().clone(),
+                Some(state.loc().clone()),
+                Some("memo".into()),
+                &now,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -185,12 +230,24 @@ mod tests {
         costs2.track_labor(occupation_id.clone(), dec!(42.2));
         costs2.track_labor("machinist", 157);
         assert_eq!(resource2.id(), state.model2().id());
-        assert_eq!(resource2.inner().primary_accountable(), &Some(state.company().agent_id()));
+        assert_eq!(
+            resource2.inner().primary_accountable(),
+            &Some(state.company().agent_id())
+        );
         assert_eq!(resource2.in_custody_of(), &state.company().agent_id());
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
+        assert_eq!(
+            resource2.inner().accounting_quantity(),
+            &Some(Measure::new(dec!(15), Unit::One))
+        );
         assert_eq!(event.inner().note(), &Some("memo".into()));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
-        assert_eq!(resource2.inner().current_location(), &Some(state.loc().clone()));
+        assert_eq!(
+            resource2.inner().onhand_quantity(),
+            &Some(Measure::new(dec!(15), Unit::One))
+        );
+        assert_eq!(
+            resource2.inner().current_location(),
+            &Some(state.loc().clone())
+        );
         assert_eq!(resource2.costs(), &costs2);
 
         // can't dropoff from a process you don't own
@@ -200,13 +257,18 @@ mod tests {
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         let mut state3 = state.clone();
-        state3.model2_mut().inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
+        state3
+            .model2_mut()
+            .inner_mut()
+            .set_primary_accountable(Some(CompanyID::new("ziggy").into()));
         let res = testfn(&state3);
         assert!(res.is_ok());
 
         // a company that doesn't have posession of a resource can't drop it off
         let mut state4 = state.clone();
-        state4.model2_mut().set_in_custody_of(CompanyID::new("ziggy").into());
+        state4
+            .model2_mut()
+            .set_in_custody_of(CompanyID::new("ziggy").into());
         let res = testfn(&state4);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
@@ -216,13 +278,34 @@ mod tests {
         let now = util::time::now();
         let id = EventID::create();
         let mut state = TestState::standard(vec![CompanyPermission::Pickup], &now);
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
-        let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &Costs::new(), &now);
+        let resource = make_resource(
+            &ResourceID::new("widget"),
+            state.company().id(),
+            &Measure::new(dec!(15), Unit::One),
+            &Costs::new_with_labor("homemaker", 157),
+            &now,
+        );
+        let process = make_process(
+            &ProcessID::create(),
+            state.company().id(),
+            "make widgets",
+            &Costs::new(),
+            &now,
+        );
         state.model = Some(resource);
         state.model2 = Some(process);
 
         let testfn = |state: &TestState<Resource, Process>| {
-            pickup(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Some("memo".into()), &now)
+            pickup(
+                state.user(),
+                state.member(),
+                state.company(),
+                id.clone(),
+                state.model().clone(),
+                state.model2().clone(),
+                Some("memo".into()),
+                &now,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -248,15 +331,19 @@ mod tests {
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         let mut state3 = state.clone();
-        state3.model_mut().inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
+        state3
+            .model_mut()
+            .inner_mut()
+            .set_primary_accountable(Some(CompanyID::new("ziggy").into()));
         let res = testfn(&state3);
         assert!(res.is_ok());
 
         // a company that doesn't have posession of a resource can't pick it up
         let mut state4 = state.clone();
-        state4.model_mut().set_in_custody_of(CompanyID::new("ziggy").into());
+        state4
+            .model_mut()
+            .set_in_custody_of(CompanyID::new("ziggy").into());
         let res = testfn(&state4);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 }
-

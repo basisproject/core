@@ -11,10 +11,8 @@
 //! [err_priv]: ../error/enum.Error.html#variant.InsufficientPrivileges
 //! [Users]: ../models/user/struct.User.html
 
-use crate::{
-    error::{Error, Result},
-};
-use serde::{Serialize, Deserialize};
+use crate::error::{Error, Result};
+use serde::{Deserialize, Serialize};
 
 /// Define the system-wide permissions.
 ///
@@ -78,59 +76,45 @@ impl Role {
     /// For a given role, return the permissions that role has access to.
     pub fn permissions(&self) -> Vec<Permission> {
         match *self {
-            Role::SuperAdmin => {
-                vec![Permission::All]
-            },
-            Role::IdentityAdmin => {
-                vec![
-                    Permission::UserUpdate,
-                    Permission::UserSetRoles,
-                    Permission::UserAdminCreate,
-                    Permission::UserAdminUpdate,
-                    Permission::UserDelete,
-                ]
-            },
-            Role::CompanyAdmin => {
-                vec![
-                    Permission::CompanyAdminUpdate,
-                    Permission::CompanyAdminDelete,
-                ]
-            }
-            Role::Bank => {
-                vec![
-                    Permission::CurrencyCreate,
-                    Permission::CurrencyUpdate,
-                    Permission::CurrencyDelete,
-                ]
-            },
-            Role::User => {
-                vec![
-                    Permission::UserUpdate,
-                    Permission::UserDelete,
-                    Permission::CompanyCreate,
-                    Permission::CompanyUpdateAgreements,
-                    Permission::CompanyUpdateCommitments,
-                    Permission::CompanyUpdateIntents,
-                    Permission::CompanyUpdateMembers,
-                    Permission::CompanyUpdateResourceSpecs,
-                    Permission::CompanyUpdateResources,
-                    Permission::CompanyUpdateProcessSpecs,
-                    Permission::CompanyUpdateProcesses,
-                    Permission::ResourceSpecCreate,
-                    Permission::ResourceSpecUpdate,
-                    Permission::ResourceSpecDelete,
-                    Permission::AccountCreate,
-                    Permission::AccountUpdate,
-                    Permission::AccountDelete,
-                    Permission::EventCreate,
-                    Permission::EventUpdate,
-                ]
-            }
-            Role::Guest => {
-                vec![
-                    Permission::UserCreate,
-                ]
-            }
+            Role::SuperAdmin => vec![Permission::All],
+            Role::IdentityAdmin => vec![
+                Permission::UserUpdate,
+                Permission::UserSetRoles,
+                Permission::UserAdminCreate,
+                Permission::UserAdminUpdate,
+                Permission::UserDelete,
+            ],
+            Role::CompanyAdmin => vec![
+                Permission::CompanyAdminUpdate,
+                Permission::CompanyAdminDelete,
+            ],
+            Role::Bank => vec![
+                Permission::CurrencyCreate,
+                Permission::CurrencyUpdate,
+                Permission::CurrencyDelete,
+            ],
+            Role::User => vec![
+                Permission::UserUpdate,
+                Permission::UserDelete,
+                Permission::CompanyCreate,
+                Permission::CompanyUpdateAgreements,
+                Permission::CompanyUpdateCommitments,
+                Permission::CompanyUpdateIntents,
+                Permission::CompanyUpdateMembers,
+                Permission::CompanyUpdateResourceSpecs,
+                Permission::CompanyUpdateResources,
+                Permission::CompanyUpdateProcessSpecs,
+                Permission::CompanyUpdateProcesses,
+                Permission::ResourceSpecCreate,
+                Permission::ResourceSpecUpdate,
+                Permission::ResourceSpecDelete,
+                Permission::AccountCreate,
+                Permission::AccountUpdate,
+                Permission::AccountDelete,
+                Permission::EventCreate,
+                Permission::EventUpdate,
+            ],
+            Role::Guest => vec![Permission::UserCreate],
         }
     }
 
@@ -149,7 +133,7 @@ impl Role {
                 }
                 _ => {
                     if p == perm {
-                        return true
+                        return true;
                     }
                 }
             }
@@ -193,4 +177,3 @@ pub mod tests {
         assert!(comp_admin.can(&Permission::CompanyAdminDelete));
     }
 }
-

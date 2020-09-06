@@ -4,30 +4,38 @@
 //! resource or move costs between processes or resources, this is where they
 //! could do it.
 
-use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
     costs::Costs,
     error::{Error, Result},
     models::{
-        Op,
-        Modifications,
-        event::{Event, EventID, EventProcessState, MoveType},
         company::{Company, Permission as CompanyPermission},
-        member::Member,
+        event::{Event, EventID, EventProcessState, MoveType},
         lib::basis_model::Model,
+        member::Member,
         process::Process,
         resource::Resource,
         user::User,
+        Modifications, Op,
     },
     transactions::event::ResourceMover,
 };
+use chrono::{DateTime, Utc};
 use om2::{Measure, NumericUnion};
-use vf_rs::{vf, geo::SpatialThing};
+use vf_rs::{geo::SpatialThing, vf};
 
 /// Lower the quantity (both accounting and obhand) or a resource by a fixed
 /// amount.
-pub fn lower<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn lower<T: Into<NumericUnion>>(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: EventID,
+    resource: Resource,
+    resource_measure: T,
+    note: Option<String>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Lower)?;
     if !company.is_active() {
@@ -56,7 +64,7 @@ pub fn lower<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Co
                 .resource_inventoried_as(Some(resource_id))
                 .resource_quantity(Some(measure))
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .active(true)
         .created(now.clone())
@@ -77,7 +85,17 @@ pub fn lower<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Co
 ///
 /// This can be useful to send costs from one process to another, for instance
 /// if a process has an excess of costs that should be moved somewhere else.
-pub fn move_costs(caller: &User, member: &Member, company: &Company, id: EventID, process_from: Process, process_to: Process, move_costs: Costs, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn move_costs(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: EventID,
+    process_from: Process,
+    process_to: Process,
+    move_costs: Costs,
+    note: Option<String>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::MoveCosts)?;
     if !company.is_active() {
@@ -104,7 +122,7 @@ pub fn move_costs(caller: &User, member: &Member, company: &Company, id: EventID
                 .receiver(company.id().clone())
                 .output_of(Some(process_from_id))
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .move_costs(Some(move_costs))
         .move_type(Some(MoveType::ProcessCosts))
@@ -125,7 +143,19 @@ pub fn move_costs(caller: &User, member: &Member, company: &Company, id: EventID
 
 /// Move a resource internally. This can split a resource into two, or move one
 /// resource entirely into another one.
-pub fn move_resource<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, resource_measure: T, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn move_resource<T: Into<NumericUnion>>(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: EventID,
+    resource_from: Resource,
+    resource_to: ResourceMover,
+    move_costs: Costs,
+    resource_measure: T,
+    new_location: Option<SpatialThing>,
+    note: Option<String>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::MoveResource)?;
     if !company.is_active() {
@@ -133,13 +163,14 @@ pub fn move_resource<T: Into<NumericUnion>>(caller: &User, member: &Member, comp
     }
 
     let measure = {
-        let unit = resource_from.get_unit().ok_or(Error::ResourceMeasureMissing)?;
+        let unit = resource_from
+            .get_unit()
+            .ok_or(Error::ResourceMeasureMissing)?;
         Measure::new(resource_measure, unit)
     };
     let resource_from_id = resource_from.id().clone();
 
-    let mut statebuilder = EventProcessState::builder()
-        .resource(resource_from);
+    let mut statebuilder = EventProcessState::builder().resource(resource_from);
     let resource_to_id = match resource_to {
         ResourceMover::Create(resource_id) => resource_id,
         ResourceMover::Update(resource) => {
@@ -149,9 +180,7 @@ pub fn move_resource<T: Into<NumericUnion>>(caller: &User, member: &Member, comp
         }
     };
 
-    let state = statebuilder
-        .build()
-        .map_err(|e| Error::BuilderFailed(e))?;
+    let state = statebuilder.build().map_err(|e| Error::BuilderFailed(e))?;
     let event = Event::builder()
         .id(id)
         .inner(
@@ -166,7 +195,7 @@ pub fn move_resource<T: Into<NumericUnion>>(caller: &User, member: &Member, comp
                 .resource_quantity(Some(measure))
                 .to_resource_inventoried_as(Some(resource_to_id))
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .move_costs(Some(move_costs))
         .move_type(Some(MoveType::Resource))
@@ -187,7 +216,16 @@ pub fn move_resource<T: Into<NumericUnion>>(caller: &User, member: &Member, comp
 
 /// Raise the quantity (both accounting and onhand) or a resource by a fixed
 /// amount.
-pub fn raise<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, resource: Resource, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn raise<T: Into<NumericUnion>>(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: EventID,
+    resource: Resource,
+    resource_measure: T,
+    note: Option<String>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Raise)?;
     if !company.is_active() {
@@ -216,7 +254,7 @@ pub fn raise<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Co
                 .resource_inventoried_as(Some(resource_id))
                 .resource_quantity(Some(measure))
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .active(true)
         .created(now.clone())
@@ -238,14 +276,17 @@ mod tests {
     use super::*;
     use crate::{
         models::{
-            lib::agent::Agent,
             company::CompanyID,
-            event::{EventID, EventError},
+            event::{EventError, EventID},
+            lib::agent::Agent,
             occupation::OccupationID,
             process::{Process, ProcessID},
             resource::ResourceID,
         },
-        util::{self, test::{self, *}},
+        util::{
+            self,
+            test::{self, *},
+        },
     };
     use om2::Unit;
     use rust_decimal_macros::*;
@@ -255,11 +296,26 @@ mod tests {
         let now = util::time::now();
         let id = EventID::create();
         let mut state = TestState::standard(vec![CompanyPermission::Lower], &now);
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        let resource = make_resource(
+            &ResourceID::new("widget"),
+            state.company().id(),
+            &Measure::new(dec!(15), Unit::One),
+            &Costs::new_with_labor("homemaker", 157),
+            &now,
+        );
         state.model = Some(resource);
 
         let testfn = |state: &TestState<Resource, Resource>| {
-            lower(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), 8, Some("a note".into()), &now)
+            lower(
+                state.user(),
+                state.member(),
+                state.company(),
+                id.clone(),
+                state.model().clone(),
+                8,
+                Some("a note".into()),
+                &now,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -276,26 +332,40 @@ mod tests {
         assert_eq!(event.inner().output_of(), &None);
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.inner().resource_quantity(), &Some(Measure::new(8, Unit::One)));
+        assert_eq!(
+            event.inner().resource_quantity(),
+            &Some(Measure::new(8, Unit::One))
+        );
         assert_eq!(event.move_costs(), &None);
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
 
         assert_eq!(resource2.id(), state.model().id());
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(7), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(7), Unit::One)));
+        assert_eq!(
+            resource2.inner().accounting_quantity(),
+            &Some(Measure::new(dec!(7), Unit::One))
+        );
+        assert_eq!(
+            resource2.inner().onhand_quantity(),
+            &Some(Measure::new(dec!(7), Unit::One))
+        );
         assert_eq!(resource2.costs(), state.model().costs());
 
         // a company that doesn't own a resource can't lower it
         let mut state2 = state.clone();
-        state2.model_mut().inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
+        state2
+            .model_mut()
+            .inner_mut()
+            .set_primary_accountable(Some(CompanyID::new("ziggy").into()));
         let res = testfn(&state2);
         assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
 
         // a company that doesn't have possession of a resource can't lower it
         let mut state3 = state.clone();
-        state3.model_mut().set_in_custody_of(CompanyID::new("ziggy").into());
+        state3
+            .model_mut()
+            .set_in_custody_of(CompanyID::new("ziggy").into());
         let res = testfn(&state3);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
@@ -306,13 +376,35 @@ mod tests {
         let id = EventID::create();
         let mut state = TestState::standard(vec![CompanyPermission::MoveCosts], &now);
         let occupation_id = OccupationID::new("lawyer");
-        let process_from = make_process(&ProcessID::create(), state.company().id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), dec!(177.25)), &now);
-        let process_to = make_process(&ProcessID::create(), state.company().id(), "overflow labor", &Costs::new_with_labor(occupation_id.clone(), dec!(804)), &now);
+        let process_from = make_process(
+            &ProcessID::create(),
+            state.company().id(),
+            "various lawyerings",
+            &Costs::new_with_labor(occupation_id.clone(), dec!(177.25)),
+            &now,
+        );
+        let process_to = make_process(
+            &ProcessID::create(),
+            state.company().id(),
+            "overflow labor",
+            &Costs::new_with_labor(occupation_id.clone(), dec!(804)),
+            &now,
+        );
         state.model = Some(process_from);
         state.model2 = Some(process_to);
 
         let testfn = |state: &TestState<Process, Process>| {
-            move_costs(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Costs::new_with_labor("lawyer", 100), Some("my note".into()), &now)
+            move_costs(
+                state.user(),
+                state.member(),
+                state.company(),
+                id.clone(),
+                state.model().clone(),
+                state.model2().clone(),
+                Costs::new_with_labor("lawyer", 100),
+                Some("my note".into()),
+                &now,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -331,7 +423,10 @@ mod tests {
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
         assert_eq!(event.inner().resource_quantity(), &None);
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("lawyer", 100)));
+        assert_eq!(
+            event.move_costs(),
+            &Some(Costs::new_with_labor("lawyer", 100))
+        );
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
@@ -350,13 +445,17 @@ mod tests {
 
         // can't move costs from a process you don't own
         let mut state2 = state.clone();
-        state2.model_mut().set_company_id(CompanyID::new("zing").into());
+        state2
+            .model_mut()
+            .set_company_id(CompanyID::new("zing").into());
         let res = testfn(&state2);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         // can't move costs into a process you don't own
         let mut state3 = state.clone();
-        state3.model2_mut().set_company_id(CompanyID::new("zing").into());
+        state3
+            .model2_mut()
+            .set_company_id(CompanyID::new("zing").into());
         let res = testfn(&state3);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
     }
@@ -366,13 +465,37 @@ mod tests {
         let now = util::time::now();
         let id = EventID::create();
         let mut state = TestState::standard(vec![CompanyPermission::MoveResource], &now);
-        let resource = make_resource(&ResourceID::new("plank"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
-        let resource_to = make_resource(&ResourceID::new("plank"), state.company().id(), &Measure::new(dec!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
+        let resource = make_resource(
+            &ResourceID::new("plank"),
+            state.company().id(),
+            &Measure::new(dec!(15), Unit::One),
+            &Costs::new_with_labor("homemaker", 157),
+            &now,
+        );
+        let resource_to = make_resource(
+            &ResourceID::new("plank"),
+            state.company().id(),
+            &Measure::new(dec!(3), Unit::One),
+            &Costs::new_with_labor("homemaker", 2),
+            &now,
+        );
         state.model = Some(resource);
         state.model2 = Some(resource_to);
 
         let testfn_inner = |state: &TestState<Resource, Resource>, mover: ResourceMover| {
-            move_resource(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), mover, Costs::new_with_labor("homemaker", 23), 8, Some(state.loc().clone()), Some("lol".into()), &now)
+            move_resource(
+                state.user(),
+                state.member(),
+                state.company(),
+                id.clone(),
+                state.model().clone(),
+                mover,
+                Costs::new_with_labor("homemaker", 23),
+                8,
+                Some(state.loc().clone()),
+                Some("lol".into()),
+                &now,
+            )
         };
         let testfn_update = |state: &TestState<Resource, Resource>| {
             testfn_inner(state, ResourceMover::Update(state.model2().clone()))
@@ -399,8 +522,14 @@ mod tests {
         assert_eq!(event.inner().output_of(), &None);
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.inner().resource_quantity(), &Some(Measure::new(8, Unit::One)));
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
+        assert_eq!(
+            event.inner().resource_quantity(),
+            &Some(Measure::new(8, Unit::One))
+        );
+        assert_eq!(
+            event.move_costs(),
+            &Some(Costs::new_with_labor("homemaker", 23))
+        );
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
@@ -408,18 +537,36 @@ mod tests {
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(157) - dec!(23));
         assert_eq!(resource_from2.id(), state.model().id());
-        assert_eq!(resource_from2.inner().primary_accountable(), &Some(state.company().agent_id()));
-        assert_eq!(resource_from2.inner().accounting_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
-        assert_eq!(resource_from2.inner().onhand_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
+        assert_eq!(
+            resource_from2.inner().primary_accountable(),
+            &Some(state.company().agent_id())
+        );
+        assert_eq!(
+            resource_from2.inner().accounting_quantity(),
+            &Some(Measure::new(dec!(15) - dec!(8), Unit::One))
+        );
+        assert_eq!(
+            resource_from2.inner().onhand_quantity(),
+            &Some(Measure::new(dec!(15) - dec!(8), Unit::One))
+        );
         assert_eq!(resource_from2.in_custody_of(), &state.company().agent_id());
         assert_eq!(resource_from2.costs(), &costs2);
 
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(23) + dec!(2));
         assert_eq!(resource_to2.id(), state.model2().id());
-        assert_eq!(resource_to2.inner().primary_accountable(), &Some(state.company().agent_id()));
-        assert_eq!(resource_to2.inner().accounting_quantity(), &Some(Measure::new(dec!(8) + dec!(3), Unit::One)));
-        assert_eq!(resource_to2.inner().onhand_quantity(), &Some(Measure::new(dec!(8) + dec!(3), Unit::One)));
+        assert_eq!(
+            resource_to2.inner().primary_accountable(),
+            &Some(state.company().agent_id())
+        );
+        assert_eq!(
+            resource_to2.inner().accounting_quantity(),
+            &Some(Measure::new(dec!(8) + dec!(3), Unit::One))
+        );
+        assert_eq!(
+            resource_to2.inner().onhand_quantity(),
+            &Some(Measure::new(dec!(8) + dec!(3), Unit::One))
+        );
         assert_eq!(resource_to2.in_custody_of(), &state.company().agent_id());
         assert_eq!(resource_to2.costs(), &costs2);
 
@@ -438,8 +585,14 @@ mod tests {
         assert_eq!(event.inner().output_of(), &None);
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.inner().resource_quantity(), &Some(Measure::new(8, Unit::One)));
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
+        assert_eq!(
+            event.inner().resource_quantity(),
+            &Some(Measure::new(8, Unit::One))
+        );
+        assert_eq!(
+            event.move_costs(),
+            &Some(Costs::new_with_labor("homemaker", 23))
+        );
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
@@ -447,30 +600,57 @@ mod tests {
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(157) - dec!(23));
         assert_eq!(resource_from3.id(), state.model().id());
-        assert_eq!(resource_from3.inner().primary_accountable(), &Some(state.company().agent_id()));
-        assert_eq!(resource_from3.inner().accounting_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
-        assert_eq!(resource_from3.inner().onhand_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
+        assert_eq!(
+            resource_from3.inner().primary_accountable(),
+            &Some(state.company().agent_id())
+        );
+        assert_eq!(
+            resource_from3.inner().accounting_quantity(),
+            &Some(Measure::new(dec!(15) - dec!(8), Unit::One))
+        );
+        assert_eq!(
+            resource_from3.inner().onhand_quantity(),
+            &Some(Measure::new(dec!(15) - dec!(8), Unit::One))
+        );
         assert_eq!(resource_from3.in_custody_of(), &state.company().agent_id());
         assert_eq!(resource_from3.costs(), &costs2);
 
         let mut costs2 = Costs::new();
         costs2.track_labor("homemaker", dec!(23));
         assert_eq!(resource_created.id(), state.model2().id());
-        assert_eq!(resource_created.inner().primary_accountable(), &Some(state.company().agent_id()));
-        assert_eq!(resource_created.inner().accounting_quantity(), &Some(Measure::new(dec!(8), Unit::One)));
-        assert_eq!(resource_created.inner().onhand_quantity(), &Some(Measure::new(dec!(8), Unit::One)));
-        assert_eq!(resource_created.in_custody_of(), &state.company().agent_id());
+        assert_eq!(
+            resource_created.inner().primary_accountable(),
+            &Some(state.company().agent_id())
+        );
+        assert_eq!(
+            resource_created.inner().accounting_quantity(),
+            &Some(Measure::new(dec!(8), Unit::One))
+        );
+        assert_eq!(
+            resource_created.inner().onhand_quantity(),
+            &Some(Measure::new(dec!(8), Unit::One))
+        );
+        assert_eq!(
+            resource_created.in_custody_of(),
+            &state.company().agent_id()
+        );
         assert_eq!(resource_created.costs(), &costs2);
 
         // can't move into a resource you don't own
         let mut state2 = state.clone();
-        state2.model2_mut().inner_mut().set_primary_accountable(Some(CompanyID::new("zing").into()));
+        state2
+            .model2_mut()
+            .inner_mut()
+            .set_primary_accountable(Some(CompanyID::new("zing").into()));
         let res = testfn_update(&state2);
         assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
 
         // a company that doesn't own a resource can't move it OBVIOUSLY
         let mut state3 = state.clone();
-        state3.model_mut().inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
+        state3
+            .model_mut()
+            .inner_mut()
+            .set_primary_accountable(Some(CompanyID::new("ziggy").into()));
         let res = testfn_update(&state3);
         assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
         let res = testfn_create(&state3);
@@ -478,7 +658,9 @@ mod tests {
 
         // a company that doesn't have posession of a resource can't move it
         let mut state4 = state.clone();
-        state4.model_mut().set_in_custody_of(CompanyID::new("ziggy").into());
+        state4
+            .model_mut()
+            .set_in_custody_of(CompanyID::new("ziggy").into());
         let res = testfn_update(&state4);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
         let res = testfn_create(&state4);
@@ -490,11 +672,26 @@ mod tests {
         let now = util::time::now();
         let id = EventID::create();
         let mut state = TestState::standard(vec![CompanyPermission::Raise], &now);
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        let resource = make_resource(
+            &ResourceID::new("widget"),
+            state.company().id(),
+            &Measure::new(dec!(15), Unit::One),
+            &Costs::new_with_labor("homemaker", 157),
+            &now,
+        );
         state.model = Some(resource);
 
         let testfn = |state: &TestState<Resource, Resource>| {
-            raise(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), 8, Some("toot".into()), &now)
+            raise(
+                state.user(),
+                state.member(),
+                state.company(),
+                id.clone(),
+                state.model().clone(),
+                8,
+                Some("toot".into()),
+                &now,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -511,28 +708,41 @@ mod tests {
         assert_eq!(event.inner().output_of(), &None);
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.inner().resource_quantity(), &Some(Measure::new(8, Unit::One)));
+        assert_eq!(
+            event.inner().resource_quantity(),
+            &Some(Measure::new(8, Unit::One))
+        );
         assert_eq!(event.move_costs(), &None);
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
 
         assert_eq!(resource2.id(), state.model().id());
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(23), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(23), Unit::One)));
+        assert_eq!(
+            resource2.inner().accounting_quantity(),
+            &Some(Measure::new(dec!(23), Unit::One))
+        );
+        assert_eq!(
+            resource2.inner().onhand_quantity(),
+            &Some(Measure::new(dec!(23), Unit::One))
+        );
         assert_eq!(resource2.costs(), state.model().costs());
 
         // a company that doesn't own a resource can't raise it
         let mut state2 = state.clone();
-        state2.model_mut().inner_mut().set_primary_accountable(Some(CompanyID::new("ziggy").into()));
+        state2
+            .model_mut()
+            .inner_mut()
+            .set_primary_accountable(Some(CompanyID::new("ziggy").into()));
         let res = testfn(&state2);
         assert_eq!(res, Err(Error::Event(EventError::ResourceOwnerMismatch)));
 
         // a company that doesn't have possession of a resource can't raise it
         let mut state3 = state.clone();
-        state3.model_mut().set_in_custody_of(CompanyID::new("ziggy").into());
+        state3
+            .model_mut()
+            .set_in_custody_of(CompanyID::new("ziggy").into());
         let res = testfn(&state3);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCustodyMismatch)));
     }
 }
-

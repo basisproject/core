@@ -259,4 +259,3 @@ macro_rules! basis_model_inner {
         }
     };
 }
-

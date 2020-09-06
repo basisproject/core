@@ -7,23 +7,19 @@
 //!
 //! [1]: ../../models/agreement/index.html
 
-use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
     error::{Error, Result},
     models::{
-        Op,
-        Modifications,
-        lib::{
-            agent::AgentID,
-            basis_model::Model,
-        },
         agreement::{Agreement, AgreementID},
         company::{Company, Permission as CompanyPermission},
+        lib::{agent::AgentID, basis_model::Model},
         member::Member,
         user::User,
+        Modifications, Op,
     },
 };
+use chrono::{DateTime, Utc};
 use vf_rs::vf;
 
 /// Create a new agreement/order.
@@ -32,9 +28,24 @@ use vf_rs::vf;
 /// agreement's `participants` list will be allowed to complete updates. This
 /// makes it so only those involved in the agreement can modify it or any of its
 /// data in any way.
-pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company, id: AgreementID, participants: Vec<AgentID>, name: T, note: T, created: Option<DateTime<Utc>>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create<T: Into<String>>(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: AgreementID,
+    participants: Vec<AgentID>,
+    name: T,
+    note: T,
+    created: Option<DateTime<Utc>>,
+    active: bool,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateAgreements)?;
-    member.access_check(caller.id(), company.id(), CompanyPermission::AgreementCreate)?;
+    member.access_check(
+        caller.id(),
+        company.id(),
+        CompanyPermission::AgreementCreate,
+    )?;
     if !company.is_active() {
         Err(Error::ObjectIsInactive("company".into()))?;
     }
@@ -46,7 +57,7 @@ pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company
                 .name(Some(name.into()))
                 .note(Some(note.into()))
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .participants(participants)
         .active(active)
@@ -58,9 +69,24 @@ pub fn create<T: Into<String>>(caller: &User, member: &Member, company: &Company
 }
 
 /// Update an agreement, including the participant list.
-pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Agreement, participants: Option<Vec<AgentID>>, name: Option<String>, note: Option<String>, created: Option<Option<DateTime<Utc>>>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    mut subject: Agreement,
+    participants: Option<Vec<AgentID>>,
+    name: Option<String>,
+    note: Option<String>,
+    created: Option<Option<DateTime<Utc>>>,
+    active: Option<bool>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateAgreements)?;
-    member.access_check(caller.id(), company.id(), CompanyPermission::AgreementUpdate)?;
+    member.access_check(
+        caller.id(),
+        company.id(),
+        CompanyPermission::AgreementUpdate,
+    )?;
     if !company.is_active() {
         Err(Error::ObjectIsInactive("company".into()))?;
     }
@@ -87,11 +113,11 @@ pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Ag
 mod tests {
     use super::*;
     use crate::{
-        models::{
-            lib::agent::Agent,
-            company::CompanyID,
+        models::{company::CompanyID, lib::agent::Agent},
+        util::{
+            self,
+            test::{self, *},
         },
-        util::{self, test::{self, *}},
     };
 
     #[test]
@@ -126,16 +152,46 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = AgreementID::create();
-        let state = TestState::standard(vec![CompanyPermission::AgreementCreate, CompanyPermission::AgreementUpdate], &now);
+        let state = TestState::standard(
+            vec![
+                CompanyPermission::AgreementCreate,
+                CompanyPermission::AgreementUpdate,
+            ],
+            &now,
+        );
         let company_from = make_company(&CompanyID::create(), "jerry's widgets", &now);
         let participants = vec![state.company().agent_id(), company_from.agent_id()];
 
-        let mods = create(state.user(), state.member(), state.company(), id.clone(), participants.clone(), "order 1234141", "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.", Some(now.clone()), true, &now).unwrap().into_vec();
+        let mods = create(
+            state.user(),
+            state.member(),
+            state.company(),
+            id.clone(),
+            participants.clone(),
+            "order 1234141",
+            "hi i'm jerry. just going to order some widgets. don't mind me, just ordering widgets.",
+            Some(now.clone()),
+            true,
+            &now,
+        )
+        .unwrap()
+        .into_vec();
         let agreement1 = mods[0].clone().expect_op::<Agreement>(Op::Create).unwrap();
         let now2 = util::time::now();
 
         let testfn = |state: &TestState<Agreement, Agreement>| {
-            update(state.user(), state.member(), state.company(), agreement1.clone(), Some(vec![company_from.agent_id()]), Some("order 1111222".into()), Some("jerry's long-winded order".into()), None, None, &now2)
+            update(
+                state.user(),
+                state.member(),
+                state.company(),
+                agreement1.clone(),
+                Some(vec![company_from.agent_id()]),
+                Some("order 1111222".into()),
+                Some("jerry's long-winded order".into()),
+                None,
+                None,
+                &now2,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -145,7 +201,10 @@ mod tests {
         assert_eq!(agreement2.id(), agreement1.id());
         assert_eq!(agreement2.inner().created(), agreement1.inner().created());
         assert_eq!(agreement2.inner().name(), &Some("order 1111222".into()));
-        assert_eq!(agreement2.inner().note(), &Some("jerry's long-winded order".into()));
+        assert_eq!(
+            agreement2.inner().note(),
+            &Some("jerry's long-winded order".into())
+        );
         assert_eq!(agreement2.participants(), &vec![company_from.agent_id()]);
         assert_eq!(agreement2.active(), agreement1.active());
         assert_eq!(agreement2.created(), agreement1.created());
@@ -153,4 +212,3 @@ mod tests {
         assert_eq!(agreement2.deleted(), &None);
     }
 }
-

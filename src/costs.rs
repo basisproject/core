@@ -96,21 +96,17 @@
 //! systemwide, collective decision. It will be a function of governance, not
 //! code.
 
-use costs_derive::Costs;
 use crate::{
     error::{Error, Result},
-    models::{
-        currency::CurrencyID,
-        occupation::OccupationID,
-        resource_spec::ResourceSpecID,
-    },
+    models::{currency::CurrencyID, occupation::OccupationID, resource_spec::ResourceSpecID},
 };
+use costs_derive::Costs;
 use getset::{Getters, MutGetters};
 use rust_decimal::prelude::*;
 use rust_decimal_macros::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::ops::{Add, Sub, Mul, Div};
+use std::ops::{Add, Div, Mul, Sub};
 
 /// A struct that acts as a container for the various types of disaggregate
 /// costs we want to store and track.
@@ -131,19 +127,28 @@ pub struct Costs {
     /// Stores resource content. Resources are ResourceSpec instances that have
     /// a resource tracking information attached, so we link to them via their
     /// ResourceSpecID
-    #[serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty")]
+    #[serde(
+        default = "Default::default",
+        skip_serializing_if = "std::collections::HashMap::is_empty"
+    )]
     resource: HashMap<ResourceSpecID, Decimal>,
     /// Stores labor *as is has been paid in credits* per-occupation. In other
     /// words, we don't track raw hours here, but rather the social labor value
     /// as negotiated between workers and their companies.
-    #[serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty")]
+    #[serde(
+        default = "Default::default",
+        skip_serializing_if = "std::collections::HashMap::is_empty"
+    )]
     labor: HashMap<OccupationID, Decimal>,
     /// Stores raw labor hours per-occupation. This information might be more
     /// useful in the future, as it's a measure of the occupation-time that went
     /// into building something, as opposed to the credits paid out. Cases where
     /// this might be handy is a system where all wages are 0, but we still want
     /// to track labor content.
-    #[serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty")]
+    #[serde(
+        default = "Default::default",
+        skip_serializing_if = "std::collections::HashMap::is_empty"
+    )]
     labor_hours: HashMap<OccupationID, Decimal>,
     /// Stores currency values of products. This is a strange one to have in a
     /// moneyless system, but supports the banking process of the system by
@@ -153,7 +158,10 @@ pub struct Costs {
     /// (or how many credits to destroy if being purchased internally). The idea
     /// is that in a hopeful future, this bucket will be obsolete and always
     /// empty as currency-based markets are phased out.
-    #[serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty")]
+    #[serde(
+        default = "Default::default",
+        skip_serializing_if = "std::collections::HashMap::is_empty"
+    )]
     currency: HashMap<CurrencyID, Decimal>,
 }
 
@@ -243,7 +251,10 @@ mod tests {
         assert_eq!(costs.get_resource("widget"), dec!(3.1) + dec!(1.8));
         assert_eq!(costs.get_resource("iron"), dec!(8.5) + dec!(0.0));
         assert_eq!(costs.get_resource("oil"), dec!(5.6) + dec!(0.0));
-        assert_eq!(costs.get_currency("usd"), Decimal::new(500, 2) + Decimal::new(1490, 2));
+        assert_eq!(
+            costs.get_currency("usd"),
+            Decimal::new(500, 2) + Decimal::new(1490, 2)
+        );
         assert_eq!(costs.get_currency("eur"), Decimal::new(230, 2));
         assert_eq!(costs.get_currency("cny"), Decimal::new(3000, 0));
         assert_eq!(costs.get_currency("btc"), Zero::zero());
@@ -280,7 +291,10 @@ mod tests {
         assert_eq!(costs.get_resource("widget"), dec!(3.1) - dec!(1.8));
         assert_eq!(costs.get_resource("iron"), dec!(8.5) - dec!(0.0));
         assert_eq!(costs.get_resource("oil"), dec!(-5.6));
-        assert_eq!(costs.get_currency("usd"), Decimal::new(500, 2) - Decimal::new(1490, 2));
+        assert_eq!(
+            costs.get_currency("usd"),
+            Decimal::new(500, 2) - Decimal::new(1490, 2)
+        );
         assert_eq!(costs.get_currency("eur"), Decimal::new(-230, 2));
         assert_eq!(costs.get_currency("cny"), Decimal::new(-3000, 0));
         assert_eq!(costs.get_currency("btc"), Zero::zero());
@@ -302,7 +316,10 @@ mod tests {
         assert_eq!(costs.get_resource("widget"), dec!(3.1) * dec!(5.2));
         assert_eq!(costs.get_resource("iron"), dec!(8.5) * dec!(5.2));
         assert_eq!(costs.get_labor_hours("miner"), dec!(3.0) * dec!(5.2));
-        assert_eq!(costs.get_currency("cny"), Decimal::new(140000, 2) * Decimal::from_f64(5.2).unwrap());
+        assert_eq!(
+            costs.get_currency("cny"),
+            Decimal::new(140000, 2) * Decimal::from_f64(5.2).unwrap()
+        );
 
         let mut costs1 = Costs::new();
         let mut costs2 = Costs::new();
@@ -326,7 +343,10 @@ mod tests {
         assert_eq!(costs.get_resource("iron"), dec!(0.0) * dec!(8.5));
         assert_eq!(costs.get_labor_hours("miner"), dec!(42.0) * dec!(3.0));
         assert_eq!(costs.get_labor_hours("axe murdererer"), dec!(0.0));
-        assert_eq!(costs.get_currency("usd"), Decimal::new(1300, 2) * Decimal::new(4200, 2));
+        assert_eq!(
+            costs.get_currency("usd"),
+            Decimal::new(1300, 2) * Decimal::new(4200, 2)
+        );
         assert_eq!(costs.get_currency("eur"), Zero::zero());
     }
 
@@ -353,7 +373,10 @@ mod tests {
         assert_eq!(costs.get_resource("widget"), dec!(3.1) / dec!(1.8));
         assert_eq!(costs.get_resource("oil"), dec!(0.0) / dec!(5.6));
         assert_eq!(costs.get_labor_hours("dog walker"), dec!(5.2) / dec!(2.2));
-        assert_eq!(costs.get_currency("usd"), Decimal::new(7800, 2) / Decimal::new(1200, 2));
+        assert_eq!(
+            costs.get_currency("usd"),
+            Decimal::new(7800, 2) / Decimal::new(1200, 2)
+        );
     }
 
     #[test]
@@ -371,7 +394,10 @@ mod tests {
         assert_eq!(costs.get_resource("widget"), dec!(3.1) / dec!(1.3));
         assert_eq!(costs.get_resource("oil"), dec!(5.6) / dec!(1.3));
         assert_eq!(costs.get_labor_hours("doctor"), dec!(14.0) / dec!(1.3));
-        assert_eq!(costs.get_currency("eur"), Decimal::new(43301, 2) / Decimal::from_f64(1.3).unwrap());
+        assert_eq!(
+            costs.get_currency("eur"),
+            Decimal::new(43301, 2) / Decimal::from_f64(1.3).unwrap()
+        );
     }
 
     #[test]
@@ -595,12 +621,20 @@ mod tests {
         }
 
         impl CostMover for Process {
-            fn costs(&self) -> &Costs { &self.costs }
-            fn set_costs(&mut self, costs: Costs) { self.costs = costs; }
+            fn costs(&self) -> &Costs {
+                &self.costs
+            }
+            fn set_costs(&mut self, costs: Costs) {
+                self.costs = costs;
+            }
         }
         impl CostMover for Resource {
-            fn costs(&self) -> &Costs { &self.costs }
-            fn set_costs(&mut self, costs: Costs) { self.costs = costs; }
+            fn costs(&self) -> &Costs {
+                &self.costs
+            }
+            fn set_costs(&mut self, costs: Costs) {
+                self.costs = costs;
+            }
         }
 
         let mut rec = Resource::default();
@@ -617,9 +651,12 @@ mod tests {
             _ => panic!("should have gotten NegativeCosts error"),
         }
 
-        rec.move_costs_to(&mut proc, &Costs::new_with_labor("firefighter", dec!(12.0))).unwrap();
-        assert_eq!(rec.costs, Costs::new_with_labor("firefighter", dec!(12.1) - dec!(12.0)));
+        rec.move_costs_to(&mut proc, &Costs::new_with_labor("firefighter", dec!(12.0)))
+            .unwrap();
+        assert_eq!(
+            rec.costs,
+            Costs::new_with_labor("firefighter", dec!(12.1) - dec!(12.0))
+        );
         assert_eq!(proc.costs, Costs::new_with_labor("firefighter", dec!(12.0)));
     }
 }
-

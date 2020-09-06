@@ -54,4 +54,3 @@ macro_rules! load_models {
 #[macro_use]
 pub(crate) mod basis_model;
 pub mod agent;
-

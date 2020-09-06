@@ -3,4 +3,3 @@
 //! the system or a company, or a user that masks/anonymizes consumer purchases.
 
 pub mod vote;
-

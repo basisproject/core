@@ -5,22 +5,28 @@
 //!
 //! [1]: ../../models/occupation/index.html
 
-use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
     error::{Error, Result},
     models::{
-        Op,
-        Modifications,
         lib::basis_model::Model,
         occupation::{Occupation, OccupationID},
         user::User,
+        Modifications, Op,
     },
 };
+use chrono::{DateTime, Utc};
 use vf_rs::vf;
 
 /// Create a new `Occupation`.
-pub fn create<T: Into<String>>(caller: &User, id: OccupationID, label: T, note: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create<T: Into<String>>(
+    caller: &User,
+    id: OccupationID,
+    label: T,
+    note: T,
+    active: bool,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::OccupationCreate)?;
     let model = Occupation::builder()
         .id(id)
@@ -29,7 +35,7 @@ pub fn create<T: Into<String>>(caller: &User, id: OccupationID, label: T, note: 
                 .note(Some(note.into()))
                 .role_label(label)
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .active(active)
         .created(now.clone())
@@ -40,7 +46,14 @@ pub fn create<T: Into<String>>(caller: &User, id: OccupationID, label: T, note: 
 }
 
 /// Update an existing `Occupation`
-pub fn update(caller: &User, mut subject: Occupation, label: Option<String>, note: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(
+    caller: &User,
+    mut subject: Occupation,
+    label: Option<String>,
+    note: Option<String>,
+    active: Option<bool>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::OccupationUpdate)?;
     if let Some(label) = label {
         subject.inner_mut().set_role_label(label);
@@ -56,7 +69,11 @@ pub fn update(caller: &User, mut subject: Occupation, label: Option<String>, not
 }
 
 /// Delete an `Occupation`
-pub fn delete(caller: &User, mut subject: Occupation, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(
+    caller: &User,
+    mut subject: Occupation,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::OccupationDelete)?;
     if subject.is_deleted() {
         Err(Error::ObjectIsDeleted("occupation".into()))?;
@@ -70,12 +87,11 @@ mod tests {
     use super::*;
     use crate::{
         access::Role,
-        models::{
-            Op,
-
-            occupation::Occupation,
+        models::{occupation::Occupation, Op},
+        util::{
+            self,
+            test::{self, *},
         },
-        util::{self, test::{self, *}},
     };
 
     #[test]
@@ -86,7 +102,14 @@ mod tests {
         state.user_mut().set_roles(vec![Role::SuperAdmin]);
 
         let testfn = |state: &TestState<Occupation, Occupation>| {
-            create(state.user(), id.clone(), "machinist", "builds things", true, &now)
+            create(
+                state.user(),
+                id.clone(),
+                "machinist",
+                "builds things",
+                true,
+                &now,
+            )
         };
 
         let mods = testfn(&state).unwrap().into_vec();
@@ -111,13 +134,29 @@ mod tests {
         let mut state = TestState::standard(vec![], &now);
         state.user_mut().set_roles(vec![Role::SuperAdmin]);
 
-        let mods = create(state.user(), id.clone(), "bone spurs in chief", "glorious leader", true, &now).unwrap().into_vec();
+        let mods = create(
+            state.user(),
+            id.clone(),
+            "bone spurs in chief",
+            "glorious leader",
+            true,
+            &now,
+        )
+        .unwrap()
+        .into_vec();
         let occupation = mods[0].clone().expect_op::<Occupation>(Op::Create).unwrap();
         state.model = Some(occupation);
 
         let now2 = util::time::now();
         let testfn = |state: &TestState<Occupation, Occupation>| {
-            update(state.user(), state.model().clone(), Some("coward".into()), None, None, &now2)
+            update(
+                state.user(),
+                state.model().clone(),
+                Some("coward".into()),
+                None,
+                None,
+                &now2,
+            )
         };
 
         // not truly an update but ok
@@ -142,7 +181,16 @@ mod tests {
         let mut state = TestState::standard(vec![], &now);
         state.user_mut().set_roles(vec![Role::SuperAdmin]);
 
-        let mods = create(state.user(), id.clone(), "the best president", "false acquisitions", true, &now).unwrap().into_vec();
+        let mods = create(
+            state.user(),
+            id.clone(),
+            "the best president",
+            "false acquisitions",
+            true,
+            &now,
+        )
+        .unwrap()
+        .into_vec();
         let occupation = mods[0].clone().expect_op::<Occupation>(Op::Create).unwrap();
         state.model = Some(occupation);
 
@@ -165,4 +213,3 @@ mod tests {
         assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 }
-

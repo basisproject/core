@@ -1,11 +1,7 @@
 //! The main error enum for the project lives here, and documents the various
 //! conditions that can arise while interacting with the system.
 
-use crate::{
-    models::{
-        event::EventError,
-    },
-};
+use crate::models::event::EventError;
 use thiserror::Error;
 
 /// This is our error enum. It contains an entry for any part of the system in
@@ -83,4 +79,3 @@ pub enum Error {
 
 /// Wraps `std::result::Result` around our `Error` enum
 pub type Result<T> = std::result::Result<T, Error>;
-

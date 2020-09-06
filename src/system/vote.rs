@@ -37,7 +37,6 @@
 //! assert_eq!(company_voter.member().as_ref().unwrap().permissions(), &vec![CompanyPermission::All]);
 //! ```
 
-use chrono::{DateTime, Utc};
 use crate::{
     access::Role,
     error::{Error, Result},
@@ -48,6 +47,7 @@ use crate::{
         user::{User, UserID},
     },
 };
+use chrono::{DateTime, Utc};
 use getset::Getters;
 use vf_rs::vf;
 
@@ -90,17 +90,19 @@ impl Vote {
     /// the `Vote::company()` method.
     pub fn systemic(user_id: UserID, now: &DateTime<Utc>) -> Result<Self> {
         let user = Self::make_voter(user_id, Role::SuperAdmin, now)?;
-        Ok(Self {
-            user,
-            member: None,
-        })
+        Ok(Self { user, member: None })
     }
 
     /// Create a new voting company member.
     ///
     /// This is specifically for voting to run a transaction internal to a
     /// company. This member is given company-wide admin abilities.
-    pub fn company(user_id: UserID, member_id: MemberID, company_id: &CompanyID, now: &DateTime<Utc>) -> Result<Self> {
+    pub fn company(
+        user_id: UserID,
+        member_id: MemberID,
+        company_id: &CompanyID,
+        now: &DateTime<Utc>,
+    ) -> Result<Self> {
         let user = Self::make_voter(user_id, Role::User, now)?;
         let company_agent_id: AgentID = company_id.clone().into();
         let member = Member::builder()
@@ -111,7 +113,7 @@ impl Vote {
                     .object(company_agent_id)
                     .relationship(())
                     .build()
-                    .map_err(|e| Error::BuilderFailed(e))?
+                    .map_err(|e| Error::BuilderFailed(e))?,
             )
             .class(MemberClass::User(MemberUser::new()))
             .permissions(vec![CompanyPermission::All])
@@ -131,9 +133,7 @@ impl Vote {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        util,
-    };
+    use crate::util;
 
     #[test]
     fn systemic() {
@@ -176,4 +176,3 @@ mod tests {
         assert_eq!(member.updated(), &now);
     }
 }
-

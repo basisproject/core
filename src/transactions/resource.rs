@@ -10,31 +10,41 @@
 //! [1]: ../resource_spec/index.html
 //! [2]: ../../models/resource/index.html
 
-use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
     costs::Costs,
     error::{Error, Result},
     models::{
-        Op,
-        Modifications,
         company::{Company, Permission as CompanyPermission},
+        lib::{agent::Agent, basis_model::Model},
         member::Member,
-        lib::{
-            agent::Agent,
-            basis_model::Model,
-        },
         resource::{Resource, ResourceID},
         resource_spec::ResourceSpecID,
         user::User,
+        Modifications, Op,
     },
 };
+use chrono::{DateTime, Utc};
 use om2::Unit;
 use url::Url;
-use vf_rs::{vf, dfc};
+use vf_rs::{dfc, vf};
 
 /// Create a new resource
-pub fn create(caller: &User, member: &Member, company: &Company, id: ResourceID, spec_id: ResourceSpecID, lot: Option<dfc::ProductBatch>, name: Option<String>, tracking_id: Option<String>, classifications: Vec<Url>, note: Option<String>, unit_of_effort: Option<Unit>, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn create(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    id: ResourceID,
+    spec_id: ResourceSpecID,
+    lot: Option<dfc::ProductBatch>,
+    name: Option<String>,
+    tracking_id: Option<String>,
+    classifications: Vec<Url>,
+    note: Option<String>,
+    unit_of_effort: Option<Unit>,
+    active: bool,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResources)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceCreate)?;
     if !company.is_active() {
@@ -53,7 +63,7 @@ pub fn create(caller: &User, member: &Member, company: &Company, id: ResourceID,
                 .tracking_identifier(tracking_id)
                 .unit_of_effort(unit_of_effort)
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .in_custody_of(company.id().clone())
         .costs(Costs::new())
@@ -66,7 +76,20 @@ pub fn create(caller: &User, member: &Member, company: &Company, id: ResourceID,
 }
 
 /// Update a resource
-pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Resource, lot: Option<dfc::ProductBatch>, name: Option<String>, tracking_id: Option<String>, classifications: Option<Vec<Url>>, note: Option<String>, unit_of_effort: Option<Unit>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    mut subject: Resource,
+    lot: Option<dfc::ProductBatch>,
+    name: Option<String>,
+    tracking_id: Option<String>,
+    classifications: Option<Vec<Url>>,
+    note: Option<String>,
+    unit_of_effort: Option<Unit>,
+    active: Option<bool>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResources)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceUpdate)?;
     if !company.is_active() {
@@ -98,7 +121,13 @@ pub fn update(caller: &User, member: &Member, company: &Company, mut subject: Re
 }
 
 /// Delete a resource
-pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: Resource, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(
+    caller: &User,
+    member: &Member,
+    company: &Company,
+    mut subject: Resource,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdateResources)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::ResourceDelete)?;
     if !company.is_active() {
@@ -118,10 +147,11 @@ pub fn delete(caller: &User, member: &Member, company: &Company, mut subject: Re
 mod tests {
     use super::*;
     use crate::{
-        models::{
-            resource_spec::ResourceSpecID,
+        models::resource_spec::ResourceSpecID,
+        util::{
+            self,
+            test::{self, *},
         },
-        util::{self, test::{self, *}},
     };
 
     #[test]
@@ -129,13 +159,33 @@ mod tests {
         let now = util::time::now();
         let id = ResourceID::create();
         let state = TestState::standard(vec![CompanyPermission::ResourceCreate], &now);
-        let spec = make_resource_spec(&ResourceSpecID::create(), state.company().id(), "widgets, baby", &now);
+        let spec = make_resource_spec(
+            &ResourceSpecID::create(),
+            state.company().id(),
+            "widgets, baby",
+            &now,
+        );
         let lot = dfc::ProductBatch::builder()
             .batch_number("123")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         let testfn = |state: &TestState<Resource, Resource>| {
-            create(state.user(), state.member(), state.company(), id.clone(), spec.id().clone(), Some(lot.clone()), Some("widget batch".into()), None, vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()], Some("niceee".into()), Some(Unit::Hour), true, &now)
+            create(
+                state.user(),
+                state.member(),
+                state.company(),
+                id.clone(),
+                spec.id().clone(),
+                Some(lot.clone()),
+                Some("widget batch".into()),
+                None,
+                vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()],
+                Some("niceee".into()),
+                Some(Unit::Hour),
+                true,
+                &now,
+            )
         };
 
         let mods = testfn(&state).unwrap().into_vec();
@@ -145,8 +195,14 @@ mod tests {
         assert_eq!(resource.id(), &id);
         assert_eq!(resource.inner().name(), &Some("widget batch".into()));
         assert_eq!(resource.inner().lot(), &Some(lot.clone()));
-        assert_eq!(resource.inner().classified_as(), &vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()]);
-        assert_eq!(resource.inner().primary_accountable(), &Some(state.company().agent_id()));
+        assert_eq!(
+            resource.inner().classified_as(),
+            &vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()]
+        );
+        assert_eq!(
+            resource.inner().primary_accountable(),
+            &Some(state.company().agent_id())
+        );
         assert_eq!(resource.inner().tracking_identifier(), &None);
         assert_eq!(resource.inner().note(), &Some("niceee".into()));
         assert_eq!(resource.inner().unit_of_effort(), &Some(Unit::Hour));
@@ -162,18 +218,59 @@ mod tests {
     fn can_update() {
         let now = util::time::now();
         let id = ResourceID::create();
-        let mut state = TestState::standard(vec![CompanyPermission::ResourceCreate, CompanyPermission::ResourceUpdate], &now);
-        let spec = make_resource_spec(&ResourceSpecID::create(), state.company().id(), "widgets, baby", &now);
+        let mut state = TestState::standard(
+            vec![
+                CompanyPermission::ResourceCreate,
+                CompanyPermission::ResourceUpdate,
+            ],
+            &now,
+        );
+        let spec = make_resource_spec(
+            &ResourceSpecID::create(),
+            state.company().id(),
+            "widgets, baby",
+            &now,
+        );
         let lot = dfc::ProductBatch::builder()
             .batch_number("123")
-            .build().unwrap();
-        let mods = create(state.user(), state.member(), state.company(), id.clone(), spec.id().clone(), Some(lot.clone()), Some("widget batch".into()), None, vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()], Some("niceee".into()), Some(Unit::Hour), true, &now).unwrap().into_vec();
+            .build()
+            .unwrap();
+        let mods = create(
+            state.user(),
+            state.member(),
+            state.company(),
+            id.clone(),
+            spec.id().clone(),
+            Some(lot.clone()),
+            Some("widget batch".into()),
+            None,
+            vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()],
+            Some("niceee".into()),
+            Some(Unit::Hour),
+            true,
+            &now,
+        )
+        .unwrap()
+        .into_vec();
         let resource = mods[0].clone().expect_op::<Resource>(Op::Create).unwrap();
         state.model = Some(resource);
 
         let now2 = util::time::now();
         let testfn = |state: &TestState<Resource, Resource>| {
-            update(state.user(), state.member(), state.company(), state.model().clone(), None, Some("better widgets".into()), Some("444-computers-and-equipment".into()), None, None, Some(Unit::WattHour), Some(false), &now2)
+            update(
+                state.user(),
+                state.member(),
+                state.company(),
+                state.model().clone(),
+                None,
+                Some("better widgets".into()),
+                Some("444-computers-and-equipment".into()),
+                None,
+                None,
+                Some(Unit::WattHour),
+                Some(false),
+                &now2,
+            )
         };
 
         let mods = testfn(&state).unwrap().into_vec();
@@ -183,9 +280,18 @@ mod tests {
         assert_eq!(resource2.id(), &id);
         assert_eq!(resource2.inner().name(), &Some("better widgets".into()));
         assert_eq!(resource2.inner().lot(), &Some(lot.clone()));
-        assert_eq!(resource2.inner().classified_as(), &vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()]);
-        assert_eq!(resource2.inner().primary_accountable(), &Some(state.company().agent_id()));
-        assert_eq!(resource2.inner().tracking_identifier(), &Some("444-computers-and-equipment".into()));
+        assert_eq!(
+            resource2.inner().classified_as(),
+            &vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()]
+        );
+        assert_eq!(
+            resource2.inner().primary_accountable(),
+            &Some(state.company().agent_id())
+        );
+        assert_eq!(
+            resource2.inner().tracking_identifier(),
+            &Some("444-computers-and-equipment".into())
+        );
         assert_eq!(resource2.inner().note(), &Some("niceee".into()));
         assert_eq!(resource2.inner().unit_of_effort(), &Some(Unit::WattHour));
         assert_eq!(resource2.in_custody_of(), &state.company().agent_id());
@@ -199,18 +305,52 @@ mod tests {
     fn can_delete() {
         let now = util::time::now();
         let id = ResourceID::create();
-        let mut state = TestState::standard(vec![CompanyPermission::ResourceCreate, CompanyPermission::ResourceDelete], &now);
-        let spec = make_resource_spec(&ResourceSpecID::create(), state.company().id(), "widgets, baby", &now);
+        let mut state = TestState::standard(
+            vec![
+                CompanyPermission::ResourceCreate,
+                CompanyPermission::ResourceDelete,
+            ],
+            &now,
+        );
+        let spec = make_resource_spec(
+            &ResourceSpecID::create(),
+            state.company().id(),
+            "widgets, baby",
+            &now,
+        );
         let lot = dfc::ProductBatch::builder()
             .batch_number("123")
-            .build().unwrap();
-        let mods = create(state.user(), state.member(), state.company(), id.clone(), spec.id().clone(), Some(lot.clone()), Some("widget batch".into()), None, vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()], Some("niceee".into()), Some(Unit::Hour), true, &now).unwrap().into_vec();
+            .build()
+            .unwrap();
+        let mods = create(
+            state.user(),
+            state.member(),
+            state.company(),
+            id.clone(),
+            spec.id().clone(),
+            Some(lot.clone()),
+            Some("widget batch".into()),
+            None,
+            vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()],
+            Some("niceee".into()),
+            Some(Unit::Hour),
+            true,
+            &now,
+        )
+        .unwrap()
+        .into_vec();
         let resource = mods[0].clone().expect_op::<Resource>(Op::Create).unwrap();
         state.model = Some(resource);
 
         let now2 = util::time::now();
         let testfn = |state: &TestState<Resource, Resource>| {
-            delete(state.user(), state.member(), state.company(), state.model().clone(), &now2)
+            delete(
+                state.user(),
+                state.member(),
+                state.company(),
+                state.model().clone(),
+                &now2,
+            )
         };
         test::standard_transaction_tests(&state, &testfn);
         test::double_deleted_tester(&state, "resource", &testfn);
@@ -222,8 +362,14 @@ mod tests {
         assert_eq!(resource2.id(), &id);
         assert_eq!(resource2.inner().name(), &Some("widget batch".into()));
         assert_eq!(resource2.inner().lot(), &Some(lot.clone()));
-        assert_eq!(resource2.inner().classified_as(), &vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()]);
-        assert_eq!(resource2.inner().primary_accountable(), &Some(state.company().agent_id()));
+        assert_eq!(
+            resource2.inner().classified_as(),
+            &vec!["https://www.wikidata.org/wiki/Q605117".parse().unwrap()]
+        );
+        assert_eq!(
+            resource2.inner().primary_accountable(),
+            &Some(state.company().agent_id())
+        );
         assert_eq!(resource2.inner().tracking_identifier(), &None);
         assert_eq!(resource2.inner().note(), &Some("niceee".into()));
         assert_eq!(resource2.inner().unit_of_effort(), &Some(Unit::Hour));
@@ -234,4 +380,3 @@ mod tests {
         assert_eq!(resource2.deleted(), &Some(now2.clone()));
     }
 }
-

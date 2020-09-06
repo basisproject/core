@@ -1,9 +1,7 @@
 //! Some helpful utilities for dealing with om2::Measure objects in the context
 //! of event processing.
 
-use crate::{
-    error::{Error, Result},
-};
+use crate::error::{Error, Result};
 use om2::{Measure, NumericUnion};
 use rust_decimal::prelude::*;
 
@@ -25,7 +23,9 @@ pub fn dec_measure(measure: &mut Measure, dec_by: &Measure) -> Result<bool> {
     if dec_quantity.is_negative() {
         Err(Error::NegativeMeasurement)?;
     }
-    let remaining = from_quantity.clone().sub(dec_quantity.clone())
+    let remaining = from_quantity
+        .clone()
+        .sub(dec_quantity.clone())
         .map_err(|e| Error::NumericUnionOpError(e))?;
     if remaining.is_negative() {
         Err(Error::NegativeMeasurement)?;
@@ -52,7 +52,9 @@ pub fn inc_measure(measure: &mut Measure, inc_by: &Measure) -> Result<bool> {
     if inc_quantity.is_negative() {
         Err(Error::NegativeMeasurement)?;
     }
-    let added = from_quantity.clone().add(inc_quantity.clone())
+    let added = from_quantity
+        .clone()
+        .add(inc_quantity.clone())
         .map_err(|e| Error::NumericUnionOpError(e))?;
     if added.is_negative() {
         Err(Error::NegativeMeasurement)?;
@@ -64,18 +66,16 @@ pub fn inc_measure(measure: &mut Measure, inc_by: &Measure) -> Result<bool> {
 /// Either use the given `measure` if it exists, or create a measure of 0 and
 /// return it using the same units/numeric types as `default`.
 pub fn unwrap_or_zero(measure: &Option<Measure>, default: &Measure) -> Measure {
-    measure
-        .clone()
-        .unwrap_or_else(|| {
-            let unit = default.has_unit().clone();
-            let numeric = match default.has_numerical_value().clone() {
-                NumericUnion::Decimal(_) => NumericUnion::Decimal(Decimal::zero()),
-                NumericUnion::Double(_) => NumericUnion::Double(f64::zero()),
-                NumericUnion::Float(_) => NumericUnion::Float(f32::zero()),
-                NumericUnion::Integer(_) => NumericUnion::Integer(i64::zero()),
-            };
-            Measure::new(numeric, unit)
-        })
+    measure.clone().unwrap_or_else(|| {
+        let unit = default.has_unit().clone();
+        let numeric = match default.has_numerical_value().clone() {
+            NumericUnion::Decimal(_) => NumericUnion::Decimal(Decimal::zero()),
+            NumericUnion::Double(_) => NumericUnion::Double(f64::zero()),
+            NumericUnion::Float(_) => NumericUnion::Float(f32::zero()),
+            NumericUnion::Integer(_) => NumericUnion::Integer(i64::zero()),
+        };
+        Measure::new(numeric, unit)
+    })
 }
 
 /// Set a Measure's count to zero (preserves Unit and NumericUnion types).
@@ -88,4 +88,3 @@ pub fn set_zero(measure: &mut Measure) {
     };
     measure.set_has_numerical_value(num);
 }
-

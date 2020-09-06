@@ -1,4 +1,4 @@
-.PHONY: all clean release doc build run test test-panic test-st macros
+.PHONY: all clean release doc fromat build run test test-panic test-st macros
 
 # non-versioned include
 VARS ?= vars.mk
@@ -17,6 +17,9 @@ release: build
 
 doc:
 	cargo doc
+
+fmt:
+	$(CARGO) fmt
 
 test-release: override CARGO_BUILD_ARGS += --release
 test-release:

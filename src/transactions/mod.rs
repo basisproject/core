@@ -37,4 +37,3 @@ pub mod process_spec;
 pub mod resource;
 pub mod resource_spec;
 pub mod user;
-

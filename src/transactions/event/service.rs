@@ -3,40 +3,55 @@
 //! For instance, delivering a package, providing healthcare, or providing legal
 //! advice are all services.
 
-use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
     costs::Costs,
     error::{Error, Result},
     models::{
-        Op,
-        Modifications,
         agreement::Agreement,
-        event::{Event, EventID, EventProcessState},
         company::{Company, Permission as CompanyPermission},
+        event::{Event, EventID, EventProcessState},
+        lib::{agent::Agent, basis_model::Model},
         member::Member,
-        lib::{
-            agent::Agent,
-            basis_model::Model,
-        },
         process::Process,
         user::User,
+        Modifications, Op,
     },
 };
+use chrono::{DateTime, Utc};
 use url::Url;
 use vf_rs::vf;
 
 /// Provide a service to another agent, moving costs along the way.
-pub fn deliver_service(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, process_from: Process, process_to: Process, move_costs: Costs, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn deliver_service(
+    caller: &User,
+    member: &Member,
+    company_from: &Company,
+    company_to: &Company,
+    agreement: &Agreement,
+    id: EventID,
+    process_from: Process,
+    process_to: Process,
+    move_costs: Costs,
+    agreed_in: Option<Url>,
+    note: Option<String>,
+    now: &DateTime<Utc>,
+) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
-    member.access_check(caller.id(), company_from.id(), CompanyPermission::DeliverService)?;
+    member.access_check(
+        caller.id(),
+        company_from.id(),
+        CompanyPermission::DeliverService,
+    )?;
     if !company_from.is_active() {
         Err(Error::ObjectIsInactive("company".into()))?;
     }
     if !company_to.is_active() {
         Err(Error::ObjectIsInactive("company".into()))?;
     }
-    if !agreement.has_participant(&company_from.agent_id()) || !agreement.has_participant(&company_from.agent_id()) {
+    if !agreement.has_participant(&company_from.agent_id())
+        || !agreement.has_participant(&company_from.agent_id())
+    {
         // can't create an event for an agreement you are not party to
         Err(Error::InsufficientPrivileges)?;
     }
@@ -63,7 +78,7 @@ pub fn deliver_service(caller: &User, member: &Member, company_from: &Company, c
                 .receiver(company_to.id().clone())
                 .output_of(Some(process_from_id))
                 .build()
-                .map_err(|e| Error::BuilderFailed(e))?
+                .map_err(|e| Error::BuilderFailed(e))?,
         )
         .move_costs(Some(move_costs))
         .active(true)
@@ -81,7 +96,6 @@ pub fn deliver_service(caller: &User, member: &Member, company_from: &Company, c
     Ok(mods)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,12 +103,15 @@ mod tests {
         models::{
             agreement::AgreementID,
             company::CompanyID,
-            event::{EventID, EventError},
+            event::{EventError, EventID},
             lib::agent::Agent,
             occupation::OccupationID,
             process::{Process, ProcessID},
         },
-        util::{self, test::{self, *}},
+        util::{
+            self,
+            test::{self, *},
+        },
     };
     use rust_decimal_macros::*;
 
@@ -105,16 +122,52 @@ mod tests {
         let mut state = TestState::standard(vec![CompanyPermission::DeliverService], &now);
         let company_from = state.company().clone();
         let company_to = make_company(&CompanyID::create(), "jinkey's skateboards", &now);
-        let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 1234", "gotta make some planks", &now);
-        let agreed_in: Url = "https://legalzoom.com/my-dad-is-suing-your-dad-the-agreement".parse().unwrap();
+        let agreement = make_agreement(
+            &AgreementID::create(),
+            &vec![company_from.agent_id(), company_to.agent_id()],
+            "order 1234",
+            "gotta make some planks",
+            &now,
+        );
+        let agreed_in: Url = "https://legalzoom.com/my-dad-is-suing-your-dad-the-agreement"
+            .parse()
+            .unwrap();
         let occupation_id = OccupationID::new("lawyer");
-        let process_from = make_process(&ProcessID::create(), company_from.id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), dec!(177.25)), &now);
-        let process_to = make_process(&ProcessID::create(), company_to.id(), "employee legal agreement drafting", &Costs::new_with_labor(occupation_id.clone(), dec!(804)), &now);
+        let process_from = make_process(
+            &ProcessID::create(),
+            company_from.id(),
+            "various lawyerings",
+            &Costs::new_with_labor(occupation_id.clone(), dec!(177.25)),
+            &now,
+        );
+        let process_to = make_process(
+            &ProcessID::create(),
+            company_to.id(),
+            "employee legal agreement drafting",
+            &Costs::new_with_labor(occupation_id.clone(), dec!(804)),
+            &now,
+        );
         state.model = Some(process_from);
         state.model2 = Some(process_to);
 
-        let testfn_inner = |state: &TestState<Process, Process>, company_from: &Company, company_to: &Company, agreement: &Agreement| {
-            deliver_service(state.user(), state.member(), company_from, company_to, agreement, id.clone(), state.model().clone(), state.model2().clone(), Costs::new_with_labor("lawyer", 100), Some(agreed_in.clone()), Some("making planks lol".into()), &now)
+        let testfn_inner = |state: &TestState<Process, Process>,
+                            company_from: &Company,
+                            company_to: &Company,
+                            agreement: &Agreement| {
+            deliver_service(
+                state.user(),
+                state.member(),
+                company_from,
+                company_to,
+                agreement,
+                id.clone(),
+                state.model().clone(),
+                state.model2().clone(),
+                Costs::new_with_labor("lawyer", 100),
+                Some(agreed_in.clone()),
+                Some("making planks lol".into()),
+                &now,
+            )
         };
         let testfn_from = |state: &TestState<Process, Process>| {
             testfn_inner(state, state.company(), &company_to, &agreement)
@@ -137,10 +190,16 @@ mod tests {
         assert_eq!(event.inner().note(), &Some("making planks lol".into()));
         assert_eq!(event.inner().output_of(), &Some(state.model().id().clone()));
         assert_eq!(event.inner().provider().clone(), company_from.agent_id());
-        assert_eq!(event.inner().realization_of(), &Some(agreement.id().clone()));
+        assert_eq!(
+            event.inner().realization_of(),
+            &Some(agreement.id().clone())
+        );
         assert_eq!(event.inner().receiver().clone(), company_to.agent_id());
         assert_eq!(event.inner().resource_quantity(), &None);
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("lawyer", 100)));
+        assert_eq!(
+            event.move_costs(),
+            &Some(Costs::new_with_labor("lawyer", 100))
+        );
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
@@ -159,13 +218,17 @@ mod tests {
 
         // can't move costs from a process you don't own
         let mut state2 = state.clone();
-        state2.model_mut().set_company_id(CompanyID::new("zing").into());
+        state2
+            .model_mut()
+            .set_company_id(CompanyID::new("zing").into());
         let res = testfn_from(&state2);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
         // can't move costs into a process company_to doesnt own
         let mut state3 = state.clone();
-        state3.model2_mut().set_company_id(CompanyID::new("zing").into());
+        state3
+            .model2_mut()
+            .set_company_id(CompanyID::new("zing").into());
         let res = testfn_from(&state3);
         assert_eq!(res, Err(Error::Event(EventError::ProcessOwnerMismatch)));
 
@@ -180,4 +243,3 @@ mod tests {
         test::deleted_company_tester(&state5, &testfn_to);
     }
 }
-

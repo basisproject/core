@@ -4,12 +4,8 @@
 //!
 //! [1]: ../../models/event/index.html
 
-use crate::{
-    models::{
-        resource::{ResourceID, Resource},
-    },
-};
-use serde::{Serialize, Deserialize};
+use crate::models::resource::{Resource, ResourceID};
+use serde::{Deserialize, Serialize};
 
 /// Helps us signify whether we want an operation that moves a resource from one
 /// place to another to a) create a new resource copied from the original or b)
@@ -27,9 +23,8 @@ pub enum ResourceMover {
 
 pub mod accounting;
 pub mod delivery;
-pub mod production;
 pub mod modification;
+pub mod production;
 pub mod service;
 pub mod transfer;
 pub mod work;
-

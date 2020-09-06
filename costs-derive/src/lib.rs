@@ -1,10 +1,6 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{
-    DeriveInput,
-    Ident,
-    parse_macro_input,
-};
+use syn::{parse_macro_input, DeriveInput, Ident};
 
 #[derive(Debug)]
 struct Field {
@@ -25,67 +21,109 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
 
     // grab our HashMap fields from the input
     let fields: Vec<Field> = match &input.data {
-        syn::Data::Struct(syn::DataStruct { fields: syn::Fields::Named(syn::FieldsNamed { named: fields, .. }), .. }) => {
-            fields.iter()
-                .map(|field| {
-                    (
-                        field.ident.as_ref().unwrap().clone(),
-                        match &field.ty {
-                            syn::Type::Path(syn::TypePath { path: syn::Path { segments, .. }, .. }) => {
-                                Some(segments[0].clone())
+        syn::Data::Struct(syn::DataStruct {
+            fields: syn::Fields::Named(syn::FieldsNamed { named: fields, .. }),
+            ..
+        }) => fields
+            .iter()
+            .map(|field| {
+                (
+                    field.ident.as_ref().unwrap().clone(),
+                    match &field.ty {
+                        syn::Type::Path(syn::TypePath {
+                            path: syn::Path { segments, .. },
+                            ..
+                        }) => Some(segments[0].clone()),
+                        _ => None,
+                    },
+                )
+            })
+            .filter(|fieldspec| match &fieldspec.1 {
+                Some(path) => {
+                    path.ident == syn::Ident::new("HashMap", proc_macro2::Span::call_site())
+                }
+                None => false,
+            })
+            .map(|(fieldname, segment)| {
+                let segment = segment.unwrap();
+                let args = match segment.arguments {
+                    syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
+                        args,
+                        ..
+                    }) => args
+                        .iter()
+                        .map(|arg| match arg {
+                            syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
+                                path: syn::Path { segments, .. },
+                                ..
+                            })) => segments[0].ident.clone(),
+                            _ => {
+                                panic!("costs-derive::derive_costs() -- error parsing HashMap args")
                             }
-                            _ => None,
-                        }
-                    )
-                })
-                .filter(|fieldspec| {
-                    match &fieldspec.1 {
-                        Some(path) => {
-                            path.ident == syn::Ident::new("HashMap", proc_macro2::Span::call_site())
-                        }
-                        None => false,
-                    }
-                })
-                .map(|(fieldname, segment)| {
-                    let segment = segment.unwrap();
-                    let args = match segment.arguments {
-                        syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments { args, .. }) => {
-                            args.iter()
-                                .map(|arg| {
-                                    match arg {
-                                        syn::GenericArgument::Type(syn::Type::Path(syn::TypePath { path: syn::Path { segments, .. }, .. })) => {
-                                            segments[0].ident.clone()
-                                        }
-                                        _ => panic!("costs-derive::derive_costs() -- error parsing HashMap args"),
-                                    }
-                                })
-                                .collect::<Vec<_>>()
-                        }
-                        _ => panic!("costs-derive::derive_costs() -- error parsing HashMap fields"),
-                    };
-                    Field {
-                        name: fieldname,
-                        hash_key: args[0].clone(),
-                        hash_val: args[1].clone(),
-                    }
-                })
-                .collect::<Vec<_>>()
-        }
+                        })
+                        .collect::<Vec<_>>(),
+                    _ => panic!("costs-derive::derive_costs() -- error parsing HashMap fields"),
+                };
+                Field {
+                    name: fieldname,
+                    hash_key: args[0].clone(),
+                    hash_val: args[1].clone(),
+                }
+            })
+            .collect::<Vec<_>>(),
         _ => panic!("costs-derive::derive_costs() -- can only derive costs on a struct"),
     };
 
-    let fn_new_with = fields.iter().map(|f| format_ident!("new_with_{}", f.name)).collect::<Vec<_>>();
-    let fn_new_with_comment = fields.iter().map(|f| format!("Create a new Cost, with one {} entry", f.name)).collect::<Vec<_>>();
-    let fn_track = fields.iter().map(|f| format_ident!("track_{}", f.name)).collect::<Vec<_>>();
-    let fn_track_comment = fields.iter().map(|f| format!("Add a {} cost to this Cost", f.name)).collect::<Vec<_>>();
-    let fn_track_panic = fields.iter().map(|f| format!("Costs::track_{}() -- given value must be >= 0", f.name)).collect::<Vec<_>>();
-    let fn_get = fields.iter().map(|f| format_ident!("get_{}", f.name)).collect::<Vec<_>>();
-    let fn_get_comment = fields.iter().map(|f| format!("Get a {} value out of this cost object, defaulting to zero if not found", f.name)).collect::<Vec<_>>();
+    let fn_new_with = fields
+        .iter()
+        .map(|f| format_ident!("new_with_{}", f.name))
+        .collect::<Vec<_>>();
+    let fn_new_with_comment = fields
+        .iter()
+        .map(|f| format!("Create a new Cost, with one {} entry", f.name))
+        .collect::<Vec<_>>();
+    let fn_track = fields
+        .iter()
+        .map(|f| format_ident!("track_{}", f.name))
+        .collect::<Vec<_>>();
+    let fn_track_comment = fields
+        .iter()
+        .map(|f| format!("Add a {} cost to this Cost", f.name))
+        .collect::<Vec<_>>();
+    let fn_track_panic = fields
+        .iter()
+        .map(|f| format!("Costs::track_{}() -- given value must be >= 0", f.name))
+        .collect::<Vec<_>>();
+    let fn_get = fields
+        .iter()
+        .map(|f| format_ident!("get_{}", f.name))
+        .collect::<Vec<_>>();
+    let fn_get_comment = fields
+        .iter()
+        .map(|f| {
+            format!(
+                "Get a {} value out of this cost object, defaulting to zero if not found",
+                f.name
+            )
+        })
+        .collect::<Vec<_>>();
     let field_name = fields.iter().map(|f| f.name.clone()).collect::<Vec<_>>();
-    let field_name_mut = fields.iter().map(|f| format_ident!("{}_mut", f.name)).collect::<Vec<_>>();
-    let field_hashkey = fields.iter().map(|f| f.hash_key.clone()).collect::<Vec<_>>();
-    let field_hashval = fields.iter().map(|f| f.hash_val.clone()).collect::<Vec<_>>();
-    let fn_div_panic = fields.iter().map(|f| format!("Costs::div() -- divide by zero for {} {{:?}}", f.name)).collect::<Vec<_>>();
+    let field_name_mut = fields
+        .iter()
+        .map(|f| format_ident!("{}_mut", f.name))
+        .collect::<Vec<_>>();
+    let field_hashkey = fields
+        .iter()
+        .map(|f| f.hash_key.clone())
+        .collect::<Vec<_>>();
+    let field_hashval = fields
+        .iter()
+        .map(|f| f.hash_val.clone())
+        .collect::<Vec<_>>();
+    let fn_div_panic = fields
+        .iter()
+        .map(|f| format!("Costs::div() -- divide by zero for {} {{:?}}", f.name))
+        .collect::<Vec<_>>();
 
     let cost_impl = quote! {
         impl #name {
@@ -322,4 +360,3 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
     };
     TokenStream::from(cost_impl)
 }
-

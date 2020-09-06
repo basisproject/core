@@ -1,13 +1,8 @@
 use crate::{
-    error::{Result, Error},
-    models::{
-        company::CompanyID,
-        member::MemberID,
-        lib::basis_model::Model,
-        user::UserID,
-    },
+    error::{Error, Result},
+    models::{company::CompanyID, lib::basis_model::Model, member::MemberID, user::UserID},
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
 /// A trait that holds common agent functionality, generally applied to models
@@ -56,4 +51,3 @@ macro_rules! impl_agent_for_model_id {
 impl_agent_for_model_id! { CompanyID }
 impl_agent_for_model_id! { MemberID }
 impl_agent_for_model_id! { UserID }
-

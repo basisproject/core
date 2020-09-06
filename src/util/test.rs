@@ -1,17 +1,11 @@
-use chrono::{DateTime, Utc};
 use crate::{
     access::Role,
     costs::Costs,
     error::{Error, Result},
     models::{
-        Modifications,
-
         agreement::{Agreement, AgreementID},
         company::{Company, CompanyID, Permission as CompanyPermission},
-        lib::{
-            agent::AgentID,
-            basis_model::Model,
-        },
+        lib::{agent::AgentID, basis_model::Model},
         member::*,
         occupation::OccupationID,
         process::{Process, ProcessID},
@@ -19,11 +13,13 @@ use crate::{
         resource::{Resource, ResourceID},
         resource_spec::{ResourceSpec, ResourceSpecID},
         user::{User, UserID},
+        Modifications,
     },
     util,
 };
+use chrono::{DateTime, Utc};
 use om2::Measure;
-use vf_rs::{vf, geo::SpatialThing};
+use vf_rs::{geo::SpatialThing, vf};
 
 #[derive(Clone, Debug, PartialEq, getset::Setters, derive_builder::Builder)]
 #[builder(pattern = "owned", setter(into))]
@@ -40,7 +36,7 @@ pub(crate) struct TestState<M1: Model, M2: Model> {
     #[builder(default)]
     pub(crate) model2: Option<M2>,
     #[builder(default)]
-    pub(crate) loc: Option<SpatialThing>
+    pub(crate) loc: Option<SpatialThing>,
 }
 
 impl<M1: Model, M2: Model> TestState<M1, M2> {
@@ -55,19 +51,33 @@ impl<M1: Model, M2: Model> TestState<M1, M2> {
         }
     }
 
-    pub(crate) fn standard(permissions: Vec<CompanyPermission>, now: &DateTime<Utc>) -> TestState<M1, M2> {
+    pub(crate) fn standard(
+        permissions: Vec<CompanyPermission>,
+        now: &DateTime<Utc>,
+    ) -> TestState<M1, M2> {
         let company = make_company(&CompanyID::create(), "larry's chairs", now);
         let user = make_user(&UserID::create(), None, now);
-        let member = make_member_worker(&MemberID::create(), user.id(), company.id(), &OccupationID::create(), permissions, now);
+        let member = make_member_worker(
+            &MemberID::create(),
+            user.id(),
+            company.id(),
+            &OccupationID::create(),
+            permissions,
+            now,
+        );
         let loc = SpatialThing::builder()
-            .mappable_address(Some("444 Checkmate lane, LOGIC and FACTS, MN, 33133".into()))
-            .build().unwrap();
+            .mappable_address(Some(
+                "444 Checkmate lane, LOGIC and FACTS, MN, 33133".into(),
+            ))
+            .build()
+            .unwrap();
         Self::builder()
             .user(user)
             .member(member)
             .company(company)
             .loc(loc)
-            .build().unwrap()
+            .build()
+            .unwrap()
     }
 
     pub(crate) fn user(&self) -> &User {
@@ -121,9 +131,10 @@ impl<M1: Model, M2: Model> TestState<M1, M2> {
 }
 
 pub(crate) fn deleted_company_tester<M1, M2, F>(state: &TestState<M1, M2>, testfn: &F)
-    where M1: Model,
-          M2: Model,
-          F: Fn(&TestState<M1, M2>) -> Result<Modifications> + Clone,
+where
+    M1: Model,
+    M2: Model,
+    F: Fn(&TestState<M1, M2>) -> Result<Modifications> + Clone,
 {
     let now = util::time::now();
 
@@ -155,9 +166,10 @@ pub(crate) fn deleted_company_tester<M1, M2, F>(state: &TestState<M1, M2>, testf
 }
 
 pub(crate) fn permissions_checks<M1, M2, F>(state: &TestState<M1, M2>, testfn: &F)
-    where M1: Model,
-          M2: Model,
-          F: Fn(&TestState<M1, M2>) -> Result<Modifications> + Clone,
+where
+    M1: Model,
+    M2: Model,
+    F: Fn(&TestState<M1, M2>) -> Result<Modifications> + Clone,
 {
     // test that a member with no permissions cannot perform this action
     let mut state1 = state.clone();
@@ -174,16 +186,19 @@ pub(crate) fn permissions_checks<M1, M2, F>(state: &TestState<M1, M2>, testfn: &
     // test that when a user's id and member's agent id don't match we cannot
     // perform this action
     let mut state3 = state.clone();
-    state3.user_mut().set_id(UserID::new("gee-i-hope-nobody-else-uses-this-exact-id-in-a-test-lol"));
+    state3.user_mut().set_id(UserID::new(
+        "gee-i-hope-nobody-else-uses-this-exact-id-in-a-test-lol",
+    ));
     let res = testfn(&state3);
     assert_eq!(res, Err(Error::InsufficientPrivileges));
 }
 
 pub(crate) fn double_deleted_tester<M1, M2, F, S>(state: &TestState<M1, M2>, tystr: S, testfn: &F)
-    where M1: Model,
-          M2: Model,
-          F: Fn(&TestState<M1, M2>) -> Result<Modifications> + Clone,
-          S: Into<String>,
+where
+    M1: Model,
+    M2: Model,
+    F: Fn(&TestState<M1, M2>) -> Result<Modifications> + Clone,
+    S: Into<String>,
 {
     let mut state1 = state.clone();
     state1.model_mut().set_deleted(Some(util::time::now()));
@@ -192,15 +207,22 @@ pub(crate) fn double_deleted_tester<M1, M2, F, S>(state: &TestState<M1, M2>, tys
 }
 
 pub(crate) fn standard_transaction_tests<M1, M2, F>(state: &TestState<M1, M2>, testfn: &F)
-    where M1: Model,
-          M2: Model,
-          F: Fn(&TestState<M1, M2>) -> Result<Modifications> + Clone,
+where
+    M1: Model,
+    M2: Model,
+    F: Fn(&TestState<M1, M2>) -> Result<Modifications> + Clone,
 {
     deleted_company_tester(state, testfn);
     permissions_checks(state, testfn);
 }
 
-pub fn make_agreement<T: Into<String>>(id: &AgreementID, participants: &Vec<AgentID>, name: T, note: T, now: &DateTime<Utc>) -> Agreement {
+pub fn make_agreement<T: Into<String>>(
+    id: &AgreementID,
+    participants: &Vec<AgentID>,
+    name: T,
+    note: T,
+    now: &DateTime<Utc>,
+) -> Agreement {
     Agreement::builder()
         .id(id.clone())
         .inner(
@@ -208,13 +230,15 @@ pub fn make_agreement<T: Into<String>>(id: &AgreementID, participants: &Vec<Agen
                 .created(now.clone())
                 .name(Some(name.into()))
                 .note(Some(note.into()))
-                .build().unwrap()
+                .build()
+                .unwrap(),
         )
         .participants(participants.clone())
         .active(true)
         .created(now.clone())
         .updated(now.clone())
-        .build().unwrap()
+        .build()
+        .unwrap()
 }
 
 pub fn make_company<T: Into<String>>(id: &CompanyID, name: T, now: &DateTime<Utc>) -> Company {
@@ -225,10 +249,18 @@ pub fn make_company<T: Into<String>>(id: &CompanyID, name: T, now: &DateTime<Utc
         .active(true)
         .created(now.clone())
         .updated(now.clone())
-        .build().unwrap()
+        .build()
+        .unwrap()
 }
 
-pub fn make_member_worker(member_id: &MemberID, user_id: &UserID, company_id: &CompanyID, occupation_id: &OccupationID, permissions: Vec<CompanyPermission>, now: &DateTime<Utc>) -> Member {
+pub fn make_member_worker(
+    member_id: &MemberID,
+    user_id: &UserID,
+    company_id: &CompanyID,
+    occupation_id: &OccupationID,
+    permissions: Vec<CompanyPermission>,
+    now: &DateTime<Utc>,
+) -> Member {
     Member::builder()
         .id(member_id.clone())
         .inner(
@@ -236,17 +268,28 @@ pub fn make_member_worker(member_id: &MemberID, user_id: &UserID, company_id: &C
                 .subject(user_id.clone())
                 .object(company_id.clone())
                 .relationship(())
-                .build().unwrap()
+                .build()
+                .unwrap(),
         )
-        .class(MemberClass::Worker(MemberWorker::new(occupation_id.clone(), None)))
+        .class(MemberClass::Worker(MemberWorker::new(
+            occupation_id.clone(),
+            None,
+        )))
         .permissions(permissions)
         .active(true)
         .created(now.clone())
         .updated(now.clone())
-        .build().unwrap()
+        .build()
+        .unwrap()
 }
 
-pub fn make_process<T: Into<String>>(id: &ProcessID, company_id: &CompanyID, name: T, costs: &Costs, now: &DateTime<Utc>) -> Process {
+pub fn make_process<T: Into<String>>(
+    id: &ProcessID,
+    company_id: &CompanyID,
+    name: T,
+    costs: &Costs,
+    now: &DateTime<Utc>,
+) -> Process {
     Process::builder()
         .id(id.clone())
         .inner(vf::Process::builder().name(name).build().unwrap())
@@ -255,25 +298,40 @@ pub fn make_process<T: Into<String>>(id: &ProcessID, company_id: &CompanyID, nam
         .active(true)
         .created(now.clone())
         .updated(now.clone())
-        .build().unwrap()
+        .build()
+        .unwrap()
 }
 
-pub fn make_process_spec<T: Into<String>>(id: &ProcessSpecID, company_id: &CompanyID, name: T, active: bool, now: &DateTime<Utc>) -> ProcessSpec {
+pub fn make_process_spec<T: Into<String>>(
+    id: &ProcessSpecID,
+    company_id: &CompanyID,
+    name: T,
+    active: bool,
+    now: &DateTime<Utc>,
+) -> ProcessSpec {
     ProcessSpec::builder()
         .id(id.clone())
         .inner(
             vf::ProcessSpecification::builder()
                 .name(name)
-                .build().unwrap()
+                .build()
+                .unwrap(),
         )
         .company_id(company_id.clone())
         .active(active)
         .created(now.clone())
         .updated(now.clone())
-        .build().unwrap()
+        .build()
+        .unwrap()
 }
 
-pub fn make_resource(id: &ResourceID, company_id: &CompanyID, quantity: &Measure, costs: &Costs, now: &DateTime<Utc>) -> Resource {
+pub fn make_resource(
+    id: &ResourceID,
+    company_id: &CompanyID,
+    quantity: &Measure,
+    costs: &Costs,
+    now: &DateTime<Utc>,
+) -> Resource {
     Resource::builder()
         .id(id.clone())
         .inner(
@@ -282,37 +340,47 @@ pub fn make_resource(id: &ResourceID, company_id: &CompanyID, quantity: &Measure
                 .onhand_quantity(Some(quantity.clone()))
                 .primary_accountable(Some(company_id.clone().into()))
                 .conforms_to("6969")
-                .build().unwrap()
+                .build()
+                .unwrap(),
         )
         .in_custody_of(company_id.clone())
         .costs(costs.clone())
         .created(now.clone())
         .updated(now.clone())
-        .build().unwrap()
+        .build()
+        .unwrap()
 }
 
-pub fn make_resource_spec<T: Into<String>>(id: &ResourceSpecID, company_id: &CompanyID, name: T, now: &DateTime<Utc>) -> ResourceSpec {
+pub fn make_resource_spec<T: Into<String>>(
+    id: &ResourceSpecID,
+    company_id: &CompanyID,
+    name: T,
+    now: &DateTime<Utc>,
+) -> ResourceSpec {
     ResourceSpec::builder()
         .id(id.clone())
         .inner(
             vf::ResourceSpecification::builder()
                 .name(name)
-                .build().unwrap()
+                .build()
+                .unwrap(),
         )
         .company_id(company_id.clone())
         .created(now.clone())
         .updated(now.clone())
-        .build().unwrap()
+        .build()
+        .unwrap()
 }
 
 pub fn make_user(user_id: &UserID, roles: Option<Vec<Role>>, now: &DateTime<Utc>) -> User {
     User::builder()
         .id(user_id.clone())
         .roles(roles.unwrap_or(vec![Role::User]))
-        .email("surely@hotmail.com")   // don't call me shirley
+        .email("surely@hotmail.com") // don't call me shirley
         .name("buzzin' frog")
         .active(true)
         .created(now.clone())
         .updated(now.clone())
-        .build().unwrap()
+        .build()
+        .unwrap()
 }
