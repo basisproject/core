@@ -91,6 +91,7 @@ pub fn create<T: Into<String>>(caller: &User, id: CompanyID, company_name: T, co
 
 /// Update a private company
 pub fn update(caller: &User, member: Option<&Member>, mut subject: Company, name: Option<String>, email: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+    caller.access_check(Permission::CompanyUpdate)?;
     caller.access_check(Permission::CompanyAdminUpdate)
         .or_else(|_| member.ok_or(Error::InsufficientPrivileges)?.access_check(caller.id(), subject.id(), CompanyPermission::CompanyUpdate))?;
     if subject.is_deleted() {
@@ -111,6 +112,7 @@ pub fn update(caller: &User, member: Option<&Member>, mut subject: Company, name
 
 /// Delete a private company
 pub fn delete(caller: &User, member: Option<&Member>, mut subject: Company, now: &DateTime<Utc>) -> Result<Modifications> {
+    caller.access_check(Permission::CompanyDelete)?;
     caller.access_check(Permission::CompanyAdminDelete)
         .or_else(|_| member.ok_or(Error::InsufficientPrivileges)?.access_check(caller.id(), subject.id(), CompanyPermission::CompanyDelete))?;
     if subject.is_deleted() {
