@@ -140,9 +140,11 @@ mod tests {
     fn can_create() {
         let id = CompanyID::create();
         let now = util::time::now();
-        let state = TestState::standard(vec![], &now);
+        let mut state = TestState::standard(vec![], &now);
         let occupation_id = OccupationID::new("CEO THE BEST CEO EVERYONE SAYS SO");
         let founder = Founder::new(state.member().id().clone(), MemberClass::Worker(MemberWorker::new(occupation_id.clone(), None)), true);
+        state.company = None;
+        state.member = None;
 
         let testfn = |state: &TestState<Company, Company>| {
             // just makin' some widgets, huh? that's cool. hey, I made a widget once,
@@ -151,6 +153,7 @@ mod tests {
             // problem. hey, maybe next time.
             create(state.user(), id.clone(), "jerry's widgets", "jerry@widgets.expert", true, founder.clone(), &now)
         };
+        test::standard_transaction_tests(&state, &testfn);
 
         let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 2);

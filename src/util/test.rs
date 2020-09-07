@@ -126,6 +126,9 @@ pub(crate) fn deleted_company_tester<M1, M2, F>(state: &TestState<M1, M2>, testf
           F: Fn(&TestState<M1, M2>) -> Result<Modifications> + Clone,
 {
     let now = util::time::now();
+    if state.company.is_none() {
+        return;
+    }
 
     let mut state1 = state.clone();
     state1.company_mut().set_deleted(None);
