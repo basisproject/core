@@ -44,6 +44,9 @@ pub enum Error {
     /// We're missing required fields in a call
     #[error("fields missing {0:?}")]
     MissingFields(Vec<String>),
+    /// An account cannot have a negative balance
+    #[error("operation creates negative account balance")]
+    NegativeAccountBalance,
     /// Negative costs cannot be created, as they would represent a surplus
     /// (aka profit). Frowned upon here!
     #[error("operation creates negative costs")]

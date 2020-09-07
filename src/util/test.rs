@@ -6,6 +6,7 @@ use crate::{
     models::{
         Modifications,
 
+        account::{Account, AccountID, Multisig},
         agreement::{Agreement, AgreementID},
         company::{Company, CompanyID, Permission as CompanyPermission},
         lib::{
@@ -23,6 +24,7 @@ use crate::{
     util,
 };
 use om2::Measure;
+use rust_decimal::prelude::*;
 use vf_rs::{vf, geo::SpatialThing};
 
 #[derive(Clone, Debug, PartialEq, getset::Setters, derive_builder::Builder)]
@@ -203,6 +205,21 @@ pub(crate) fn standard_transaction_tests<M1, M2, F>(state: &TestState<M1, M2>, t
 {
     deleted_company_tester(state, testfn);
     permissions_checks(state, testfn);
+}
+
+pub fn make_account<T: Into<String>, D: Into<Decimal>>(id: &AccountID, user_id: &UserID, balance: D, name: T, now: &DateTime<Utc>) -> Account {
+    Account::builder()
+        .id(id.clone())
+        .user_ids(vec![user_id.clone()])
+        .multisig(vec![Multisig::new(1)])
+        .name(name.into())
+        .description("THIS IS MY ACCOUNT. IF YOU SHOUT A STATEMENT IT MAKES IT MORE TRUE. ASK RON.")
+        .balance(balance.into())
+        .ubi(false)
+        .active(true)
+        .created(now.clone())
+        .updated(now.clone())
+        .build().unwrap()
 }
 
 pub fn make_agreement<T: Into<String>>(id: &AgreementID, participants: &Vec<AgentID>, name: T, note: T, now: &DateTime<Utc>) -> Agreement {
