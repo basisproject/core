@@ -270,6 +270,9 @@ mod tests {
         state2.user_mut().set_id(UserID::create());
         let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
+        state2.user_mut().set_id(state.model2().user_ids()[0].clone());
+        let res = testfn(&state2);
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let res = testfn_inner(&state, dec!(56));
         assert_eq!(res, Err(Error::NegativeAccountBalance));
