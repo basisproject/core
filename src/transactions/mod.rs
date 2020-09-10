@@ -23,7 +23,7 @@ pub enum OrderAction {
     TransferCustody,
 }
 
-//pub mod account;
+pub mod account;
 pub mod agreement;
 pub mod commitment;
 pub mod company;

@@ -26,6 +26,8 @@ pub enum Permission {
 
     AccountCreate,
     AccountDelete,
+    AccountSetOwners,
+    AccountTransfer,
     AccountUpdate,
 
     CompanyAdminDelete,
@@ -125,6 +127,8 @@ impl Role {
                     Permission::ResourceSpecDelete,
                     Permission::AccountCreate,
                     Permission::AccountUpdate,
+                    Permission::AccountSetOwners,
+                    Permission::AccountTransfer,
                     Permission::AccountDelete,
                     Permission::EventCreate,
                     Permission::EventUpdate,

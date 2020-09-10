@@ -19,6 +19,10 @@ pub enum Error {
     /// trying to delete a Process that has non-zero costs).
     #[error("cannot erase costs")]
     CannotEraseCosts,
+    /// When trying to erase credits from the system. Generally this happens if
+    /// you try to delete an account that has a non-zero balance.
+    #[error("cannot erase credits")]
+    CannotEraseCredits,
     /// When you try to do something that requires a commitment but the given
     /// commitment doesn't match the action being performed.
     #[error("commitment is invalid")]
@@ -44,6 +48,9 @@ pub enum Error {
     /// We're missing required fields in a call
     #[error("fields missing {0:?}")]
     MissingFields(Vec<String>),
+    /// An account cannot have a negative balance
+    #[error("operation creates negative account balance")]
+    NegativeAccountBalance,
     /// Negative costs cannot be created, as they would represent a surplus
     /// (aka profit). Frowned upon here!
     #[error("operation creates negative costs")]
