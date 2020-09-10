@@ -23,6 +23,7 @@ use crate::{
         user::User,
     },
 };
+use rust_decimal::prelude::*;
 use vf_rs::vf;
 
 /// An object that is passed into a `company::create()` transaction that
