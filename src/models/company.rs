@@ -93,6 +93,9 @@ pub enum Permission {
     /// Can move resources internally within the company
     MoveResource,
 
+    /// Can run payroll for this company
+    Payroll,
+
     /// Can pick up (for delivery) a resource
     Pickup,
 

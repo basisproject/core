@@ -23,6 +23,8 @@ use crate::{
         user::User,
     },
 };
+use rust_decimal::prelude::*;
+use std::collections::HashMap;
 use vf_rs::vf;
 
 /// An object that is passed into a `company::create()` transaction that
@@ -108,6 +110,24 @@ pub fn update(caller: &User, member: Option<&Member>, mut subject: Company, name
     }
     subject.set_updated(now.clone());
     Ok(Modifications::new_single(Op::Update, subject))
+}
+
+/// Run payroll on a company.
+///
+/// Takes a hash table of member_id -> account pairs and a vector of `work`
+/// events and modifies the passed account balance and the given company's
+/// costs.
+pub fn payroll(caller: &User, member: &Member, mut subject: Company, mut accounts: HashMap<MemberID, Account>, work_events: &Vec<Event>, now: &DateTime<Utc>) -> Result<Modifications> {
+    caller.access_check(Permission::CompanyPayoll)?;
+    member.access_check(caller.id(), company.id(), CompanyPermission::Payroll)?;
+    if subject.is_deleted() {
+        Err(Error::ObjectIsDeleted("company".into()))?;
+    }
+    for work in work_events {
+        subject.
+        let costs = work.move_costs();
+    }
+    Ok(Modifications::new())
 }
 
 /// Delete a private company
