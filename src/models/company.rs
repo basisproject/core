@@ -19,6 +19,7 @@ use crate::{
         resource::Resource,
     },
 };
+use rust_decimal::prelude::*;
 use serde::{Serialize, Deserialize};
 use vf_rs::vf;
 
@@ -160,6 +161,8 @@ basis_model! {
         inner: vf::Agent,
         /// Primary email address
         email: String,
+        /// A credit value tracking this company's maximum costs
+        max_costs: Decimal,
     }
     CompanyBuilder
 }
