@@ -26,7 +26,7 @@ pub struct Multisig {
 
 impl Multisig {
     /// Create a new multisig obj
-    pub(crate) fn new(signatures_required: u64) -> Self {
+    pub fn new(signatures_required: u64) -> Self {
         Self {
             signatures_required,
         }
