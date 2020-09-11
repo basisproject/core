@@ -105,7 +105,7 @@ use crate::{
         resource_spec::ResourceSpecID,
     },
 };
-use getset::{Getters, MutGetters};
+use getset::{Getters, MutGetters, Setters};
 use rust_decimal::prelude::*;
 use rust_decimal_macros::*;
 use serde::{Serialize, Deserialize};
@@ -125,9 +125,12 @@ use std::ops::{Add, Sub, Mul, Div};
 /// immediately recognize what we're trying to do, and littering generics all
 /// over the place isn't my cup of tea for an object that's supposed to be
 /// conceptually and operationally simple.
-#[derive(Costs, Clone, Debug, Default, PartialEq, Getters, MutGetters, Serialize, Deserialize)]
-#[getset(get = "pub", get_mut)]
+#[derive(Costs, Clone, Debug, Default, PartialEq, Getters, MutGetters, Setters, Serialize, Deserialize)]
+#[getset(get = "pub", get_mut, set)]
 pub struct Costs {
+    /// An aggregate total (in credit value) of this cost object.
+    #[serde(default = "Decimal::zero", skip_serializing_if = "rust_decimal::prelude::Zero::is_zero")]
+    credits: Decimal,
     /// Stores resource content. Resources are ResourceSpec instances that have
     /// a resource tracking information attached, so we link to them via their
     /// ResourceSpecID
@@ -161,6 +164,108 @@ impl Costs {
     /// Creates an empty cost object.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Create a new Cost, with one resource entry
+    pub fn new_with_resource<T, V>(id: T, resource: V, credit_value_per_unit: Decimal) -> Self
+        where T: Into<ResourceSpecID>,
+              V: Into<Decimal> + Copy,
+    {
+        let mut costs = Self::new();
+        costs.track_resource(id, resource.clone());
+        costs.track_credits(resource.into() * credit_value_per_unit);
+        costs
+    }
+
+    /// Create a new Cost, with one labor entry
+    pub fn new_with_labor<T, V>(id: T, labor: V) -> Self
+        where T: Into<OccupationID>,
+              V: Into<Decimal> + Copy,
+    {
+        let mut costs = Self::new();
+        costs.track_labor(id, labor.clone());
+        costs.track_credits(labor);
+        costs
+    }
+
+    /// Create a new Cost, with one labor_hours entry
+    pub fn new_with_labor_hours<T, V>(id: T, labor_hours: V) -> Self
+        where T: Into<OccupationID>,
+              V: Into<Decimal> + Copy,
+    {
+        let mut costs = Self::new();
+        costs.track_labor_hours(id, labor_hours);
+        costs
+    }
+
+    /// Create a new Cost, with one currency entry
+    pub fn new_with_currency<T, V>(id: T, currency: V, conversion_rate: Decimal) -> Self
+        where T: Into<CurrencyID>,
+              V: Into<Decimal> + Copy,
+    {
+        let mut costs = Self::new();
+        costs.track_currency(id, currency.clone());
+        costs.track_credits(currency.into() * conversion_rate);
+        costs
+    }
+
+    /// Add a credit cost to this Cost
+    pub fn track_credits<V>(&mut self, val: V)
+        where V: Into<Decimal> + Copy,
+    {
+        self.set_credits(self.credits().clone() + val.into());
+    }
+
+    /// Add a resource cost to this Cost
+    pub fn track_resource<T, V>(&mut self, id: T, val: V)
+        where T: Into<ResourceSpecID>,
+              V: Into<Decimal> + Copy,
+    {
+        if val.into() < Decimal::zero() {
+            panic!("Costs::track_resource() -- given value must be >= 0");
+        }
+        let entry = self.resource_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
+        *entry += val.into();
+        self.dezero();
+    }
+
+    /// Add a labor cost to this Cost
+    pub fn track_labor<T, V>(&mut self, id: T, val: V)
+        where T: Into<OccupationID>,
+              V: Into<Decimal> + Copy,
+    {
+        if val.into() < Decimal::zero() {
+            panic!("Costs::track_labor() -- given value must be >= 0");
+        }
+        let entry = self.labor_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
+        *entry += val.into();
+        self.dezero();
+    }
+
+    /// Add a labor_hours cost to this Cost
+    pub fn track_labor_hours<T, V>(&mut self, id: T, val: V)
+        where T: Into<OccupationID>,
+              V: Into<Decimal> + Copy,
+    {
+        if val.into() < Decimal::zero() {
+            panic!("Costs::track_labor_hours() -- given value must be >= 0");
+        }
+        let entry = self.labor_hours_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
+        *entry += val.into();
+        self.dezero();
+    }
+
+    /// Add a currency cost to this Cost
+    pub fn track_currency<T, V>(&mut self, id: T, val: V)
+        where T: Into<CurrencyID>,
+              V: Into<Decimal> + Copy,
+    {
+        if val.into() < Decimal::zero() {
+            panic!("Costs::track_currency() -- given value must be >= 0");
+        }
+        let entry = self.currency_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
+        *entry += val.into();
+        self.dezero();
     }
 }
 

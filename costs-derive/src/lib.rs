@@ -74,11 +74,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
         _ => panic!("costs-derive::derive_costs() -- can only derive costs on a struct"),
     };
 
-    let fn_new_with = fields.iter().map(|f| format_ident!("new_with_{}", f.name)).collect::<Vec<_>>();
-    let fn_new_with_comment = fields.iter().map(|f| format!("Create a new Cost, with one {} entry", f.name)).collect::<Vec<_>>();
     let fn_track = fields.iter().map(|f| format_ident!("track_{}", f.name)).collect::<Vec<_>>();
-    let fn_track_comment = fields.iter().map(|f| format!("Add a {} cost to this Cost", f.name)).collect::<Vec<_>>();
-    let fn_track_panic = fields.iter().map(|f| format!("Costs::track_{}() -- given value must be >= 0", f.name)).collect::<Vec<_>>();
     let fn_get = fields.iter().map(|f| format_ident!("get_{}", f.name)).collect::<Vec<_>>();
     let fn_get_comment = fields.iter().map(|f| format!("Get a {} value out of this cost object, defaulting to zero if not found", f.name)).collect::<Vec<_>>();
     let field_name = fields.iter().map(|f| f.name.clone()).collect::<Vec<_>>();
@@ -89,31 +85,6 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
 
     let cost_impl = quote! {
         impl #name {
-            #(
-                #[doc = #fn_new_with_comment]
-                pub fn #fn_new_with<T, V>(id: T, #field_name: V) -> Self
-                    where T: Into<#field_hashkey>,
-                          V: Into<#field_hashval> + Copy,
-                {
-                    let mut costs = Self::new();
-                    costs.#fn_track(id, #field_name);
-                    costs
-                }
-            )*
-            #(
-                #[doc = #fn_track_comment]
-                pub fn #fn_track<T, V>(&mut self, id: T, val: V)
-                    where T: Into<#field_hashkey>,
-                          V: Into<#field_hashval> + Copy,
-                {
-                    if val.into() < #field_hashval::zero() {
-                        panic!(#fn_track_panic);
-                    }
-                    let entry = self.#field_name_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
-                    *entry += val.into();
-                    self.dezero();
-                }
-            )*
             #(
                 #[doc = #fn_get_comment]
                 pub fn #fn_get<T: Into<#field_hashkey>>(&self, id: T) -> #field_hashval {
