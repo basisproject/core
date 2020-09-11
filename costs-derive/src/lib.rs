@@ -121,7 +121,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 }
             )*
 
-            /// Test if we hve an empty cost set
+            /// Test if we have an empty cost set
             pub fn is_zero(&self) -> bool {
                 #(
                     for (_, val) in self.#field_name().iter() {
@@ -196,6 +196,18 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 )*
                 // if we have fields and they're all > 0 then this will be true
                 count > 0
+            }
+
+            /// Determine if any of our costs are below 0
+            pub fn is_lt_0(&self) -> bool {
+                #(
+                    for (_, v) in self.#field_name().iter() {
+                        if *v < #field_hashval::zero() {
+                            return true;
+                        }
+                    }
+                )*
+                false
             }
 
             /// Determine if dividing one set of costs by another will result in

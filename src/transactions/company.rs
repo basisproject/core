@@ -13,6 +13,7 @@
 use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
+    costs::Costs,
     error::{Error, Result},
     models::{
         Op,
@@ -62,6 +63,7 @@ pub fn create<T: Into<String>>(caller: &User, id: CompanyID, company_name: T, co
         )
         .email(company_email)
         .max_costs(Decimal::zero())
+        .total_costs(Costs::new())
         .active(company_active)
         .created(now.clone())
         .updated(now.clone())

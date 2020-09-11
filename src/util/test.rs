@@ -246,6 +246,7 @@ pub fn make_company<T: Into<String>>(id: &CompanyID, name: T, now: &DateTime<Utc
         .email("jerry@widgets.biz")
         .active(true)
         .max_costs(Decimal::zero())
+        .total_costs(Costs::new())
         .created(now.clone())
         .updated(now.clone())
         .build().unwrap()

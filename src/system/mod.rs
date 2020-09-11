@@ -2,5 +2,6 @@
 //! the system itself. For instance, a voting user/member that acts on behalf of
 //! the system or a company, or a user that masks/anonymizes consumer purchases.
 
+pub mod credit_converter;
 pub mod vote;
 
