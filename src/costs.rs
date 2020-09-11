@@ -167,13 +167,13 @@ impl Costs {
     }
 
     /// Create a new Cost, with one resource entry
-    pub fn new_with_resource<T, V>(id: T, resource: V, credit_value_per_unit: Decimal) -> Self
+    pub fn new_with_resource<T, V>(id: T, resource: V, credit_value_per_unit: V) -> Self
         where T: Into<ResourceSpecID>,
               V: Into<Decimal> + Copy,
     {
         let mut costs = Self::new();
         costs.track_resource(id, resource.clone());
-        costs.track_credits(resource.into() * credit_value_per_unit);
+        costs.track_credits(resource.into() * credit_value_per_unit.into());
         costs
     }
 
@@ -199,13 +199,13 @@ impl Costs {
     }
 
     /// Create a new Cost, with one currency entry
-    pub fn new_with_currency<T, V>(id: T, currency: V, conversion_rate: Decimal) -> Self
+    pub fn new_with_currency<T, V>(id: T, currency: V, conversion_rate: V) -> Self
         where T: Into<CurrencyID>,
               V: Into<Decimal> + Copy,
     {
         let mut costs = Self::new();
         costs.track_currency(id, currency.clone());
-        costs.track_credits(currency.into() * conversion_rate);
+        costs.track_credits(currency.into() * conversion_rate.into());
         costs
     }
 
@@ -217,15 +217,17 @@ impl Costs {
     }
 
     /// Add a resource cost to this Cost
-    pub fn track_resource<T, V>(&mut self, id: T, val: V)
+    pub fn track_resource<T, V>(&mut self, id: T, val: V, credit_value_per_unit: V)
         where T: Into<ResourceSpecID>,
               V: Into<Decimal> + Copy,
     {
         if val.into() < Decimal::zero() {
             panic!("Costs::track_resource() -- given value must be >= 0");
         }
+        let val = val.into();
         let entry = self.resource_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
-        *entry += val.into();
+        *entry += val.clone();
+        self.track_credits(val * credit_value_per_unit.into());
         self.dezero();
     }
 
@@ -237,8 +239,10 @@ impl Costs {
         if val.into() < Decimal::zero() {
             panic!("Costs::track_labor() -- given value must be >= 0");
         }
+        let val = val.into();
         let entry = self.labor_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
-        *entry += val.into();
+        *entry += val.clone();
+        self.track_credits(val);
         self.dezero();
     }
 
@@ -256,7 +260,7 @@ impl Costs {
     }
 
     /// Add a currency cost to this Cost
-    pub fn track_currency<T, V>(&mut self, id: T, val: V)
+    pub fn track_currency<T, V>(&mut self, id: T, val: V, conversion_rate: V)
         where T: Into<CurrencyID>,
               V: Into<Decimal> + Copy,
     {
@@ -265,6 +269,7 @@ impl Costs {
         }
         let entry = self.currency_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
         *entry += val.into();
+        self.track_credits(val * conversion_rate.into());
         self.dezero();
     }
 }
@@ -527,7 +532,7 @@ mod tests {
         assert_eq!(Costs::is_sub_lt_0(&costs2, &costs1), true);
 
         let costs1 = Costs::new_with_labor("machinist", dec!(42.0));
-        let costs2 = Costs::new_with_resource("steel", dec!(13.0));
+        let costs2 = Costs::new_with_resource("steel", dec!(13.0), dec!(0.031));
         assert_eq!(Costs::is_sub_lt_0(&costs1, &costs2), true);
         assert_eq!(Costs::is_sub_lt_0(&costs2, &costs1), true);
 
@@ -540,7 +545,7 @@ mod tests {
         costs1.track_labor_hours("doctor", dec!(0.89002));
         costs1.track_resource("steel", dec!(13.0002292));
         costs1.track_resource("crude oil", dec!(1.34411));
-        costs1.track_currency("usd", Decimal::new(4298, 2));
+        costs1.track_currency("usd", Decimal::new(4298, 2), dec!(1.0019));
         let costs2 = costs1.clone();
         assert_eq!(Costs::is_sub_lt_0(&costs1, &costs2), false);
         assert_eq!(Costs::is_sub_lt_0(&costs2, &costs1), false);
