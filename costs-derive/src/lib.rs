@@ -74,14 +74,12 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
         _ => panic!("costs-derive::derive_costs() -- can only derive costs on a struct"),
     };
 
-    let fn_track = fields.iter().map(|f| format_ident!("track_{}", f.name)).collect::<Vec<_>>();
     let fn_get = fields.iter().map(|f| format_ident!("get_{}", f.name)).collect::<Vec<_>>();
     let fn_get_comment = fields.iter().map(|f| format!("Get a {} value out of this cost object, defaulting to zero if not found", f.name)).collect::<Vec<_>>();
     let field_name = fields.iter().map(|f| f.name.clone()).collect::<Vec<_>>();
     let field_name_mut = fields.iter().map(|f| format_ident!("{}_mut", f.name)).collect::<Vec<_>>();
     let field_hashkey = fields.iter().map(|f| f.hash_key.clone()).collect::<Vec<_>>();
     let field_hashval = fields.iter().map(|f| f.hash_val.clone()).collect::<Vec<_>>();
-    let fn_div_panic = fields.iter().map(|f| format!("Costs::div() -- divide by zero for {} {{:?}}", f.name)).collect::<Vec<_>>();
 
     let cost_impl = quote! {
         impl #name {
@@ -119,24 +117,6 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 )*
             }
 
-            /// Given a set of costs, subtract them from our current costs, but only if
-            /// the result is >= 0 for each cost tracked. Then, return a costs object
-            /// showing exactly how much was taken.
-            pub fn take(&mut self, costs: &Costs) -> Costs {
-                let mut new_costs = Costs::new();
-                #(
-                    for (k, lval) in self.#field_name_mut().iter_mut() {
-                        let mut rval = costs.#fn_get(k.clone());
-                        let val = if lval > &mut rval { rval } else { lval.clone() };
-                        *lval -= val;
-                        new_costs.#fn_track(k.clone(), val.clone());
-                    }
-                )*
-                new_costs.dezero();
-                self.dezero();
-                new_costs
-            }
-
             /// Determine if subtracting one set of costs from another results
             /// in any negative values
             pub fn is_sub_lt_0(costs1: &Costs, costs2: &Costs) -> bool {
@@ -168,29 +148,13 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 // if we have fields and they're all > 0 then this will be true
                 count > 0
             }
-
-            /// Determine if dividing one set of costs by another will result in
-            /// a divide-by-zero panic.
-            pub fn is_div_by_0(costs1: &Costs, costs2: &Costs) -> bool {
-                #(
-                    for (k, v) in costs1.#field_name().iter() {
-                        let div = costs2.#fn_get(k.clone());
-                        if v == &#field_hashval::zero() {
-                            continue;
-                        }
-                        if div == #field_hashval::zero() {
-                            return true;
-                        }
-                    }
-                )*
-                false
-            }
         }
 
         impl Add for Costs {
             type Output = Self;
 
             fn add(mut self, other: Self) -> Self {
+                self.credits += other.credits().clone();
                 #(
                     for k in other.#field_name().keys() {
                         let entry = self.#field_name_mut().entry(k.clone()).or_insert(#field_hashval::zero());
@@ -206,6 +170,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             type Output = Self;
 
             fn sub(mut self, other: Self) -> Self {
+                self.credits -= other.credits().clone();
                 #(
                     for k in other.#field_name().keys() {
                         let entry = self.#field_name_mut().entry(k.clone()).or_insert(#field_hashval::zero());
@@ -217,56 +182,14 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl Mul for Costs {
-            type Output = Self;
-
-            fn mul(mut self, rhs: Self) -> Self {
-                #(
-                    for (k, val) in self.#field_name_mut().iter_mut() {
-                        *val *= rhs.#field_name().get(k).unwrap_or(&#field_hashval::zero());
-                    }
-                )*
-                self.dezero();
-                self
-            }
-        }
-
         impl Mul<rust_decimal::Decimal> for Costs {
             type Output = Self;
 
             fn mul(mut self, rhs: rust_decimal::Decimal) -> Self {
+                self.credits *= rhs.clone();
                 #(
                     for (_, val) in self.#field_name_mut().iter_mut() {
                         *val *= rhs;
-                    }
-                )*
-                self.dezero();
-                self
-            }
-        }
-
-        impl Div for Costs {
-            type Output = Self;
-
-            fn div(mut self, rhs: Self) -> Self::Output {
-                #(
-                    for (k, v) in self.#field_name_mut().iter_mut() {
-                        let div = rhs.#field_name().get(k).map(|x| x.clone()).unwrap_or(#field_hashval::zero());
-                        if v == &#field_hashval::zero() {
-                            continue;
-                        }
-                        if div == #field_hashval::zero() {
-                            panic!(#fn_div_panic, k);
-                        }
-                        *v /= div;
-                    }
-                    for (k, _) in rhs.#field_name().iter() {
-                        match self.#field_name().get(k) {
-                            None => {
-                                self.#field_name_mut().insert(k.clone(), #field_hashval::zero());
-                            }
-                            _ => {}
-                        }
                     }
                 )*
                 self.dezero();
@@ -278,9 +201,13 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             type Output = Self;
 
             fn div(mut self, rhs: Decimal) -> Self::Output {
+                if self.is_zero() {
+                    return self;
+                }
                 if rhs == Decimal::zero() {
                     panic!("Costs::div() -- divide by zero");
                 }
+                self.credits /= rhs.clone();
                 #(
                     for (_, v) in self.#field_name_mut().iter_mut() {
                         *v /= rhs;

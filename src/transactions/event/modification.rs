@@ -154,7 +154,7 @@ mod tests {
         let now = util::time::now();
         let id = EventID::create();
         let mut state = TestState::standard(vec![CompanyPermission::Accept], &now);
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_resource("steel", 157), &now);
+        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_resource("steel", 157, dec!(0.01)), &now);
         let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &Costs::new(), &now);
         state.model = Some(resource);
         state.model2 = Some(process);
@@ -187,7 +187,7 @@ mod tests {
         assert_eq!(resource2.in_custody_of(), &state.company().agent_id());
         assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
         assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(12), Unit::One)));
-        assert_eq!(resource2.costs(), &Costs::new_with_resource("steel", 157));
+        assert_eq!(resource2.costs(), &Costs::new_with_resource("steel", 157, dec!(0.01)));
 
         // can't accept into a process you don't own
         let mut state2 = state.clone();
@@ -216,7 +216,7 @@ mod tests {
         let occupation_id = OccupationID::new("mechanic");
         let costs = Costs::new_with_labor(occupation_id.clone(), dec!(102.3));
         let process = make_process(&ProcessID::create(), state.company().id(), "repair car", &costs, &now);
-        let resource = make_resource(&ResourceID::new("car"), state.company().id(), &Measure::new(dec!(3), Unit::One), &Costs::new_with_resource("steel", 157), &now);
+        let resource = make_resource(&ResourceID::new("car"), state.company().id(), &Measure::new(dec!(3), Unit::One), &Costs::new_with_resource("steel", 157, dec!(0.01)), &now);
         state.model = Some(process);
         state.model2 = Some(resource);
 
@@ -251,7 +251,7 @@ mod tests {
 
         let mut costs2 = Costs::new();
         costs2.track_labor(occupation_id.clone(), dec!(102.3));
-        costs2.track_resource("steel", 157);
+        costs2.track_resource("steel", 157, dec!(0.01));
         assert_eq!(resource2.id(), state.model2().id());
         assert_eq!(resource2.inner().primary_accountable(), &Some(state.company().agent_id()));
         assert_eq!(resource2.in_custody_of(), &state.company().agent_id());
