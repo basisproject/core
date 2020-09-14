@@ -17,7 +17,6 @@ use crate::{
     models::{
         lib::agent::{Agent, AgentID},
     },
-    system::credit_converter::CreditConverter,
 };
 use rust_decimal::prelude::*;
 use serde::{Serialize, Deserialize};
@@ -173,13 +172,13 @@ basis_model! {
 impl Company {
     /// Add a set of costs to this company, checking to make sure we are not
     /// above `max_costs`. Returns the company's post-op `total_costs` value.
-    pub fn increase_costs(&mut self, costs: Costs, credit_converter: &CreditConverter) -> Result<&Costs> {
+    pub fn increase_costs(&mut self, costs: Costs) -> Result<&Costs> {
         if costs.is_lt_0() {
             Err(Error::NegativeCosts)?;
         }
         let new_costs = self.total_costs().clone() + costs;
-        let credit_value = credit_converter.reduce(&new_costs)?;
-        if &credit_value > self.max_costs() {
+        let credit_value = new_costs.credits();
+        if credit_value > self.max_costs() {
             Err(Error::MaxCostsReached)?;
         }
         self.set_total_costs(new_costs);
@@ -221,22 +220,21 @@ mod tests {
     #[test]
     fn increase_costs() {
         let mut company = make_company(&CompanyID::create(), "jerry's delicious widgets", &util::time::now());
-        let converter = CreditConverter::new();
         company.set_max_costs(dec!(1000));
         let costs1 = Costs::new_with_labor("widgetmaker", 500);
-        let total_costs = company.increase_costs(costs1.clone(), &converter).unwrap();
+        let total_costs = company.increase_costs(costs1.clone()).unwrap();
         assert_eq!(total_costs, &costs1);
 
         let costs2 = Costs::new_with_labor("truck driver", 400);
-        let total_costs = company.increase_costs(costs2.clone(), &converter).unwrap();
+        let total_costs = company.increase_costs(costs2.clone()).unwrap();
         assert_eq!(total_costs, &(costs1.clone() + costs2.clone()));
 
         let costs3 = Costs::new_with_labor("CEO. THE BEST CEO. BIG HANDS", 200);
-        let res = company.increase_costs(costs3.clone(), &converter);
+        let res = company.increase_costs(costs3.clone());
         assert_eq!(res, Err(Error::MaxCostsReached));
 
         let costs4 = Costs::new_with_labor("CEO. THE BEST CEO. BIG HANDS", 100);
-        let total_costs = company.increase_costs(costs4.clone(), &converter).unwrap();
+        let total_costs = company.increase_costs(costs4.clone()).unwrap();
         assert_eq!(total_costs, &(costs1.clone() + costs2.clone() + costs4.clone()));
     }
 

@@ -76,7 +76,6 @@ mod tests {
         util::{self, test::*},
     };
     use om2::{Measure, Unit};
-    use rust_decimal_macros::*;
 
     #[test]
     fn compare() {
@@ -86,7 +85,7 @@ mod tests {
         let company_id1 = CompanyID::new("jerry's widgets");
         let company_id2 = CompanyID::new("frank's widgets");
         let measure = Measure::new(50, Unit::Kilogram);
-        let costs = Costs::new_with_labor("machinist", dec!(23.2));
+        let costs = Costs::new_with_labor("machinist", num!(23.2));
         let resource1 = make_resource(&id1, &company_id1, &measure, &costs, &now);
         let resource2 = make_resource(&id2, &company_id2, &measure, &costs, &now);
 
@@ -103,9 +102,9 @@ mod tests {
         assert!(resource1 != resource3);
         resource3.inner_mut().set_primary_accountable(Some(company_id1.clone().into()));
         assert!(resource1 == resource3);
-        resource3.set_costs(Costs::new_with_labor("machinist", dec!(23.1)));
+        resource3.set_costs(Costs::new_with_labor("machinist", num!(23.1)));
         assert!(resource1 != resource3);
-        resource3.set_costs(Costs::new_with_labor("machinist", dec!(23.2)));
+        resource3.set_costs(Costs::new_with_labor("machinist", num!(23.2)));
         assert!(resource1 == resource3);
     }
 
