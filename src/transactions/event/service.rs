@@ -110,11 +110,12 @@ mod tests {
         let occupation_id = OccupationID::new("lawyer");
         let process_from = make_process(&ProcessID::create(), company_from.id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), dec!(177.25)), &now);
         let process_to = make_process(&ProcessID::create(), company_to.id(), "employee legal agreement drafting", &Costs::new_with_labor(occupation_id.clone(), dec!(804)), &now);
+        let costs_to_move = process_from.costs().clone() * dec!(0.777777777);
         state.model = Some(process_from);
         state.model2 = Some(process_to);
 
         let testfn_inner = |state: &TestState<Process, Process>, company_from: &Company, company_to: &Company, agreement: &Agreement| {
-            deliver_service(state.user(), state.member(), company_from, company_to, agreement, id.clone(), state.model().clone(), state.model2().clone(), Costs::new_with_labor("lawyer", 100), Some(agreed_in.clone()), Some("making planks lol".into()), &now)
+            deliver_service(state.user(), state.member(), company_from, company_to, agreement, id.clone(), state.model().clone(), state.model2().clone(), costs_to_move.clone(), Some(agreed_in.clone()), Some("making planks lol".into()), &now)
         };
         let testfn_from = |state: &TestState<Process, Process>| {
             testfn_inner(state, state.company(), &company_to, &agreement)
@@ -140,22 +141,18 @@ mod tests {
         assert_eq!(event.inner().realization_of(), &Some(agreement.id().clone()));
         assert_eq!(event.inner().receiver().clone(), company_to.agent_id());
         assert_eq!(event.inner().resource_quantity(), &None);
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("lawyer", 100)));
+        assert_eq!(event.move_costs(), &Some(costs_to_move.clone()));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
 
-        let mut costs2 = Costs::new();
-        costs2.track_labor("lawyer", dec!(177.25) - dec!(100));
         assert_eq!(process_from2.id(), state.model().id());
         assert_eq!(process_from2.company_id(), company_from.id());
-        assert_eq!(process_from2.costs(), &costs2);
+        assert_eq!(process_from2.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
-        let mut costs2 = Costs::new();
-        costs2.track_labor("lawyer", dec!(804) + dec!(100));
         assert_eq!(process_to2.id(), state.model2().id());
         assert_eq!(process_to2.company_id(), company_to.id());
-        assert_eq!(process_to2.costs(), &costs2);
+        assert_eq!(process_to2.costs(), &(state.model2().costs().clone() + costs_to_move.clone()));
 
         // can't move costs from a process you don't own
         let mut state2 = state.clone();

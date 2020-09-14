@@ -283,11 +283,12 @@ mod tests {
         costs.track_labor("homemaker", dec!(13.6));
         let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &costs, &now);
+        let costs_to_move = resource.costs().clone() * dec!(0.02);
         state.model = Some(resource);
         state.model2 = Some(process);
 
         let testfn = |state: &TestState<Resource, Process>| {
-            cite(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Costs::new_with_labor("homemaker", 23), Some("memo".into()), &now)
+            cite(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), costs_to_move.clone(), Some("memo".into()), &now)
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -304,25 +305,20 @@ mod tests {
         assert_eq!(event.inner().note(), &Some("memo".into()));
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
+        assert_eq!(event.move_costs(), &Some(costs_to_move.clone()));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
 
-        let mut costs3 = Costs::new();
-        costs3.track_labor("homemaker", dec!(157) - dec!(23));
         assert_eq!(resource2.id(), state.model().id());
         assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
         assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
-        assert_eq!(resource2.costs(), &costs3);
+        assert_eq!(resource2.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
-        let mut costs2 = Costs::new();
-        costs2.track_labor(occupation_id.clone(), dec!(42.2));
-        costs2.track_labor("homemaker", dec!(23) + dec!(13.6));
         assert_eq!(process2.id(), state.model2().id());
         assert_eq!(process2.company_id(), state.company().id());
         assert_eq!(process2.inner().name(), "make widgets");
-        assert_eq!(process2.costs(), &costs2);
+        assert_eq!(process2.costs(), &(state.model2().costs().clone() + costs_to_move.clone()));
 
         // can't consume into a process you don't own
         let mut state2 = state.clone();
@@ -353,12 +349,14 @@ mod tests {
         costs.track_labor(occupation_id.clone(), dec!(42.2));
         costs.track_labor("homemaker", dec!(13.6));
         let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        let resource_costs = resource.costs().clone();
+        let move_costs = resource_costs.clone() * (dec!(8) / dec!(15));
         let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &costs, &now);
         state.model = Some(resource);
         state.model2 = Some(process);
 
         let testfn = |state: &TestState<Resource, Process>| {
-            consume(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now)
+            consume(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), move_costs.clone(), 8, Some("memo".into()), &now)
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -375,25 +373,22 @@ mod tests {
         assert_eq!(event.inner().note(), &Some("memo".into()));
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
+        assert_eq!(event.move_costs(), &Some(move_costs.clone()));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
 
-        let mut costs2 = Costs::new();
-        costs2.track_labor(occupation_id.clone(), dec!(42.2));
-        costs2.track_labor("homemaker", dec!(23) + dec!(13.6));
         assert_eq!(process2.id(), state.model2().id());
         assert_eq!(process2.company_id(), state.company().id());
         assert_eq!(process2.inner().name(), "make widgets");
-        assert_eq!(process2.costs(), &costs2);
+        assert_eq!(process2.costs(), &(costs.clone() + move_costs.clone()));
 
         let mut costs3 = Costs::new();
         costs3.track_labor("homemaker", dec!(157) - dec!(23));
         assert_eq!(resource2.id(), state.model().id());
         assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(7), Unit::One)));
         assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(7), Unit::One)));
-        assert_eq!(resource2.costs(), &costs3);
+        assert_eq!(resource2.costs(), &(resource_costs.clone() - move_costs.clone()));
 
         // can't consume into a process you don't own
         let mut state2 = state.clone();
@@ -425,11 +420,12 @@ mod tests {
         costs.track_labor("homemaker", dec!(89.3));
         let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &costs, &now);
         let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        let costs_to_move = process.costs().clone() * dec!(0.5777);
         state.model = Some(process);
         state.model2 = Some(resource);
 
         let testfn = |state: &TestState<Process, Resource>| {
-            produce(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Costs::new_with_labor("homemaker", 23), 8, Some("memo".into()), &now)
+            produce(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), costs_to_move.clone(), 8, Some("memo".into()), &now)
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -447,25 +443,20 @@ mod tests {
         assert_eq!(event.inner().output_of(), &Some(state.model().id().clone()));
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
+        assert_eq!(event.move_costs(), &Some(costs_to_move.clone()));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
 
-        let mut costs2 = Costs::new();
-        costs2.track_labor(occupation_id.clone(), dec!(42.2));
-        costs2.track_labor("homemaker", dec!(89.3) - dec!(23));
         assert_eq!(process2.id(), state.model().id());
         assert_eq!(process2.company_id(), state.company().id());
         assert_eq!(process2.inner().name(), "make widgets");
-        assert_eq!(process2.costs(), &costs2);
+        assert_eq!(process2.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
-        let mut costs3 = Costs::new();
-        costs3.track_labor("homemaker", dec!(157) + dec!(23));
         assert_eq!(resource2.id(), state.model2().id());
         assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(23), Unit::One)));
         assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(23), Unit::One)));
-        assert_eq!(resource2.costs(), &costs3);
+        assert_eq!(resource2.costs(), &(state.model2().costs().clone() + costs_to_move.clone()));
 
         // can't produce from a process you don't own
         let mut state2 = state.clone();
@@ -497,11 +488,12 @@ mod tests {
         costs.track_labor("homemaker", dec!(13.6));
         let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &costs, &now);
+        let costs_to_move = resource.costs().clone() * (dec!(8) / dec!(15));
         state.model = Some(resource);
         state.model2 = Some(process);
 
         let testfn = |state: &TestState<Resource, Process>| {
-            useeee(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Costs::new_with_labor("homemaker", dec!(0.3)), Some(Measure::new(8, Unit::Hour)), Some("memo".into()), &now)
+            useeee(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), costs_to_move.clone(), Some(Measure::new(8, Unit::Hour)), Some("memo".into()), &now)
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -518,25 +510,20 @@ mod tests {
         assert_eq!(event.inner().note(), &Some("memo".into()));
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", dec!(0.3))));
+        assert_eq!(event.move_costs(), &Some(costs_to_move.clone()));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
 
-        let mut costs2 = Costs::new();
-        costs2.track_labor(occupation_id.clone(), dec!(42.2));
-        costs2.track_labor("homemaker", dec!(0.3) + dec!(13.6));
-        assert_eq!(process2.id(), state.model2().id());
-        assert_eq!(process2.company_id(), state.company().id());
-        assert_eq!(process2.inner().name(), "make widgets");
-        assert_eq!(process2.costs(), &costs2);
-
-        let mut costs3 = Costs::new();
-        costs3.track_labor("homemaker", dec!(157) - dec!(0.3));
         assert_eq!(resource2.id(), state.model().id());
         assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
         assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
-        assert_eq!(resource2.costs(), &costs3);
+        assert_eq!(resource2.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
+
+        assert_eq!(process2.id(), state.model2().id());
+        assert_eq!(process2.company_id(), state.company().id());
+        assert_eq!(process2.inner().name(), "make widgets");
+        assert_eq!(process2.costs(), &(state.model2().costs().clone() + costs_to_move.clone()));
 
         // can't useeee into a process you don't own
         let mut state2 = state.clone();

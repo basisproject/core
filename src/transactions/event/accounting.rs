@@ -308,11 +308,12 @@ mod tests {
         let occupation_id = OccupationID::new("lawyer");
         let process_from = make_process(&ProcessID::create(), state.company().id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), dec!(177.25)), &now);
         let process_to = make_process(&ProcessID::create(), state.company().id(), "overflow labor", &Costs::new_with_labor(occupation_id.clone(), dec!(804)), &now);
+        let costs_to_move = process_from.costs().clone() * dec!(0.45);
         state.model = Some(process_from);
         state.model2 = Some(process_to);
 
         let testfn = |state: &TestState<Process, Process>| {
-            move_costs(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Costs::new_with_labor("lawyer", 100), Some("my note".into()), &now)
+            move_costs(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), costs_to_move.clone(), Some("my note".into()), &now)
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -331,7 +332,7 @@ mod tests {
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
         assert_eq!(event.inner().resource_quantity(), &None);
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("lawyer", 100)));
+        assert_eq!(event.move_costs(), &Some(costs_to_move.clone()));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
@@ -340,13 +341,11 @@ mod tests {
         costs2.track_labor("lawyer", dec!(177.25) - dec!(100));
         assert_eq!(process_from2.id(), state.model().id());
         assert_eq!(process_from2.company_id(), state.company().id());
-        assert_eq!(process_from2.costs(), &costs2);
+        assert_eq!(process_from2.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
-        let mut costs2 = Costs::new();
-        costs2.track_labor("lawyer", dec!(804) + dec!(100));
         assert_eq!(process_to2.id(), state.model2().id());
         assert_eq!(process_to2.company_id(), state.company().id());
-        assert_eq!(process_to2.costs(), &costs2);
+        assert_eq!(process_to2.costs(), &(state.model2().costs().clone() + costs_to_move.clone()));
 
         // can't move costs from a process you don't own
         let mut state2 = state.clone();
@@ -368,11 +367,12 @@ mod tests {
         let mut state = TestState::standard(vec![CompanyPermission::MoveResource], &now);
         let resource = make_resource(&ResourceID::new("plank"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let resource_to = make_resource(&ResourceID::new("plank"), state.company().id(), &Measure::new(dec!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
+        let costs_to_move = resource.costs().clone() * (dec!(8) / dec!(15));
         state.model = Some(resource);
         state.model2 = Some(resource_to);
 
         let testfn_inner = |state: &TestState<Resource, Resource>, mover: ResourceMover| {
-            move_resource(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), mover, Costs::new_with_labor("homemaker", 23), 8, Some(state.loc().clone()), Some("lol".into()), &now)
+            move_resource(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), mover, costs_to_move.clone(), 8, Some(state.loc().clone()), Some("lol".into()), &now)
         };
         let testfn_update = |state: &TestState<Resource, Resource>| {
             testfn_inner(state, ResourceMover::Update(state.model2().clone()))
@@ -400,28 +400,24 @@ mod tests {
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
         assert_eq!(event.inner().resource_quantity(), &Some(Measure::new(8, Unit::One)));
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
+        assert_eq!(event.move_costs(), &Some(costs_to_move.clone()));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
 
-        let mut costs2 = Costs::new();
-        costs2.track_labor("homemaker", dec!(157) - dec!(23));
         assert_eq!(resource_from2.id(), state.model().id());
         assert_eq!(resource_from2.inner().primary_accountable(), &Some(state.company().agent_id()));
         assert_eq!(resource_from2.inner().accounting_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
         assert_eq!(resource_from2.inner().onhand_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
         assert_eq!(resource_from2.in_custody_of(), &state.company().agent_id());
-        assert_eq!(resource_from2.costs(), &costs2);
+        assert_eq!(resource_from2.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
-        let mut costs2 = Costs::new();
-        costs2.track_labor("homemaker", dec!(23) + dec!(2));
         assert_eq!(resource_to2.id(), state.model2().id());
         assert_eq!(resource_to2.inner().primary_accountable(), &Some(state.company().agent_id()));
         assert_eq!(resource_to2.inner().accounting_quantity(), &Some(Measure::new(dec!(8) + dec!(3), Unit::One)));
         assert_eq!(resource_to2.inner().onhand_quantity(), &Some(Measure::new(dec!(8) + dec!(3), Unit::One)));
         assert_eq!(resource_to2.in_custody_of(), &state.company().agent_id());
-        assert_eq!(resource_to2.costs(), &costs2);
+        assert_eq!(resource_to2.costs(), &(state.model2().costs().clone() + costs_to_move.clone()));
 
         // test ResourceMover::Create()
         let mods = testfn_create(&state).unwrap().into_vec();
@@ -439,28 +435,24 @@ mod tests {
         assert_eq!(event.inner().provider().clone(), state.company().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
         assert_eq!(event.inner().resource_quantity(), &Some(Measure::new(8, Unit::One)));
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor("homemaker", 23)));
+        assert_eq!(event.move_costs(), &Some(costs_to_move.clone()));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now);
         assert_eq!(event.updated(), &now);
 
-        let mut costs2 = Costs::new();
-        costs2.track_labor("homemaker", dec!(157) - dec!(23));
         assert_eq!(resource_from3.id(), state.model().id());
         assert_eq!(resource_from3.inner().primary_accountable(), &Some(state.company().agent_id()));
         assert_eq!(resource_from3.inner().accounting_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
         assert_eq!(resource_from3.inner().onhand_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
         assert_eq!(resource_from3.in_custody_of(), &state.company().agent_id());
-        assert_eq!(resource_from3.costs(), &costs2);
+        assert_eq!(resource_from3.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
-        let mut costs2 = Costs::new();
-        costs2.track_labor("homemaker", dec!(23));
         assert_eq!(resource_created.id(), state.model2().id());
         assert_eq!(resource_created.inner().primary_accountable(), &Some(state.company().agent_id()));
         assert_eq!(resource_created.inner().accounting_quantity(), &Some(Measure::new(dec!(8), Unit::One)));
         assert_eq!(resource_created.inner().onhand_quantity(), &Some(Measure::new(dec!(8), Unit::One)));
         assert_eq!(resource_created.in_custody_of(), &state.company().agent_id());
-        assert_eq!(resource_created.costs(), &costs2);
+        assert_eq!(resource_created.costs(), &(costs_to_move.clone()));
 
         // can't move into a resource you don't own
         let mut state2 = state.clone();
