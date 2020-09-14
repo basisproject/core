@@ -96,7 +96,6 @@ mod tests {
         },
         util::{self, test::{self, *}},
     };
-    use rust_decimal_macros::*;
 
     #[test]
     fn can_deliver_service() {
@@ -108,9 +107,9 @@ mod tests {
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 1234", "gotta make some planks", &now);
         let agreed_in: Url = "https://legalzoom.com/my-dad-is-suing-your-dad-the-agreement".parse().unwrap();
         let occupation_id = OccupationID::new("lawyer");
-        let process_from = make_process(&ProcessID::create(), company_from.id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), dec!(177.25)), &now);
-        let process_to = make_process(&ProcessID::create(), company_to.id(), "employee legal agreement drafting", &Costs::new_with_labor(occupation_id.clone(), dec!(804)), &now);
-        let costs_to_move = process_from.costs().clone() * dec!(0.777777777);
+        let process_from = make_process(&ProcessID::create(), company_from.id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), num!(177.25)), &now);
+        let process_to = make_process(&ProcessID::create(), company_to.id(), "employee legal agreement drafting", &Costs::new_with_labor(occupation_id.clone(), num!(804)), &now);
+        let costs_to_move = process_from.costs().clone() * num!(0.777777777);
         state.model = Some(process_from);
         state.model2 = Some(process_to);
 

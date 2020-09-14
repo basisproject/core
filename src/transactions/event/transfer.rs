@@ -251,7 +251,6 @@ mod tests {
         util::{self, test::{self, *}},
     };
     use om2::Unit;
-    use rust_decimal_macros::*;
 
     #[test]
     fn can_transfer() {
@@ -262,9 +261,9 @@ mod tests {
         let company_to = make_company(&CompanyID::create(), "jinkey's skateboards", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 1234", "gotta get some planks", &now);
         let agreed_in: Url = "https://legalzoom.com/standard-boilerplate-hereto-notwithstanding-each-of-them-damage-to-the-hood-ornament-alone".parse().unwrap();
-        let resource_from = make_resource(&ResourceID::new("plank"), company_from.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
-        let resource_to = make_resource(&ResourceID::new("plank"), company_to.id(), &Measure::new(dec!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
-        let costs_to_move = resource_from.costs().clone() * dec!(0.67777777);
+        let resource_from = make_resource(&ResourceID::new("plank"), company_from.id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        let resource_to = make_resource(&ResourceID::new("plank"), company_to.id(), &Measure::new(num!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
+        let costs_to_move = resource_from.costs().clone() * num!(0.67777777);
         state.model = Some(resource_from);
         state.model2 = Some(resource_to);
 
@@ -306,15 +305,15 @@ mod tests {
 
         assert_eq!(resource2.id(), state.model().id());
         assert_eq!(resource2.inner().primary_accountable(), &Some(company_from.agent_id()));
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
+        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(num!(15) - num!(8), Unit::One)));
+        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(num!(15) - num!(8), Unit::One)));
         assert_eq!(resource2.in_custody_of(), &company_from.agent_id());
         assert_eq!(resource2.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
         assert_eq!(resource_to2.id(), state.model2().id());
         assert_eq!(resource_to2.inner().primary_accountable(), &Some(company_to.agent_id()));
-        assert_eq!(resource_to2.inner().accounting_quantity(), &Some(Measure::new(dec!(8) + dec!(3), Unit::One)));
-        assert_eq!(resource_to2.inner().onhand_quantity(), &Some(Measure::new(dec!(8) + dec!(3), Unit::One)));
+        assert_eq!(resource_to2.inner().accounting_quantity(), &Some(Measure::new(num!(8) + num!(3), Unit::One)));
+        assert_eq!(resource_to2.inner().onhand_quantity(), &Some(Measure::new(num!(8) + num!(3), Unit::One)));
         assert_eq!(resource_to2.in_custody_of(), &company_to.agent_id());
         assert_eq!(resource_to2.costs(), &(state.model2().costs().clone() + costs_to_move.clone()));
 
@@ -340,15 +339,15 @@ mod tests {
 
         assert_eq!(resource3.id(), state.model().id());
         assert_eq!(resource3.inner().primary_accountable(), &Some(company_from.agent_id()));
-        assert_eq!(resource3.inner().accounting_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
-        assert_eq!(resource3.inner().onhand_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
+        assert_eq!(resource3.inner().accounting_quantity(), &Some(Measure::new(num!(15) - num!(8), Unit::One)));
+        assert_eq!(resource3.inner().onhand_quantity(), &Some(Measure::new(num!(15) - num!(8), Unit::One)));
         assert_eq!(resource3.in_custody_of(), &company_from.agent_id());
         assert_eq!(resource3.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
         assert_eq!(resource_created.id(), state.model2().id());
         assert_eq!(resource_created.inner().primary_accountable(), &Some(company_to.agent_id()));
-        assert_eq!(resource_created.inner().accounting_quantity(), &Some(Measure::new(dec!(8), Unit::One)));
-        assert_eq!(resource_created.inner().onhand_quantity(), &Some(Measure::new(dec!(8), Unit::One)));
+        assert_eq!(resource_created.inner().accounting_quantity(), &Some(Measure::new(num!(8), Unit::One)));
+        assert_eq!(resource_created.inner().onhand_quantity(), &Some(Measure::new(num!(8), Unit::One)));
         assert_eq!(resource_created.in_custody_of(), &company_to.agent_id());
         assert_eq!(resource_created.costs(), &costs_to_move);
 
@@ -396,9 +395,9 @@ mod tests {
         let company_to = make_company(&CompanyID::create(), "jinkey's skateboards", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 1234", "gotta get some planks", &now);
         let agreed_in: Url = "https://legalzoom.com/is-it-too-much-to-ask-for-todays-pedestrian-to-wear-at-least-one-piece-of-reflective-clothing".parse().unwrap();
-        let resource_from = make_resource(&ResourceID::new("plank"), company_from.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
-        let resource_to = make_resource(&ResourceID::new("plank"), company_to.id(), &Measure::new(dec!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
-        let costs_to_move = resource_from.costs().clone() * dec!(0.1555232);
+        let resource_from = make_resource(&ResourceID::new("plank"), company_from.id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        let resource_to = make_resource(&ResourceID::new("plank"), company_to.id(), &Measure::new(num!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
+        let costs_to_move = resource_from.costs().clone() * num!(0.1555232);
         state.model = Some(resource_from);
         state.model2 = Some(resource_to);
 
@@ -440,15 +439,15 @@ mod tests {
 
         assert_eq!(resource2.id(), state.model().id());
         assert_eq!(resource2.inner().primary_accountable(), &Some(company_from.agent_id()));
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
+        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(num!(15) - num!(8), Unit::One)));
+        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(num!(15), Unit::One)));
         assert_eq!(resource2.in_custody_of(), &company_from.agent_id());
         assert_eq!(resource2.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
         assert_eq!(resource_to2.id(), state.model2().id());
         assert_eq!(resource_to2.inner().primary_accountable(), &Some(company_to.agent_id()));
-        assert_eq!(resource_to2.inner().accounting_quantity(), &Some(Measure::new(dec!(8) + dec!(3), Unit::One)));
-        assert_eq!(resource_to2.inner().onhand_quantity(), &Some(Measure::new(dec!(3), Unit::One)));
+        assert_eq!(resource_to2.inner().accounting_quantity(), &Some(Measure::new(num!(8) + num!(3), Unit::One)));
+        assert_eq!(resource_to2.inner().onhand_quantity(), &Some(Measure::new(num!(3), Unit::One)));
         assert_eq!(resource_to2.in_custody_of(), &company_to.agent_id());
         assert_eq!(resource_to2.costs(), &(state.model2().costs().clone() + costs_to_move.clone()));
 
@@ -473,20 +472,20 @@ mod tests {
         assert_eq!(event.updated(), &now);
 
         let mut costs2 = Costs::new();
-        costs2.track_labor("homemaker", dec!(157) - dec!(23));
+        costs2.track_labor("homemaker", num!(157) - num!(23));
         assert_eq!(resource3.id(), state.model().id());
         assert_eq!(resource3.inner().primary_accountable(), &Some(company_from.agent_id()));
-        assert_eq!(resource3.inner().accounting_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
-        assert_eq!(resource3.inner().onhand_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
+        assert_eq!(resource3.inner().accounting_quantity(), &Some(Measure::new(num!(15) - num!(8), Unit::One)));
+        assert_eq!(resource3.inner().onhand_quantity(), &Some(Measure::new(num!(15), Unit::One)));
         assert_eq!(resource3.in_custody_of(), &company_from.agent_id());
         assert_eq!(resource3.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
         let mut costs2 = Costs::new();
-        costs2.track_labor("homemaker", dec!(23));
+        costs2.track_labor("homemaker", num!(23));
         assert_eq!(resource_created.id(), state.model2().id());
         assert_eq!(resource_created.inner().primary_accountable(), &Some(company_to.agent_id()));
-        assert_eq!(resource_created.inner().accounting_quantity(), &Some(Measure::new(dec!(8), Unit::One)));
-        assert_eq!(resource_created.inner().onhand_quantity(), &Some(Measure::new(dec!(0), Unit::One)));
+        assert_eq!(resource_created.inner().accounting_quantity(), &Some(Measure::new(num!(8), Unit::One)));
+        assert_eq!(resource_created.inner().onhand_quantity(), &Some(Measure::new(num!(0), Unit::One)));
         assert_eq!(resource_created.in_custody_of(), &company_from.agent_id());
         assert_eq!(resource_created.costs(), &costs_to_move);
 
@@ -526,9 +525,9 @@ mod tests {
         let company_to = make_company(&CompanyID::create(), "jinkey's skateboards", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 1234", "gotta get some planks", &now);
         let agreed_in: Url = "https://legaldoom.com/trade-secrets-trade-secrets".parse().unwrap();
-        let resource_from = make_resource(&ResourceID::new("plank"), company_from.id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
-        let resource_to = make_resource(&ResourceID::new("plank"), company_to.id(), &Measure::new(dec!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
-        let costs_to_move = resource_from.costs().clone() * (dec!(8) / dec!(15));
+        let resource_from = make_resource(&ResourceID::new("plank"), company_from.id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        let resource_to = make_resource(&ResourceID::new("plank"), company_to.id(), &Measure::new(num!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
+        let costs_to_move = resource_from.costs().clone() * (num!(8) / num!(15));
         state.model = Some(resource_from);
         state.model2 = Some(resource_to);
 
@@ -570,15 +569,15 @@ mod tests {
 
         assert_eq!(resource2.id(), state.model().id());
         assert_eq!(resource2.inner().primary_accountable(), &Some(company_from.agent_id()));
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
+        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(num!(15), Unit::One)));
+        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(num!(15) - num!(8), Unit::One)));
         assert_eq!(resource2.in_custody_of(), &company_from.agent_id());
         assert_eq!(resource2.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
         assert_eq!(resource_to2.id(), state.model2().id());
         assert_eq!(resource_to2.inner().primary_accountable(), &Some(company_to.agent_id()));
-        assert_eq!(resource_to2.inner().accounting_quantity(), &Some(Measure::new(dec!(3), Unit::One)));
-        assert_eq!(resource_to2.inner().onhand_quantity(), &Some(Measure::new(dec!(8) + dec!(3), Unit::One)));
+        assert_eq!(resource_to2.inner().accounting_quantity(), &Some(Measure::new(num!(3), Unit::One)));
+        assert_eq!(resource_to2.inner().onhand_quantity(), &Some(Measure::new(num!(8) + num!(3), Unit::One)));
         assert_eq!(resource_to2.in_custody_of(), &company_to.agent_id());
         assert_eq!(resource_to2.costs(), &(state.model2().costs().clone() + costs_to_move.clone()));
 
@@ -602,20 +601,20 @@ mod tests {
         assert_eq!(event.updated(), &now);
 
         let mut costs2 = Costs::new();
-        costs2.track_labor("homemaker", dec!(157) - dec!(23));
+        costs2.track_labor("homemaker", num!(157) - num!(23));
         assert_eq!(resource3.id(), state.model().id());
         assert_eq!(resource3.inner().primary_accountable(), &Some(company_from.agent_id()));
-        assert_eq!(resource3.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
-        assert_eq!(resource3.inner().onhand_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
+        assert_eq!(resource3.inner().accounting_quantity(), &Some(Measure::new(num!(15), Unit::One)));
+        assert_eq!(resource3.inner().onhand_quantity(), &Some(Measure::new(num!(15) - num!(8), Unit::One)));
         assert_eq!(resource3.in_custody_of(), &company_from.agent_id());
         assert_eq!(resource3.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
         let mut costs2 = Costs::new();
-        costs2.track_labor("homemaker", dec!(23));
+        costs2.track_labor("homemaker", num!(23));
         assert_eq!(resource_created.id(), state.model2().id());
         assert_eq!(resource_created.inner().primary_accountable(), &Some(company_from.agent_id()));
-        assert_eq!(resource_created.inner().accounting_quantity(), &Some(Measure::new(dec!(0), Unit::One)));
-        assert_eq!(resource_created.inner().onhand_quantity(), &Some(Measure::new(dec!(8), Unit::One)));
+        assert_eq!(resource_created.inner().accounting_quantity(), &Some(Measure::new(num!(0), Unit::One)));
+        assert_eq!(resource_created.inner().onhand_quantity(), &Some(Measure::new(num!(8), Unit::One)));
         assert_eq!(resource_created.in_custody_of(), &company_to.agent_id());
         assert_eq!(resource_created.costs(), &costs_to_move);
 

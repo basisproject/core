@@ -696,7 +696,6 @@ mod tests {
         util,
     };
     use om2::{Measure, NumericUnion, Unit};
-    use rust_decimal_macros::*;
     use vf_rs::vf;
 
     fn required_fields(event: &Event, state: &EventProcessState) -> (Vec<&'static str>, Vec<&'static str>) {
@@ -903,7 +902,7 @@ mod tests {
             .id("1111")
             .inner(vf::Process::builder().name("Make widgets").build().unwrap())
             .company_id(company_id.clone())
-            .costs(Costs::new_with_labor("machinist", dec!(100.0)))
+            .costs(Costs::new_with_labor("machinist", num!(100.0)))
             .active(true)
             .created(now.clone())
             .updated(now.clone())
@@ -928,7 +927,7 @@ mod tests {
                     .build().unwrap()
             )
             .in_custody_of(company_id.clone())
-            .costs(Costs::new_with_labor("machinist", dec!(34.91)))
+            .costs(Costs::new_with_labor("machinist", num!(34.91)))
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();
@@ -943,7 +942,7 @@ mod tests {
                     .build().unwrap()
             )
             .in_custody_of(company_to.clone())
-            .costs(Costs::new_with_labor("trucker", dec!(29.8)))
+            .costs(Costs::new_with_labor("trucker", num!(29.8)))
             .created(now.clone())
             .updated(now.clone())
             .build().unwrap();
@@ -959,7 +958,7 @@ mod tests {
                 )
                 .active(true)
                 .permissions(vec![Permission::MemberCreate, Permission::MemberSetPermissions, Permission::MemberDelete])
-                .class(MemberClass::Worker(MemberWorker::new("CEO", Some(Compensation::new_hourly(dec!(0.0), "12345")))))
+                .class(MemberClass::Worker(MemberWorker::new("CEO", Some(Compensation::new_hourly(num!(0.0), "12345")))))
                 .created(now.clone())
                 .updated(now.clone())
                 .build().unwrap();
@@ -989,10 +988,10 @@ mod tests {
                     .receiver(company_to.clone())
                     .resource_inventoried_as(state.resource.as_ref().unwrap().id().clone())
                     .to_resource_inventoried_as(state.to_resource.as_ref().unwrap().id().clone())
-                    .resource_quantity(Measure::new(NumericUnion::Decimal(dec!(6)), Unit::One))
+                    .resource_quantity(Measure::new(NumericUnion::Decimal(num!(6)), Unit::One))
                     .build().unwrap()
             )
-            .move_costs(Costs::new_with_labor("machinist", dec!(30.0)))
+            .move_costs(Costs::new_with_labor("machinist", num!(30.0)))
             .move_type(None)
             .created(now.clone())
             .updated(now.clone())
@@ -1097,17 +1096,17 @@ mod tests {
         assert_eq!(mods.len(), 2);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
-        assert_eq!(process.costs(), &Costs::new_with_labor("machinist", dec!(30.0)));
+        assert_eq!(process.costs(), &Costs::new_with_labor("machinist", num!(30.0)));
         check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap());
 
         let resource = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
         assert_eq!(resource.inner().accounting_quantity().clone().unwrap(), Measure::new(NumericUnion::Integer(4), Unit::One));
-        assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", dec!(4.91)));
+        assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", num!(4.91)));
         check_resource_mods(vec!["costs", "accounting_quantity", "onhand_quantity"], &resource, state.resource.as_ref().unwrap());
 
         let mut event = make_event(vf::Action::Consume, &company_id, &company_id, &state, &now);
-        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(5)), Unit::One)));
-        event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(num!(5)), Unit::One)));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", num!(100.000001))));
         let res = event.process(state.clone(), &now);
         assert_eq!(res, Err(Error::NegativeCosts));
 
@@ -1149,8 +1148,8 @@ mod tests {
         check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap());
 
         let mut event = make_event(vf::Action::DeliverService, &company_id, &company2_id, &state, &now);
-        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(5)), Unit::One)));
-        event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(num!(5)), Unit::One)));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", num!(100.000001))));
         let res = event.process(state.clone(), &now);
         assert_eq!(res, Err(Error::NegativeCosts));
 
@@ -1183,19 +1182,19 @@ mod tests {
         check_resource_mods(vec!["accounting_quantity", "onhand_quantity"], &resource, state.resource.as_ref().unwrap());
 
         let mut event = make_event(vf::Action::Lower, &company_id, &company_id, &state, &now);
-        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(15)), Unit::One)));
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(num!(15)), Unit::One)));
         let res = event.process(state.clone(), &now);
         assert_eq!(res, Err(Error::NegativeMeasurement));
 
         let mut event = make_event(vf::Action::Lower, &company_id, &company_id, &state, &now);
-        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(10)), Unit::One)));
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(num!(10)), Unit::One)));
         let res = event.process(state.clone(), &now);
         assert_eq!(res, Err(Error::Event(EventError::ResourceCostQuantityMismatch)));
 
         let mut event = make_event(vf::Action::Lower, &company_id, &company_id, &state, &now);
         let mut state2 = state.clone();
         state2.resource.as_mut().map(|x| x.set_costs(Costs::new()));
-        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(10)), Unit::One)));
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(num!(10)), Unit::One)));
         let mods = event.process(state2, &now).unwrap().into_vec();
         let resource2 = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
         assert_eq!(resource2.inner().accounting_quantity().as_ref().unwrap(), &Measure::new(0 as i64, Unit::One));
@@ -1220,12 +1219,12 @@ mod tests {
         check_process_mods(vec!["costs"], &process, state.output_of.as_ref().unwrap());
 
         let resource = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
-        assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", dec!(64.91)));
+        assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", num!(64.91)));
         check_resource_mods(vec!["costs", "onhand_quantity"], &resource, state.resource.as_ref().unwrap());
 
         let mut event = make_event(vf::Action::Modify, &company_id, &company_id, &state, &now);
-        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(5)), Unit::One)));
-        event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(num!(5)), Unit::One)));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", num!(100.000001))));
         let res = event.process(state, &now);
         assert_eq!(res, Err(Error::NegativeCosts));
     }
@@ -1293,7 +1292,7 @@ mod tests {
         assert_eq!(mods.len(), 2);
 
         let mut costs = Costs::new();
-        costs.track_labor("machinist", dec!(34.91) - dec!(30.0));
+        costs.track_labor("machinist", num!(34.91) - num!(30.0));
         let resource = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
         assert_eq!(resource.costs(), &costs);
         assert_eq!(resource.inner().accounting_quantity(), &Some(Measure::new(10 - 6, Unit::One)));
@@ -1303,8 +1302,8 @@ mod tests {
         check_resource_mods(vec!["costs", "in_custody_of", "primary_accountable", "accounting_quantity", "onhand_quantity"], &resource, state.resource.as_ref().unwrap());
 
         let mut costs = Costs::new();
-        costs.track_labor("trucker", dec!(29.8));
-        costs.track_labor("machinist", dec!(30.0));
+        costs.track_labor("trucker", num!(29.8));
+        costs.track_labor("machinist", num!(30.0));
         let resource2 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
         assert_eq!(resource2.costs(), &costs);
         assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(1 + 6, Unit::One)));
@@ -1315,13 +1314,13 @@ mod tests {
 
         // going to move just costs (set count to 0 lol)
         let mut event2 = event.clone();
-        event2.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(13.2))));
-        event2.inner_mut().set_resource_quantity(Some(Measure::new(dec!(0), Unit::One)));
+        event2.set_move_costs(Some(Costs::new_with_labor("machinist", num!(13.2))));
+        event2.inner_mut().set_resource_quantity(Some(Measure::new(num!(0), Unit::One)));
         let mods = event2.process(state.clone(), &now).unwrap().into_vec();
         assert_eq!(mods.len(), 2);
 
         let mut costs = Costs::new();
-        costs.track_labor("machinist", dec!(34.91) - dec!(13.2));
+        costs.track_labor("machinist", num!(34.91) - num!(13.2));
         let resource3 = mods[0].clone().expect_op::<Resource>(Op::Update).unwrap();
         assert_eq!(resource3.costs(), &costs);
         assert_eq!(resource3.inner().accounting_quantity(), &Some(Measure::new(10, Unit::One)));
@@ -1331,8 +1330,8 @@ mod tests {
         check_resource_mods(vec!["costs", "in_custody_of", "primary_accountable", "accounting_quantity", "onhand_quantity"], &resource3, state.resource.as_ref().unwrap());
 
         let mut costs = Costs::new();
-        costs.track_labor("machinist", dec!(13.2));
-        costs.track_labor("trucker", dec!(29.8));
+        costs.track_labor("machinist", num!(13.2));
+        costs.track_labor("trucker", num!(29.8));
         let resource4 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
         assert_eq!(resource4.costs(), &costs);
         assert_eq!(resource4.inner().accounting_quantity(), &Some(Measure::new(1, Unit::One)));
@@ -1358,7 +1357,7 @@ mod tests {
         let resource5 = mods[1].clone().expect_op::<Resource>(Op::Create).unwrap();
         let mut resource2_clone = resource2.clone();
         resource2_clone.inner_mut().accounting_quantity_mut().as_mut().map(|x| x.set_has_numerical_value(NumericUnion::Integer(6)));
-        resource2_clone.set_costs(Costs::new_with_labor("machinist", dec!(30.0)));
+        resource2_clone.set_costs(Costs::new_with_labor("machinist", num!(30.0)));
         resource2_clone.set_created(now4.clone());
         resource2_clone.set_updated(now4.clone());
         assert_eq!(resource5.id(), event.inner().to_resource_inventoried_as().as_ref().unwrap());
@@ -1372,8 +1371,8 @@ mod tests {
         let state = make_state(&company_id, &company_id, true, &now);
 
         let mut event = make_event(vf::Action::Produce, &company_id, &company_id, &state, &now);
-        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(5)), Unit::One)));
-        event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(42.0))));
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(num!(5)), Unit::One)));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", num!(42.0))));
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
@@ -1388,12 +1387,12 @@ mod tests {
         assert_eq!(resource.inner().accounting_quantity().clone().unwrap(), Measure::new(NumericUnion::Integer(15), Unit::One));
         assert_eq!(resource.inner().primary_accountable().clone().unwrap(), company_id.clone().into());
         assert_eq!(resource.in_custody_of(), &company_id.clone().into());
-        assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", dec!(76.91)));
+        assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", num!(76.91)));
         check_resource_mods(vec!["costs", "in_custody_of", "accounting_quantity", "onhand_quantity", "primary_accountable"], &resource, state.resource.as_ref().unwrap());
 
         let mut event = make_event(vf::Action::Produce, &company_id, &company_id, &state, &now);
-        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(5)), Unit::One)));
-        event.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(num!(5)), Unit::One)));
+        event.set_move_costs(Some(Costs::new_with_labor("machinist", num!(100.000001))));
         let res = event.process(state.clone(), &now);
         assert_eq!(res, Err(Error::NegativeCosts));
 
@@ -1422,7 +1421,7 @@ mod tests {
         check_resource_mods(vec!["accounting_quantity", "onhand_quantity", "primary_accountable"], &resource, state.resource.as_ref().unwrap());
 
         let mut event = make_event(vf::Action::Raise, &company_id, &company_id, &state, &now);
-        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(dec!(-15)), Unit::One)));
+        event.inner_mut().set_resource_quantity(Some(Measure::new(NumericUnion::Decimal(num!(-15)), Unit::One)));
         let res = event.process(state.clone(), &now);
         assert_eq!(res, Err(Error::NegativeMeasurement));
     }
@@ -1469,7 +1468,7 @@ mod tests {
         let resource5 = mods[1].clone().expect_op::<Resource>(Op::Create).unwrap();
         let mut resource2_clone = resource2.clone();
         resource2_clone.inner_mut().accounting_quantity_mut().as_mut().map(|x| x.set_has_numerical_value(NumericUnion::Integer(6)));
-        resource2_clone.set_costs(Costs::new_with_labor("machinist", dec!(30.0)));
+        resource2_clone.set_costs(Costs::new_with_labor("machinist", num!(30.0)));
         resource2_clone.set_created(now4.clone());
         resource2_clone.set_updated(now4.clone());
         assert_eq!(resource5.id(), event.inner().to_resource_inventoried_as().as_ref().unwrap());
@@ -1520,7 +1519,7 @@ mod tests {
         resource2_clone.inner_mut().onhand_quantity_mut().as_mut().map(|x| x.set_has_numerical_value(NumericUnion::Integer(0)));
         resource2_clone.set_in_custody_of(company_id.clone().into());
         resource2_clone.inner_mut().set_primary_accountable(Some(company2_id.clone().into()));
-        resource2_clone.set_costs(Costs::new_with_labor("machinist", dec!(30.0)));
+        resource2_clone.set_costs(Costs::new_with_labor("machinist", num!(30.0)));
         resource2_clone.set_created(now4.clone());
         resource2_clone.set_updated(now4.clone());
         assert_eq!(resource5.id(), event.inner().to_resource_inventoried_as().as_ref().unwrap());
@@ -1570,7 +1569,7 @@ mod tests {
         resource2_clone.inner_mut().onhand_quantity_mut().as_mut().map(|x| x.set_has_numerical_value(NumericUnion::Integer(6)));
         resource2_clone.set_in_custody_of(company2_id.clone().into());
         resource2_clone.inner_mut().set_primary_accountable(Some(company_id.clone().into()));
-        resource2_clone.set_costs(Costs::new_with_labor("machinist", dec!(30.0)));
+        resource2_clone.set_costs(Costs::new_with_labor("machinist", num!(30.0)));
         resource2_clone.set_created(now4.clone());
         resource2_clone.set_updated(now4.clone());
         assert_eq!(resource5.id(), event.inner().to_resource_inventoried_as().as_ref().unwrap());
@@ -1596,11 +1595,11 @@ mod tests {
 
         let resource = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
         assert_eq!(resource.in_custody_of().clone(), company_id.clone().into());
-        assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", dec!(4.91)));
+        assert_eq!(resource.costs(), &Costs::new_with_labor("machinist", num!(4.91)));
         check_resource_mods(vec!["costs", "in_custody_of"], &resource, state.resource.as_ref().unwrap());
 
         let mut event2 = make_event(vf::Action::Use, &company_id, &company_id, &state, &now);
-        event2.set_move_costs(Some(Costs::new_with_labor("machinist", dec!(100.000001))));
+        event2.set_move_costs(Some(Costs::new_with_labor("machinist", num!(100.000001))));
         let res = event2.process(state.clone(), &now);
         assert_eq!(res, Err(Error::NegativeCosts));
 
@@ -1632,7 +1631,7 @@ mod tests {
         costs.track_labor("machinist", 42);    // should not be tracked
         event.set_move_costs(Some(costs));
         event.inner_mut().set_provider(state.provider.as_ref().unwrap().agent_id());
-        event.inner_mut().set_effort_quantity(Some(Measure::new(dec!(0), Unit::Hour)));
+        event.inner_mut().set_effort_quantity(Some(Measure::new(num!(0), Unit::Hour)));
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
@@ -1675,7 +1674,7 @@ mod tests {
         let mut event = make_event(vf::Action::Work, &company_id, &company_id, &state, &now);
         event.set_move_costs(Some(Costs::new()));
         event.inner_mut().set_provider(state.provider.as_ref().unwrap().agent_id());
-        event.inner_mut().set_effort_quantity(Some(Measure::new(dec!(5.4), Unit::Hour)));
+        event.inner_mut().set_effort_quantity(Some(Measure::new(num!(5.4), Unit::Hour)));
         fuzz_state(event.clone(), state.clone(), &now);
 
         let res = event.process(state.clone(), &now).unwrap();
@@ -1683,7 +1682,7 @@ mod tests {
         assert_eq!(mods.len(), 1);
 
         let process = mods[0].clone().expect_op::<Process>(Op::Update).unwrap();
-        assert_eq!(process.costs(), &Costs::new_with_labor_hours("CEO", dec!(5.4)));
+        assert_eq!(process.costs(), &Costs::new_with_labor_hours("CEO", num!(5.4)));
         check_process_mods(vec!["costs"], &process, state.input_of.as_ref().unwrap());
 
         let mut state2 = state.clone();

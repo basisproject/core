@@ -110,7 +110,6 @@ mod tests {
         },
         util::test::{self, *},
     };
-    use rust_decimal_macros::*;
 
     #[test]
     fn can_work() {
@@ -120,12 +119,12 @@ mod tests {
         let mut state = TestState::standard(vec![CompanyPermission::Work], &now);
         let occupation_id = state.member().occupation_id().unwrap().clone();
         let worker = state.member().clone();
-        let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &Costs::new_with_labor(occupation_id.clone(), dec!(177.5)), &now);
+        let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &Costs::new_with_labor(occupation_id.clone(), num!(177.5)), &now);
         state.model = Some(worker);
         state.model2 = Some(process);
 
         let testfn = |state: &TestState<Member, Process>| {
-            work(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Some(dec!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2)
+            work(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), Some(num!(78.4)), now.clone(), now2.clone(), Some("just doing some work".into()), &now2)
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -141,14 +140,14 @@ mod tests {
         assert_eq!(event.inner().note(), &Some("just doing some work".into()));
         assert_eq!(event.inner().provider().clone(), state.model().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor(occupation_id.clone(), dec!(78.4))));
+        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor(occupation_id.clone(), num!(78.4))));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now2);
         assert_eq!(event.updated(), &now2);
 
         let mut costs2 = Costs::new();
-        costs2.track_labor(occupation_id.clone(), dec!(177.5) + dec!(78.4));
-        costs2.track_labor_hours(occupation_id.clone(), dec!(6.8666666666666666666666666666));
+        costs2.track_labor(occupation_id.clone(), num!(177.5) + num!(78.4));
+        costs2.track_labor_hours(occupation_id.clone(), num!(6.8666666666666666666666666666));
         let process2 = mods[1].clone().expect_op::<Process>(Op::Update).unwrap();
         assert_eq!(process2.id(), state.model2().id());
         assert_eq!(process2.company_id(), state.company().id());
@@ -173,14 +172,14 @@ mod tests {
         assert_eq!(event.inner().note(), &Some("just doing some work".into()));
         assert_eq!(event.inner().provider().clone(), state2.model().agent_id());
         assert_eq!(event.inner().receiver().clone(), state.company().agent_id());
-        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor(occupation_id.clone(), dec!(78.4))));
+        assert_eq!(event.move_costs(), &Some(Costs::new_with_labor(occupation_id.clone(), num!(78.4))));
         assert_eq!(event.active(), &true);
         assert_eq!(event.created(), &now2);
         assert_eq!(event.updated(), &now2);
 
         let mut costs2 = Costs::new();
-        costs2.track_labor(occupation_id.clone(), dec!(177.5) + dec!(78.4));
-        costs2.track_labor_hours(occupation_id.clone(), dec!(6.8666666666666666666666666666));
+        costs2.track_labor(occupation_id.clone(), num!(177.5) + num!(78.4));
+        costs2.track_labor_hours(occupation_id.clone(), num!(6.8666666666666666666666666666));
         let process2 = mods[1].clone().expect_op::<Process>(Op::Update).unwrap();
 
         assert_eq!(process2.id(), state.model2().id());

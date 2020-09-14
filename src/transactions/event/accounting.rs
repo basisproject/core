@@ -248,14 +248,13 @@ mod tests {
         util::{self, test::{self, *}},
     };
     use om2::Unit;
-    use rust_decimal_macros::*;
 
     #[test]
     fn can_lower() {
         let now = util::time::now();
         let id = EventID::create();
         let mut state = TestState::standard(vec![CompanyPermission::Lower], &now);
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         state.model = Some(resource);
 
         let testfn = |state: &TestState<Resource, Resource>| {
@@ -283,8 +282,8 @@ mod tests {
         assert_eq!(event.updated(), &now);
 
         assert_eq!(resource2.id(), state.model().id());
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(7), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(7), Unit::One)));
+        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(num!(7), Unit::One)));
+        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(num!(7), Unit::One)));
         assert_eq!(resource2.costs(), state.model().costs());
 
         // a company that doesn't own a resource can't lower it
@@ -306,9 +305,9 @@ mod tests {
         let id = EventID::create();
         let mut state = TestState::standard(vec![CompanyPermission::MoveCosts], &now);
         let occupation_id = OccupationID::new("lawyer");
-        let process_from = make_process(&ProcessID::create(), state.company().id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), dec!(177.25)), &now);
-        let process_to = make_process(&ProcessID::create(), state.company().id(), "overflow labor", &Costs::new_with_labor(occupation_id.clone(), dec!(804)), &now);
-        let costs_to_move = process_from.costs().clone() * dec!(0.45);
+        let process_from = make_process(&ProcessID::create(), state.company().id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), num!(177.25)), &now);
+        let process_to = make_process(&ProcessID::create(), state.company().id(), "overflow labor", &Costs::new_with_labor(occupation_id.clone(), num!(804)), &now);
+        let costs_to_move = process_from.costs().clone() * num!(0.45);
         state.model = Some(process_from);
         state.model2 = Some(process_to);
 
@@ -338,7 +337,7 @@ mod tests {
         assert_eq!(event.updated(), &now);
 
         let mut costs2 = Costs::new();
-        costs2.track_labor("lawyer", dec!(177.25) - dec!(100));
+        costs2.track_labor("lawyer", num!(177.25) - num!(100));
         assert_eq!(process_from2.id(), state.model().id());
         assert_eq!(process_from2.company_id(), state.company().id());
         assert_eq!(process_from2.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
@@ -365,9 +364,9 @@ mod tests {
         let now = util::time::now();
         let id = EventID::create();
         let mut state = TestState::standard(vec![CompanyPermission::MoveResource], &now);
-        let resource = make_resource(&ResourceID::new("plank"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
-        let resource_to = make_resource(&ResourceID::new("plank"), state.company().id(), &Measure::new(dec!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
-        let costs_to_move = resource.costs().clone() * (dec!(8) / dec!(15));
+        let resource = make_resource(&ResourceID::new("plank"), state.company().id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        let resource_to = make_resource(&ResourceID::new("plank"), state.company().id(), &Measure::new(num!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
+        let costs_to_move = resource.costs().clone() * (num!(8) / num!(15));
         state.model = Some(resource);
         state.model2 = Some(resource_to);
 
@@ -407,15 +406,15 @@ mod tests {
 
         assert_eq!(resource_from2.id(), state.model().id());
         assert_eq!(resource_from2.inner().primary_accountable(), &Some(state.company().agent_id()));
-        assert_eq!(resource_from2.inner().accounting_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
-        assert_eq!(resource_from2.inner().onhand_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
+        assert_eq!(resource_from2.inner().accounting_quantity(), &Some(Measure::new(num!(15) - num!(8), Unit::One)));
+        assert_eq!(resource_from2.inner().onhand_quantity(), &Some(Measure::new(num!(15) - num!(8), Unit::One)));
         assert_eq!(resource_from2.in_custody_of(), &state.company().agent_id());
         assert_eq!(resource_from2.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
         assert_eq!(resource_to2.id(), state.model2().id());
         assert_eq!(resource_to2.inner().primary_accountable(), &Some(state.company().agent_id()));
-        assert_eq!(resource_to2.inner().accounting_quantity(), &Some(Measure::new(dec!(8) + dec!(3), Unit::One)));
-        assert_eq!(resource_to2.inner().onhand_quantity(), &Some(Measure::new(dec!(8) + dec!(3), Unit::One)));
+        assert_eq!(resource_to2.inner().accounting_quantity(), &Some(Measure::new(num!(8) + num!(3), Unit::One)));
+        assert_eq!(resource_to2.inner().onhand_quantity(), &Some(Measure::new(num!(8) + num!(3), Unit::One)));
         assert_eq!(resource_to2.in_custody_of(), &state.company().agent_id());
         assert_eq!(resource_to2.costs(), &(state.model2().costs().clone() + costs_to_move.clone()));
 
@@ -442,15 +441,15 @@ mod tests {
 
         assert_eq!(resource_from3.id(), state.model().id());
         assert_eq!(resource_from3.inner().primary_accountable(), &Some(state.company().agent_id()));
-        assert_eq!(resource_from3.inner().accounting_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
-        assert_eq!(resource_from3.inner().onhand_quantity(), &Some(Measure::new(dec!(15) - dec!(8), Unit::One)));
+        assert_eq!(resource_from3.inner().accounting_quantity(), &Some(Measure::new(num!(15) - num!(8), Unit::One)));
+        assert_eq!(resource_from3.inner().onhand_quantity(), &Some(Measure::new(num!(15) - num!(8), Unit::One)));
         assert_eq!(resource_from3.in_custody_of(), &state.company().agent_id());
         assert_eq!(resource_from3.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
         assert_eq!(resource_created.id(), state.model2().id());
         assert_eq!(resource_created.inner().primary_accountable(), &Some(state.company().agent_id()));
-        assert_eq!(resource_created.inner().accounting_quantity(), &Some(Measure::new(dec!(8), Unit::One)));
-        assert_eq!(resource_created.inner().onhand_quantity(), &Some(Measure::new(dec!(8), Unit::One)));
+        assert_eq!(resource_created.inner().accounting_quantity(), &Some(Measure::new(num!(8), Unit::One)));
+        assert_eq!(resource_created.inner().onhand_quantity(), &Some(Measure::new(num!(8), Unit::One)));
         assert_eq!(resource_created.in_custody_of(), &state.company().agent_id());
         assert_eq!(resource_created.costs(), &(costs_to_move.clone()));
 
@@ -482,7 +481,7 @@ mod tests {
         let now = util::time::now();
         let id = EventID::create();
         let mut state = TestState::standard(vec![CompanyPermission::Raise], &now);
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         state.model = Some(resource);
 
         let testfn = |state: &TestState<Resource, Resource>| {
@@ -510,8 +509,8 @@ mod tests {
         assert_eq!(event.updated(), &now);
 
         assert_eq!(resource2.id(), state.model().id());
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(23), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(23), Unit::One)));
+        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(num!(23), Unit::One)));
+        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(num!(23), Unit::One)));
         assert_eq!(resource2.costs(), state.model().costs());
 
         // a company that doesn't own a resource can't raise it

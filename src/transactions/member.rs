@@ -155,7 +155,6 @@ mod tests {
         },
         util::{self, test::{self, *}},
     };
-    use rust_decimal_macros::*;
     use om2::{Measure, Unit};
 
     #[test]
@@ -304,7 +303,7 @@ mod tests {
         assert_eq!(mods.len(), 1);
         let member2 = mods[0].clone().expect_op::<Member>(Op::Update).unwrap();
         assert_eq!(state.model().compensation(), None);
-        assert_eq!(member2.compensation().unwrap().wage(), &Measure::new(dec!(32), Unit::Hour));
+        assert_eq!(member2.compensation().unwrap().wage(), &Measure::new(num!(32), Unit::Hour));
         assert_eq!(member2.compensation().unwrap(), &compensation);
         assert_eq!(member2.updated(), &now2);
 

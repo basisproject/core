@@ -270,7 +270,6 @@ mod tests {
         util::{self, test::{self, *}},
     };
     use om2::Unit;
-    use rust_decimal_macros::*;
 
     #[test]
     fn can_cite() {
@@ -279,11 +278,11 @@ mod tests {
         let mut state = TestState::standard(vec![CompanyPermission::Cite], &now);
         let occupation_id = OccupationID::new("machinist");
         let mut costs = Costs::new();
-        costs.track_labor(occupation_id.clone(), dec!(42.2));
-        costs.track_labor("homemaker", dec!(13.6));
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        costs.track_labor(occupation_id.clone(), num!(42.2));
+        costs.track_labor("homemaker", num!(13.6));
+        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &costs, &now);
-        let costs_to_move = resource.costs().clone() * dec!(0.02);
+        let costs_to_move = resource.costs().clone() * num!(0.02);
         state.model = Some(resource);
         state.model2 = Some(process);
 
@@ -311,8 +310,8 @@ mod tests {
         assert_eq!(event.updated(), &now);
 
         assert_eq!(resource2.id(), state.model().id());
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
+        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(num!(15), Unit::One)));
+        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(num!(15), Unit::One)));
         assert_eq!(resource2.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
         assert_eq!(process2.id(), state.model2().id());
@@ -346,11 +345,11 @@ mod tests {
         let mut state = TestState::standard(vec![CompanyPermission::Consume], &now);
         let occupation_id = OccupationID::new("machinist");
         let mut costs = Costs::new();
-        costs.track_labor(occupation_id.clone(), dec!(42.2));
-        costs.track_labor("homemaker", dec!(13.6));
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        costs.track_labor(occupation_id.clone(), num!(42.2));
+        costs.track_labor("homemaker", num!(13.6));
+        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let resource_costs = resource.costs().clone();
-        let move_costs = resource_costs.clone() * (dec!(8) / dec!(15));
+        let move_costs = resource_costs.clone() * (num!(8) / num!(15));
         let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &costs, &now);
         state.model = Some(resource);
         state.model2 = Some(process);
@@ -384,10 +383,10 @@ mod tests {
         assert_eq!(process2.costs(), &(costs.clone() + move_costs.clone()));
 
         let mut costs3 = Costs::new();
-        costs3.track_labor("homemaker", dec!(157) - dec!(23));
+        costs3.track_labor("homemaker", num!(157) - num!(23));
         assert_eq!(resource2.id(), state.model().id());
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(7), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(7), Unit::One)));
+        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(num!(7), Unit::One)));
+        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(num!(7), Unit::One)));
         assert_eq!(resource2.costs(), &(resource_costs.clone() - move_costs.clone()));
 
         // can't consume into a process you don't own
@@ -416,11 +415,11 @@ mod tests {
         let mut state = TestState::standard(vec![CompanyPermission::Produce], &now);
         let occupation_id = OccupationID::new("machinist");
         let mut costs = Costs::new();
-        costs.track_labor(occupation_id.clone(), dec!(42.2));
-        costs.track_labor("homemaker", dec!(89.3));
+        costs.track_labor(occupation_id.clone(), num!(42.2));
+        costs.track_labor("homemaker", num!(89.3));
         let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &costs, &now);
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
-        let costs_to_move = process.costs().clone() * dec!(0.5777);
+        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        let costs_to_move = process.costs().clone() * num!(0.5777);
         state.model = Some(process);
         state.model2 = Some(resource);
 
@@ -454,8 +453,8 @@ mod tests {
         assert_eq!(process2.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
         assert_eq!(resource2.id(), state.model2().id());
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(23), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(23), Unit::One)));
+        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(num!(23), Unit::One)));
+        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(num!(23), Unit::One)));
         assert_eq!(resource2.costs(), &(state.model2().costs().clone() + costs_to_move.clone()));
 
         // can't produce from a process you don't own
@@ -484,11 +483,11 @@ mod tests {
         let mut state = TestState::standard(vec![CompanyPermission::Use], &now);
         let occupation_id = OccupationID::new("machinist");
         let mut costs = Costs::new();
-        costs.track_labor(occupation_id.clone(), dec!(42.2));
-        costs.track_labor("homemaker", dec!(13.6));
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        costs.track_labor(occupation_id.clone(), num!(42.2));
+        costs.track_labor("homemaker", num!(13.6));
+        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &costs, &now);
-        let costs_to_move = resource.costs().clone() * (dec!(8) / dec!(15));
+        let costs_to_move = resource.costs().clone() * (num!(8) / num!(15));
         state.model = Some(resource);
         state.model2 = Some(process);
 
@@ -516,8 +515,8 @@ mod tests {
         assert_eq!(event.updated(), &now);
 
         assert_eq!(resource2.id(), state.model().id());
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
+        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(num!(15), Unit::One)));
+        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(num!(15), Unit::One)));
         assert_eq!(resource2.costs(), &(state.model().costs().clone() - costs_to_move.clone()));
 
         assert_eq!(process2.id(), state.model2().id());
