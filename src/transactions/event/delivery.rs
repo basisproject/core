@@ -20,6 +20,7 @@ use crate::{
         resource::Resource,
         user::User,
     },
+    util::number::Ratio,
 };
 use vf_rs::{vf, geo::SpatialThing};
 
@@ -28,7 +29,7 @@ use vf_rs::{vf, geo::SpatialThing};
 /// created.
 ///
 /// This operates on a whole resource.
-pub fn dropoff(caller: &User, member: &Member, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn dropoff(caller: &User, member: &Member, company: &Company, id: EventID, process: Process, resource: Resource, move_costs_ratio: Ratio, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Dropoff)?;
     if !company.is_active() {
@@ -37,6 +38,7 @@ pub fn dropoff(caller: &User, member: &Member, company: &Company, id: EventID, p
 
     let process_id = process.id().clone();
     let resource_id = resource.id().clone();
+    let move_costs = process.costs().clone() * move_costs_ratio;
 
     let state = EventProcessState::builder()
         .output_of(process)
@@ -139,7 +141,6 @@ mod tests {
         util::{self, test::{self, *}},
     };
     use om2::{Measure, Unit};
-    use rust_decimal_macros::*;
 
     #[test]
     fn can_dropoff() {
@@ -147,14 +148,15 @@ mod tests {
         let id = EventID::create();
         let mut state = TestState::standard(vec![CompanyPermission::Dropoff], &now);
         let occupation_id = OccupationID::new("trucker");
-        let costs = Costs::new_with_labor(occupation_id.clone(), dec!(42.2));
+        let costs = Costs::new_with_labor(occupation_id.clone(), num!(42.2));
         let process = make_process(&ProcessID::create(), state.company().id(), "deliver widgets", &costs, &now);
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("machinist", 157), &now);
+        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("machinist", 157), &now);
+        let move_costs_ratio = Ratio::new(1).unwrap();
         state.model = Some(process);
         state.model2 = Some(resource);
 
         let testfn = |state: &TestState<Process, Resource>| {
-            dropoff(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), state.model().costs().clone(), Some(state.loc().clone()), Some("memo".into()), &now)
+            dropoff(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), move_costs_ratio.clone(), Some(state.loc().clone()), Some("memo".into()), &now)
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -182,14 +184,14 @@ mod tests {
         assert_eq!(process2.costs(), &Costs::new());
 
         let mut costs2 = Costs::new();
-        costs2.track_labor(occupation_id.clone(), dec!(42.2));
+        costs2.track_labor(occupation_id.clone(), num!(42.2));
         costs2.track_labor("machinist", 157);
         assert_eq!(resource2.id(), state.model2().id());
         assert_eq!(resource2.inner().primary_accountable(), &Some(state.company().agent_id()));
         assert_eq!(resource2.in_custody_of(), &state.company().agent_id());
-        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
+        assert_eq!(resource2.inner().accounting_quantity(), &Some(Measure::new(num!(15), Unit::One)));
         assert_eq!(event.inner().note(), &Some("memo".into()));
-        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(dec!(15), Unit::One)));
+        assert_eq!(resource2.inner().onhand_quantity(), &Some(Measure::new(num!(15), Unit::One)));
         assert_eq!(resource2.inner().current_location(), &Some(state.loc().clone()));
         assert_eq!(resource2.costs(), &costs2);
 
@@ -216,7 +218,7 @@ mod tests {
         let now = util::time::now();
         let id = EventID::create();
         let mut state = TestState::standard(vec![CompanyPermission::Pickup], &now);
-        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(dec!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
+        let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let process = make_process(&ProcessID::create(), state.company().id(), "make widgets", &Costs::new(), &now);
         state.model = Some(resource);
         state.model2 = Some(process);

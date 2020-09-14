@@ -198,7 +198,6 @@ mod tests {
         util::{self, test::{self, *}},
     };
     use om2::Unit;
-    use rust_decimal_macros::*;
 
     #[test]
     fn can_create() {
@@ -209,10 +208,10 @@ mod tests {
         let company_from = make_company(&CompanyID::create(), "bridget's widgets", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), state.company().agent_id()], "order 111222", "UwU big order of widgetzzz", &now);
         let costs = Costs::new_with_labor("widgetmaker", 42);
-        let resource = make_resource(&ResourceID::new("widget1"), company_from.id(), &Measure::new(dec!(30), Unit::One), &Costs::new_with_labor("widgetmaker", dec!(50)), &now);
+        let resource = make_resource(&ResourceID::new("widget1"), company_from.id(), &Measure::new(num!(30), Unit::One), &Costs::new_with_labor("widgetmaker", num!(50)), &now);
 
         let testfn_inner = |state: &TestState<Commitment, Commitment>, agreement: &Agreement, company_from: &Company, company_to: &Company| {
-            create(state.user(), state.member(), state.company(), &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(state.loc().clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.agent_id(), company_to.agent_id(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now)
+            create(state.user(), state.member(), state.company(), &agreement, id.clone(), costs.clone(), OrderAction::Transfer, None, Some(state.loc().clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.agent_id(), company_to.agent_id(), None, Some(resource.id().clone()), Some(Measure::new(num!(10), Unit::One)), true, &now)
         };
         let testfn = |state: &TestState<Commitment, Commitment>| {
             testfn_inner(state, &agreement, &company_from, &company_to)
@@ -244,7 +243,7 @@ mod tests {
         assert_eq!(commitment.inner().receiver(), &state.company().agent_id());
         assert_eq!(commitment.inner().resource_conforms_to(), &None);
         assert_eq!(commitment.inner().resource_inventoried_as(), &Some(ResourceID::new("widget1")));
-        assert_eq!(commitment.inner().resource_quantity(), &Some(Measure::new(dec!(10), Unit::One)));
+        assert_eq!(commitment.inner().resource_quantity(), &Some(Measure::new(num!(10), Unit::One)));
         assert_eq!(commitment.active(), &true);
         assert_eq!(commitment.created(), &now);
         assert_eq!(commitment.updated(), &now);
@@ -273,16 +272,16 @@ mod tests {
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 111222", "UwU big order of widgetzzz", &now);
         let costs1 = Costs::new_with_labor("widgetmaker", 42);
         let costs2 = Costs::new_with_labor("widgetmaker", 31);
-        let resource = make_resource(&ResourceID::new("widget1"), company_from.id(), &Measure::new(dec!(30), Unit::One), &Costs::new_with_labor("widgetmaker", dec!(50)), &now);
+        let resource = make_resource(&ResourceID::new("widget1"), company_from.id(), &Measure::new(num!(30), Unit::One), &Costs::new_with_labor("widgetmaker", num!(50)), &now);
         let agreement_url: Url = "http://legalzoom.com/standard-widget-shopping-cart-agreement".parse().unwrap();
 
-        let mods = create(state.user(), state.member(), state.company(), &agreement, id.clone(), costs1.clone(), OrderAction::Transfer, None, Some(state.loc().clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.agent_id(), company_to.agent_id(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now).unwrap().into_vec();
+        let mods = create(state.user(), state.member(), state.company(), &agreement, id.clone(), costs1.clone(), OrderAction::Transfer, None, Some(state.loc().clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.agent_id(), company_to.agent_id(), None, Some(resource.id().clone()), Some(Measure::new(num!(10), Unit::One)), true, &now).unwrap().into_vec();
         let commitment1 = mods[0].clone().expect_op::<Commitment>(Op::Create).unwrap();
         let now2 = util::time::now();
         state.model = Some(commitment1.clone());
 
         let testfn = |state: &TestState<Commitment, Commitment>| {
-            update(state.user(), state.member(), state.company(), state.model().clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.agent_id()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(dec!(50), Unit::One))), None, &now2)
+            update(state.user(), state.member(), state.company(), state.model().clone(), Some(costs2.clone()), None, Some(Some(agreement_url.clone())), None, Some(Some(now2.clone())), None, None, Some(Some(true)), Some(Some(now.clone())), None, None, Some(vec![company_from.agent_id()]), None, None, Some(Some("here, larry".into())), None, None, None, Some(Some(Measure::new(num!(50), Unit::One))), None, &now2)
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -311,7 +310,7 @@ mod tests {
         assert_eq!(commitment2.inner().receiver(), commitment1.inner().receiver());
         assert_eq!(commitment2.inner().resource_conforms_to(), commitment1.inner().resource_conforms_to());
         assert_eq!(commitment2.inner().resource_inventoried_as(), commitment1.inner().resource_inventoried_as());
-        assert_eq!(commitment2.inner().resource_quantity(), &Some(Measure::new(dec!(50), Unit::One)));
+        assert_eq!(commitment2.inner().resource_quantity(), &Some(Measure::new(num!(50), Unit::One)));
         assert_eq!(commitment2.active(), &true);
         assert_eq!(commitment2.created(), &now);
         assert_eq!(commitment2.updated(), &now2);
@@ -326,10 +325,10 @@ mod tests {
         let company_from = make_company(&CompanyID::create(), "bridget's widgets", &now);
         let company_to = state.company().clone();
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 111222", "UwU big order of widgetzzz", &now);
-        let resource = make_resource(&ResourceID::new("widget1"), company_from.id(), &Measure::new(dec!(30), Unit::One), &Costs::new_with_labor("widgetmaker", dec!(50)), &now);
+        let resource = make_resource(&ResourceID::new("widget1"), company_from.id(), &Measure::new(num!(30), Unit::One), &Costs::new_with_labor("widgetmaker", num!(50)), &now);
         let costs1 = Costs::new_with_labor("widgetmaker", 42);
 
-        let mods = create(state.user(), state.member(), state.company(), &agreement, id.clone(), costs1.clone(), OrderAction::Transfer, None, Some(state.loc().clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.agent_id(), company_to.agent_id(), None, Some(resource.id().clone()), Some(Measure::new(dec!(10), Unit::One)), true, &now).unwrap().into_vec();
+        let mods = create(state.user(), state.member(), state.company(), &agreement, id.clone(), costs1.clone(), OrderAction::Transfer, None, Some(state.loc().clone()), Some(now.clone()), None, None, Some(false), None, None, None, vec![], None, Some("widgetzz".into()), Some("sending widgets to larry".into()), None, company_from.agent_id(), company_to.agent_id(), None, Some(resource.id().clone()), Some(Measure::new(num!(10), Unit::One)), true, &now).unwrap().into_vec();
         let commitment1 = mods[0].clone().expect_op::<Commitment>(Op::Create).unwrap();
         let now2 = util::time::now();
         state.model = Some(commitment1.clone());

@@ -13,12 +13,12 @@
 
 use crate::{
     costs::Costs,
+    error::{Error, Result},
     models::{
         lib::agent::{Agent, AgentID},
-        process::Process,
-        resource::Resource,
     },
 };
+use rust_decimal::prelude::*;
 use serde::{Serialize, Deserialize};
 use vf_rs::vf;
 
@@ -154,7 +154,7 @@ basis_model! {
     /// purpose.
     ///
     /// Companies can be planned (exist by the will of the system members),
-    /// syndicates (exist by the will of the workers of that comany), or private
+    /// syndicates (exist by the will of the workers of that company), or private
     /// (exist completely outside the system).
     pub struct Company {
         id: <<CompanyID>>,
@@ -163,31 +163,54 @@ basis_model! {
         inner: vf::Agent,
         /// Primary email address
         email: String,
+        /// A credit value tracking this company's maximum costs
+        max_costs: Decimal,
+        /// The total amount of costs this company possesses. Cannot be above
+        /// `max_costs` when converted to a credit value.
+        total_costs: Costs,
     }
     CompanyBuilder
 }
 
 impl Company {
-    /// Calculate the total costs for this company, given a set of processes and
-    /// resources that belong to the company.
-    pub fn total_costs(&self, processes: &Vec<Process>, resources: &Vec<Resource>) -> Costs {
-        let process_costs = processes.iter()
-            .filter(|x| x.company_id() == self.id())
-            .fold(Costs::new(), |acc, x| acc + x.costs().clone());
-        let resource_costs = resources.iter()
-            .filter(|x| {
-                match x.inner().primary_accountable() {
-                    Some(agent_id) => {
-                        match agent_id {
-                            AgentID::CompanyID(company_id) => self.id() == company_id,
-                            _ => false,
-                        }
-                    }
-                    None => false,
-                }
-            })
-            .fold(Costs::new(), |acc, x| acc + x.costs().clone());
-        process_costs + resource_costs
+    /// Add a set of costs to this company, checking to make sure we are not
+    /// above `max_costs`. Returns the company's post-op `total_costs` value.
+    fn increase_costs(&mut self, costs: Costs) -> Result<&Costs> {
+        if costs.is_lt_0() {
+            Err(Error::NegativeCosts)?;
+        }
+        let new_costs = self.total_costs().clone() + costs;
+        let credit_value = new_costs.credits();
+        if credit_value > self.max_costs() {
+            Err(Error::MaxCostsReached)?;
+        }
+        self.set_total_costs(new_costs);
+        Ok(self.total_costs())
+    }
+
+    /// Subtract a set of costs to this company. Returns the company's post-op
+    /// `total_costs` value.
+    ///
+    /// Note that we don't need to check if we're over our `max_costs` value
+    /// because we are reducing costs here.
+    fn decrease_costs(&mut self, costs: Costs) -> Result<&Costs> {
+        if costs.is_lt_0() {
+            Err(Error::NegativeCosts)?;
+        }
+        let total = self.total_costs().clone();
+        if Costs::is_sub_lt_0(&total, &costs) {
+            Err(Error::NegativeCosts)?;
+        }
+        self.set_total_costs(total - costs);
+        Ok(self.total_costs())
+    }
+
+    /// Transfer a set of costs from this company to another. The receiving
+    /// company must not go over their `max_costs` value.
+    pub fn transfer_costs_to(&mut self, company_to: &mut Company, costs: Costs) -> Result<&Costs> {
+        self.decrease_costs(costs.clone())?;
+        company_to.increase_costs(costs)?;
+        Ok(self.total_costs())
     }
 }
 
@@ -201,43 +224,74 @@ impl Agent for Company {
 mod tests {
     use super::*;
     use crate::{
-        models::{
-            process::ProcessID,
-            resource::ResourceID,
-        },
         util::{self, test::*},
     };
-    use om2::{Measure, Unit};
     use rust_decimal_macros::*;
 
     #[test]
-    fn totals_costs() {
-        let company_id = CompanyID::create();
-        let company = make_company(&company_id, "jerry's delicious widgets", &util::time::now());
+    fn increase_costs() {
+        let mut company = make_company(&CompanyID::create(), "jerry's delicious widgets", &util::time::now());
+        company.set_max_costs(dec!(1000));
+        let costs1 = Costs::new_with_labor("widgetmaker", 500);
+        let total_costs = company.increase_costs(costs1.clone()).unwrap();
+        assert_eq!(total_costs, &costs1);
 
-        let now = util::time::now();
-        let process1 = make_process(&ProcessID::create(), &company_id, "make widgets", &Costs::new_with_labor("lumberjack", dec!(16.9)), &now);
-        let process2 = make_process(&ProcessID::create(), &company_id, "market widgets", &Costs::new_with_labor("marketer", dec!(123.4)), &now);
-        let resource1 = make_resource(&ResourceID::create(), &company_id, &Measure::new(dec!(10.0), Unit::One), &Costs::new_with_labor("lumberjack", dec!(23.1)), &now);
-        let resource2 = make_resource(&ResourceID::create(), &company_id, &Measure::new(dec!(10.0), Unit::One), &Costs::new_with_labor("trucker", dec!(12.5)), &now);
+        let costs2 = Costs::new_with_labor("truck driver", 400);
+        let total_costs = company.increase_costs(costs2.clone()).unwrap();
+        assert_eq!(total_costs, &(costs1.clone() + costs2.clone()));
 
-        let costs = company.total_costs(&vec![process1, process2], &vec![resource1, resource2]);
-        let mut expected_costs = Costs::new();
-        expected_costs.track_labor("lumberjack", dec!(40));
-        expected_costs.track_labor("trucker", dec!(12.5));
-        expected_costs.track_labor("marketer", dec!(123.4));
-        assert_eq!(costs, expected_costs);
+        let costs3 = Costs::new_with_labor("CEO. THE BEST CEO. BIG HANDS", 200);
+        let res = company.increase_costs(costs3.clone());
+        assert_eq!(res, Err(Error::MaxCostsReached));
 
-        let process1 = make_process(&ProcessID::create(), &CompanyID::create(), "make widgets", &Costs::new_with_labor("lumberjack", dec!(16.9)), &now);
-        let process2 = make_process(&ProcessID::create(), &company_id, "market widgets", &Costs::new_with_labor("marketer", dec!(123.4)), &now);
-        let resource1 = make_resource(&ResourceID::create(), &CompanyID::create(), &Measure::new(dec!(10.0), Unit::One), &Costs::new_with_labor("lumberjack", dec!(23.1)), &now);
-        let resource2 = make_resource(&ResourceID::create(), &company_id, &Measure::new(dec!(10.0), Unit::One), &Costs::new_with_labor("trucker", dec!(12.5)), &now);
+        let costs4 = Costs::new_with_labor("CEO. THE BEST CEO. BIG HANDS", 100);
+        let total_costs = company.increase_costs(costs4.clone()).unwrap();
+        assert_eq!(total_costs, &(costs1.clone() + costs2.clone() + costs4.clone()));
+    }
 
-        let costs = company.total_costs(&vec![process1, process2], &vec![resource1, resource2]);
-        let mut expected_costs = Costs::new();
-        expected_costs.track_labor("trucker", dec!(12.5));
-        expected_costs.track_labor("marketer", dec!(123.4));
-        assert_eq!(costs, expected_costs);
+    #[test]
+    fn decrease_costs() {
+        let mut company = make_company(&CompanyID::create(), "jerry's delicious widgets", &util::time::now());
+        company.set_max_costs(dec!(2000));
+        let mut costs = Costs::new();
+        costs.track_labor("machinist", dec!(500));
+        costs.track_labor("ceo", dec!(800));
+        company.set_total_costs(costs.clone());
+
+        let mut costs1 = Costs::new();
+        costs1.track_labor("machinist", dec!(100));
+        costs1.track_labor("ceo", dec!(100));
+        let mut comp = Costs::new();
+        comp.track_labor("machinist", dec!(400));
+        comp.track_labor("ceo", dec!(700));
+        let total_costs = company.decrease_costs(costs1).unwrap();
+        assert_eq!(total_costs, &comp);
+
+        let mut costs2 = Costs::new();
+        costs2.track_labor("machinist", dec!(350));
+        costs2.track_labor("ceo", dec!(600));
+        let mut comp = Costs::new();
+        comp.track_labor("machinist", dec!(50));
+        comp.track_labor("ceo", dec!(100));
+        let total_costs = company.decrease_costs(costs2).unwrap();
+        assert_eq!(total_costs, &comp);
+
+        let mut costs3 = Costs::new();
+        costs3.track_labor("machinist", dec!(400));
+        costs3.track_labor("ceo", dec!(600));
+        let res = company.decrease_costs(costs3);
+        assert_eq!(res, Err(Error::NegativeCosts));
+
+        let mut costs4 = Costs::new();
+        costs4.track_labor("marketing", dec!(10));
+        let res = company.decrease_costs(costs4);
+        assert_eq!(res, Err(Error::NegativeCosts));
+
+        let mut costs5 = Costs::new();
+        costs5.track_labor("marketing", dec!(10));
+        costs5 = Costs::new() - costs5.clone();
+        let res = company.decrease_costs(costs5);
+        assert_eq!(res, Err(Error::NegativeCosts));
     }
 }
 

@@ -6,6 +6,7 @@ use crate::{
         event::EventError,
     },
 };
+use rust_decimal::Decimal;
 use thiserror::Error;
 
 /// This is our error enum. It contains an entry for any part of the system in
@@ -33,11 +34,12 @@ pub enum Error {
     /// You don't have permission to perform this action
     #[error("insufficient privileges")]
     InsufficientPrivileges,
-    /// We get this when trying to pull a measure out of a resource and come up
-    /// blank, for instance when using `consume` on a resource that hasn't had
-    /// its quantities initialized via `produce`/`raise`/`transfer`/etc.
-    #[error("a resource measurement (account/onhand quantity) is missing")]
-    ResourceMeasureMissing,
+    /// The given ratio is not a value between 0 and 1 (inclusive)
+    #[error("invalid ratio {0} (must be 0 <= R <= 1")]
+    InvalidRatio(Decimal),
+    /// Happens when an entity tries to take on more costs than is allowed.
+    #[error("maximum costs reached")]
+    MaxCostsReached,
     /// Happens when trying to operate on two `Measure` objects with different
     /// units, such as adding 12 Hours to 16 Kilograms
     #[error("operation on measurement with mismatched units")]
@@ -78,6 +80,11 @@ pub enum Error {
     /// match expectation.
     #[error("Op does not match expectation")]
     OpMismatch,
+    /// We get this when trying to pull a measure out of a resource and come up
+    /// blank, for instance when using `consume` on a resource that hasn't had
+    /// its quantities initialized via `produce`/`raise`/`transfer`/etc.
+    #[error("a resource measurement (account/onhand quantity) is missing")]
+    ResourceMeasureMissing,
     /// When we try to convert an AgentID to another ID type but it fails (like
     /// `let company_id: CompanyID = AgentID::UserID(user_id).try_from()?;`).
     #[error("AgentID is the wrong type")]

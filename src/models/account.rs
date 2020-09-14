@@ -26,7 +26,7 @@ pub struct Multisig {
 
 impl Multisig {
     /// Create a new multisig obj
-    pub(crate) fn new(signatures_required: u64) -> Self {
+    pub fn new(signatures_required: u64) -> Self {
         Self {
             signatures_required,
         }
@@ -71,22 +71,21 @@ mod tests {
     use crate::{
         util::{self, test::*},
     };
-    use rust_decimal_macros::*;
 
     #[test]
     fn account_cannot_go_negative() {
         let now = util::time::now();
-        let mut account = make_account(&AccountID::create(), &UserID::create(), dec!(50.0), "my account", &now);
-        let amount = account.adjust_balance(dec!(-49)).unwrap();
-        assert_eq!(amount, &dec!(1));
-        assert_eq!(account.balance(), &dec!(1));
-        let amount = account.adjust_balance(dec!(-0.6)).unwrap();
-        assert_eq!(amount, &dec!(0.4));
-        assert_eq!(account.balance(), &dec!(0.4));
-        let amount = account.adjust_balance(dec!(-0.4)).unwrap();
-        assert_eq!(amount, &dec!(0));
-        assert_eq!(account.balance(), &dec!(0));
-        let res = account.adjust_balance(dec!(-0.1));
+        let mut account = make_account(&AccountID::create(), &UserID::create(), num!(50.0), "my account", &now);
+        let amount = account.adjust_balance(num!(-49)).unwrap();
+        assert_eq!(amount, &num!(1));
+        assert_eq!(account.balance(), &num!(1));
+        let amount = account.adjust_balance(num!(-0.6)).unwrap();
+        assert_eq!(amount, &num!(0.4));
+        assert_eq!(account.balance(), &num!(0.4));
+        let amount = account.adjust_balance(num!(-0.4)).unwrap();
+        assert_eq!(amount, &num!(0));
+        assert_eq!(account.balance(), &num!(0));
+        let res = account.adjust_balance(num!(-0.1));
         assert_eq!(res, Err(Error::NegativeAccountBalance));
     }
 }

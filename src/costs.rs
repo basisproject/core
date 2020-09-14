@@ -2,37 +2,57 @@
 //! treating the result like any number that can be added, subtracted,
 //! multiplied, or divided.
 //!
+//! While `Costs` track disaggregate cost values (labor, resources, currency,
+//! etc) they also track an *aggregate* credit value that is used to memorialize
+//! costs at the point of inception and to keep the credit value of costs from
+//! fluctuating over time as the credit value of the underlying resources and
+//! currencies being tracked change. This aggregate value, `credits`, can be
+//! thought of as a "price" in the parlance of our times.
+//!
+//! The tracking of the aggregate `credits` value means that when we add a
+//! resource or currency cost to a `Costs` object, we must also specify that
+//! item's "price" in credits (thus we have a third parameter, which is our
+//! credit price multiplier). See the examples below.
+//!
 //! ```rust
-//! use basis_core::costs::Costs;
-//! use rust_decimal::prelude::*;
-//! use rust_decimal_macros::*;
+//! use basis_core::{
+//!     costs::Costs,
+//!     num,
+//! };
 //!
 //! let mut costs = Costs::new();
-//! costs.track_resource("gasoline", dec!(0.4));
-//! costs.track_resource("iron", dec!(2.2));
-//! costs.track_labor("ceo", dec!(42.0));
-//! costs.track_labor("machinist", dec!(122.0));
-//! costs.track_labor_hours("ceo", dec!(2.0));
-//! costs.track_labor_hours("machinist", dec!(8.0));
-//! costs.track_currency("usd", dec!(42.00));
+//! // notice the "price" parameter when tracking resources/currencies.
+//! costs.track_resource("gasoline", num!(0.4), num!(1.3));
+//! costs.track_resource("iron", num!(2.2), num!(0.0019));
+//! costs.track_labor("ceo", num!(42.0));
+//! costs.track_labor("machinist", num!(122.0));
+//! costs.track_labor_hours("ceo", num!(2.0));
+//! costs.track_labor_hours("machinist", num!(8.0));
+//! costs.track_currency("usd", num!(42.00), num!(0.99891));
+//! // read the aggregate value of the costs' credits
+//! assert_eq!(costs.credits(), &num!(206.4784));
 //!
-//! let costs2 = costs * dec!(2.5);
-//! assert_eq!(costs2.get_resource("gasoline"), dec!(0.4) * dec!(2.5));
-//! assert_eq!(costs2.get_resource("iron"), dec!(2.2) * dec!(2.5));
-//! assert_eq!(costs2.get_labor("ceo"), dec!(42.0) * dec!(2.5));
-//! assert_eq!(costs2.get_labor("machinist"), dec!(122.0) * dec!(2.5));
-//! assert_eq!(costs2.get_labor_hours("ceo"), dec!(2.0) * dec!(2.5));
-//! assert_eq!(costs2.get_labor_hours("machinist"), dec!(8.0) * dec!(2.5));
-//! assert_eq!(costs2.get_currency("usd"), dec!(42.00) * dec!(2.5));
+//! // we can multiple costs by arbitrary decimals
+//! let costs2 = costs * num!(2.5);
+//! assert_eq!(costs2.credits(), &(num!(206.4784) * num!(2.5)));
+//! assert_eq!(costs2.get_resource("gasoline"), num!(0.4) * num!(2.5));
+//! assert_eq!(costs2.get_resource("iron"), num!(2.2) * num!(2.5));
+//! assert_eq!(costs2.get_labor("ceo"), num!(42.0) * num!(2.5));
+//! assert_eq!(costs2.get_labor("machinist"), num!(122.0) * num!(2.5));
+//! assert_eq!(costs2.get_labor_hours("ceo"), num!(2.0) * num!(2.5));
+//! assert_eq!(costs2.get_labor_hours("machinist"), num!(8.0) * num!(2.5));
+//! assert_eq!(costs2.get_currency("usd"), num!(42.00) * num!(2.5));
 //!
-//! let costs3 = costs2 / dec!(3.2);
-//! assert_eq!(costs3.get_resource("gasoline"), (dec!(0.4) * dec!(2.5)) / dec!(3.2));
-//! assert_eq!(costs3.get_resource("iron"), (dec!(2.2) * dec!(2.5)) / dec!(3.2));
-//! assert_eq!(costs3.get_labor("ceo"), (dec!(42.0) * dec!(2.5)) / dec!(3.2));
-//! assert_eq!(costs3.get_labor("machinist"), (dec!(122.0) * dec!(2.5)) / dec!(3.2));
-//! assert_eq!(costs3.get_labor_hours("ceo"), (dec!(2.0) * dec!(2.5)) / dec!(3.2));
-//! assert_eq!(costs3.get_labor_hours("machinist"), (dec!(8.0) * dec!(2.5)) / dec!(3.2));
-//! assert_eq!(costs3.get_currency("usd"), (dec!(42.00) * dec!(2.5)) / dec!(3.2));
+//! // and divide them as well
+//! let costs3 = costs2 / num!(3.2);
+//! assert_eq!(costs3.credits(), &((num!(206.4784) * num!(2.5))/ num!(3.2)));
+//! assert_eq!(costs3.get_resource("gasoline"), (num!(0.4) * num!(2.5)) / num!(3.2));
+//! assert_eq!(costs3.get_resource("iron"), (num!(2.2) * num!(2.5)) / num!(3.2));
+//! assert_eq!(costs3.get_labor("ceo"), (num!(42.0) * num!(2.5)) / num!(3.2));
+//! assert_eq!(costs3.get_labor("machinist"), (num!(122.0) * num!(2.5)) / num!(3.2));
+//! assert_eq!(costs3.get_labor_hours("ceo"), (num!(2.0) * num!(2.5)) / num!(3.2));
+//! assert_eq!(costs3.get_labor_hours("machinist"), (num!(8.0) * num!(2.5)) / num!(3.2));
+//! assert_eq!(costs3.get_currency("usd"), (num!(42.00) * num!(2.5)) / num!(3.2));
 //! ```
 //!
 //! In effect, Costs are an abstraction around Basis' view of production. While
@@ -64,8 +84,13 @@
 //!
 //! The best way we can represent this without having enormous tree structures
 //! that are the size of the economy itself is through the Costs object which
-//! aggregates costs on the level of four hash objects:
+//! aggregates costs on the level of four hash objects as well as a total credit
+//! value:
 //!
+//! - **total-credit-value** (`credits`) -- How much credits *total* it took to
+//! make something as a sum of `labor + resource + currency` where `resource`
+//! and `currency` are multiplied by their price-per-unit (in credits) when
+//! initially tracked.
 //! - **labor-occupation-wage** (`labor`) -- How much total cost *in wages* it
 //! took to make something, per-occupation.
 //! - **labor-occupation-hours** (`labor_hours`) -- How many *total hours* it
@@ -76,9 +101,9 @@
 //! purchasing inputs, useful for pricing either within or without the network.
 //!
 //! Labor hours are not used for cost/price value when charging consumers for
-//! end products (we use the wage value), but are there to track the actual cost
-//! of human labor time outside of the negotiations and fluctiations of wages.
-//! This also makes it so in a future society where all wages are zero
+//! end products (we use the wage value, ie `labor`), but are there to track the
+//! actual cost of human labor time outside of the negotiations and fluctiations
+//! of wages. This also makes it so in a future society where all wages are zero
 //! (communism) we can *still track labor costs in units of hours*.
 //!
 //! Resources are interesting, because the ultimate goal is to track them *as
@@ -104,10 +129,10 @@ use crate::{
         occupation::OccupationID,
         resource_spec::ResourceSpecID,
     },
+    util::number::Ratio,
 };
-use getset::{Getters, MutGetters};
+use getset::{Getters, MutGetters, Setters};
 use rust_decimal::prelude::*;
-use rust_decimal_macros::*;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::ops::{Add, Sub, Mul, Div};
@@ -125,9 +150,12 @@ use std::ops::{Add, Sub, Mul, Div};
 /// immediately recognize what we're trying to do, and littering generics all
 /// over the place isn't my cup of tea for an object that's supposed to be
 /// conceptually and operationally simple.
-#[derive(Costs, Clone, Debug, Default, PartialEq, Getters, MutGetters, Serialize, Deserialize)]
-#[getset(get = "pub", get_mut)]
+#[derive(Costs, Clone, Debug, Default, PartialEq, Getters, MutGetters, Setters, Serialize, Deserialize)]
+#[getset(get = "pub", get_mut, set)]
 pub struct Costs {
+    /// An aggregate total (in credit value) of this cost object.
+    #[serde(default = "Decimal::zero", skip_serializing_if = "rust_decimal::prelude::Zero::is_zero")]
+    credits: Decimal,
     /// Stores resource content. Resources are ResourceSpec instances that have
     /// a resource tracking information attached, so we link to them via their
     /// ResourceSpecID
@@ -162,6 +190,136 @@ impl Costs {
     pub fn new() -> Self {
         Self::default()
     }
+
+    /// Standard abstraction around decimal rounding
+    pub fn do_round(val: &Decimal) -> Decimal {
+        val.round_dp(16)
+    }
+
+    /// Make sure this Costs object is a standard format. This means we do any
+    /// rounding needed and remove and zero values.
+    pub fn normalize(&mut self) {
+        //self.round();
+        self.strip();
+        self.dezero();
+    }
+
+    /// Create a new Cost, with one resource entry
+    pub fn new_with_resource<T, V, C>(id: T, resource: V, credit_value_per_unit: C) -> Self
+        where T: Into<ResourceSpecID>,
+              V: Into<Decimal> + Copy,
+              C: Into<Decimal> + Copy,
+    {
+        let mut costs = Self::new();
+        costs.track_resource(id, resource, credit_value_per_unit);
+        costs
+    }
+
+    /// Create a new Cost, with one labor entry
+    pub fn new_with_labor<T, V>(id: T, labor: V) -> Self
+        where T: Into<OccupationID>,
+              V: Into<Decimal> + Copy,
+    {
+        let mut costs = Self::new();
+        costs.track_labor(id, labor);
+        costs
+    }
+
+    /// Create a new Cost, with one labor_hours entry
+    pub fn new_with_labor_hours<T, V>(id: T, labor_hours: V) -> Self
+        where T: Into<OccupationID>,
+              V: Into<Decimal> + Copy,
+    {
+        let mut costs = Self::new();
+        costs.track_labor_hours(id, labor_hours);
+        costs
+    }
+
+    /// Create a new Cost, with one currency entry
+    pub fn new_with_currency<T, V, C>(id: T, currency: V, conversion_rate: C) -> Self
+        where T: Into<CurrencyID>,
+              V: Into<Decimal> + Copy,
+              C: Into<Decimal> + Copy,
+    {
+        let mut costs = Self::new();
+        costs.track_currency(id, currency, conversion_rate);
+        costs
+    }
+
+    /// Add a credit cost to this Cost
+    pub fn track_credits<V>(&mut self, val: V)
+        where V: Into<Decimal> + Copy,
+    {
+        self.set_credits(self.credits() + val.into());
+    }
+
+    /// Add a resource cost to this Cost
+    pub fn track_resource<T, V, C>(&mut self, id: T, val: V, credit_value_per_unit: C)
+        where T: Into<ResourceSpecID>,
+              V: Into<Decimal> + Copy,
+              C: Into<Decimal> + Copy,
+    {
+        if val.into() < Decimal::zero() {
+            panic!("Costs::track_resource() -- given value must be >= 0");
+        }
+        let val = val.into();
+        let entry = self.resource_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
+        *entry += val;
+        self.track_credits(val * credit_value_per_unit.into());
+        self.normalize();
+    }
+
+    /// Add a labor cost to this Cost
+    pub fn track_labor<T, V>(&mut self, id: T, val: V)
+        where T: Into<OccupationID>,
+              V: Into<Decimal> + Copy,
+    {
+        if val.into() < Decimal::zero() {
+            panic!("Costs::track_labor() -- given value must be >= 0");
+        }
+        let val = val.into();
+        let entry = self.labor_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
+        *entry += val;
+        self.track_credits(val);
+        self.normalize();
+    }
+
+    /// Add a labor_hours cost to this Cost
+    pub fn track_labor_hours<T, V>(&mut self, id: T, val: V)
+        where T: Into<OccupationID>,
+              V: Into<Decimal> + Copy,
+    {
+        if val.into() < Decimal::zero() {
+            panic!("Costs::track_labor_hours() -- given value must be >= 0");
+        }
+        let entry = self.labor_hours_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
+        *entry += val.into();
+        self.normalize();
+    }
+
+    /// Add a currency cost to this Cost
+    pub fn track_currency<T, V, C>(&mut self, id: T, val: V, conversion_rate: C)
+        where T: Into<CurrencyID>,
+              V: Into<Decimal> + Copy,
+              C: Into<Decimal> + Copy,
+    {
+        if val.into() < Decimal::zero() {
+            panic!("Costs::track_currency() -- given value must be >= 0");
+        }
+        let entry = self.currency_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
+        let val = val.into();
+        *entry += val;
+        self.track_credits(val * conversion_rate.into());
+        self.normalize();
+    }
+}
+
+impl Mul<Ratio> for Costs {
+    type Output = Costs;
+
+    fn mul(self, rhs: Ratio) -> Costs {
+        self * rhs.inner().clone()
+    }
 }
 
 /// A standard interface around moving costs from one object to another.
@@ -178,13 +336,13 @@ pub(crate) trait CostMover {
     ///
     /// This method can fail if the costs for any reason fall below zero.
     fn release_costs(&mut self, costs_to_release: &Costs) -> Result<Costs> {
-        let mut costs = self.costs().clone();
+        let costs = self.costs().clone();
         if Costs::is_sub_lt_0(&costs, costs_to_release) {
             Err(Error::NegativeCosts)?;
         }
-        let taken = costs.take(costs_to_release);
-        self.set_costs(costs);
-        Ok(taken)
+        let new_costs = costs - costs_to_release.clone();
+        self.set_costs(new_costs);
+        Ok(costs_to_release.clone())
     }
 
     /// When called on an object, the object receives (takes) the costs in the
@@ -195,7 +353,10 @@ pub(crate) trait CostMover {
         if costs_to_receive.is_zero() {
             return Ok(false);
         }
-        let negative = costs_to_receive.clone() * dec!(-1.0);
+        // ok, a bit weird, i know, but we want to know if this *addition* will
+        // result in a negative, and since we don't have a is_add_lt_0 fn, we
+        // use us_sub_lt_0 instead, but we have to invert it. sue me.
+        let negative = costs_to_receive.clone() * num!(-1.0);
         if Costs::is_sub_lt_0(self.costs(), &negative) {
             Err(Error::NegativeCosts)?;
         }
@@ -218,31 +379,31 @@ mod tests {
         let mut costs1 = Costs::new();
         let mut costs2 = Costs::new();
 
-        costs1.track_labor("miner", dec!(6.0));
-        costs1.track_resource("widget", dec!(3.1));
-        costs1.track_resource("iron", dec!(8.5));
-        costs1.track_labor_hours("miner", dec!(0.5));
-        costs1.track_currency("usd", Decimal::new(500, 2));
-        costs2.track_currency("eur", Decimal::new(230, 2));
-        costs2.track_labor("miner", dec!(2.0));
-        costs2.track_labor("widgetmaker", dec!(3.0));
-        costs2.track_resource("widget", dec!(1.8));
-        costs2.track_resource("oil", dec!(5.6));
-        costs2.track_labor_hours("miner", dec!(0.7));
-        costs2.track_labor_hours("birthday clown", dec!(0.3));
-        costs2.track_currency("usd", Decimal::new(1490, 2));
-        costs2.track_currency("cny", Decimal::new(3000, 0));
+        costs1.track_labor("miner", num!(6.0));
+        costs1.track_resource("widget", num!(3.1), num!(1.0));
+        costs1.track_resource("iron", num!(8.5), num!(0.0019));
+        costs1.track_labor_hours("miner", num!(0.5));
+        costs1.track_currency("usd", Decimal::new(500, 2), num!(0.99891));
+        costs2.track_currency("eur", Decimal::new(230, 2), num!(0.99891));
+        costs2.track_labor("miner", num!(2.0));
+        costs2.track_labor("widgetmaker", num!(3.0));
+        costs2.track_resource("widget", num!(1.8), num!(1.2));
+        costs2.track_resource("oil", num!(5.6), num!(3.2));
+        costs2.track_labor_hours("miner", num!(0.7));
+        costs2.track_labor_hours("birthday clown", num!(0.3));
+        costs2.track_currency("usd", Decimal::new(1490, 2), num!(0.99891));
+        costs2.track_currency("cny", Decimal::new(3000, 0), num!(0.99891));
 
         let costs = costs1 + costs2;
-        assert_eq!(costs.get_labor("miner"), dec!(6.0) + dec!(2.0));
-        assert_eq!(costs.get_labor("widgetmaker"), dec!(3.0));
-        assert_eq!(costs.get_labor("joker"), dec!(0.0));
-        assert_eq!(costs.get_labor_hours("miner"), dec!(0.5) + dec!(0.7));
-        assert_eq!(costs.get_labor_hours("birthday clown"), dec!(0.3));
-        assert_eq!(costs.get_labor_hours("magical wish pony"), dec!(0.0));
-        assert_eq!(costs.get_resource("widget"), dec!(3.1) + dec!(1.8));
-        assert_eq!(costs.get_resource("iron"), dec!(8.5) + dec!(0.0));
-        assert_eq!(costs.get_resource("oil"), dec!(5.6) + dec!(0.0));
+        assert_eq!(costs.get_labor("miner"), num!(6.0) + num!(2.0));
+        assert_eq!(costs.get_labor("widgetmaker"), num!(3.0));
+        assert_eq!(costs.get_labor("joker"), num!(0.0));
+        assert_eq!(costs.get_labor_hours("miner"), num!(0.5) + num!(0.7));
+        assert_eq!(costs.get_labor_hours("birthday clown"), num!(0.3));
+        assert_eq!(costs.get_labor_hours("magical wish pony"), num!(0.0));
+        assert_eq!(costs.get_resource("widget"), num!(3.1) + num!(1.8));
+        assert_eq!(costs.get_resource("iron"), num!(8.5) + num!(0.0));
+        assert_eq!(costs.get_resource("oil"), num!(5.6) + num!(0.0));
         assert_eq!(costs.get_currency("usd"), Decimal::new(500, 2) + Decimal::new(1490, 2));
         assert_eq!(costs.get_currency("eur"), Decimal::new(230, 2));
         assert_eq!(costs.get_currency("cny"), Decimal::new(3000, 0));
@@ -254,32 +415,32 @@ mod tests {
         let mut costs1 = Costs::new();
         let mut costs2 = Costs::new();
 
-        costs1.track_labor("miner", dec!(6.0));
-        costs1.track_resource("widget", dec!(3.1));
-        costs1.track_resource("iron", dec!(8.5));
-        costs1.track_labor_hours("miner", dec!(0.5));
-        costs1.track_currency("usd", Decimal::new(500, 2));
-        costs2.track_currency("eur", Decimal::new(230, 2));
-        costs2.track_labor("miner", dec!(2.0));
-        costs2.track_labor("widgetmaker", dec!(3.0));
-        costs2.track_resource("widget", dec!(1.8));
-        costs2.track_resource("oil", dec!(5.6));
-        costs2.track_labor_hours("miner", dec!(0.7));
-        costs2.track_labor_hours("birthday clown", dec!(0.3));
-        costs2.track_currency("usd", Decimal::new(1490, 2));
-        costs2.track_currency("cny", Decimal::new(3000, 0));
+        costs1.track_labor("miner", num!(6.0));
+        costs1.track_resource("widget", num!(3.1), num!(1.0));
+        costs1.track_resource("iron", num!(8.5), num!(0.0019));
+        costs1.track_labor_hours("miner", num!(0.5));
+        costs1.track_currency("usd", Decimal::new(500, 2), num!(0.99891));
+        costs2.track_currency("eur", Decimal::new(230, 2), num!(0.99891));
+        costs2.track_labor("miner", num!(2.0));
+        costs2.track_labor("widgetmaker", num!(3.0));
+        costs2.track_resource("widget", num!(1.8), num!(0.99));
+        costs2.track_resource("oil", num!(5.6), num!(2.3));
+        costs2.track_labor_hours("miner", num!(0.7));
+        costs2.track_labor_hours("birthday clown", num!(0.3));
+        costs2.track_currency("usd", Decimal::new(1490, 2), num!(0.99891));
+        costs2.track_currency("cny", Decimal::new(3000, 0), num!(0.99891));
 
         // negatives are ok
         let costs = costs1 - costs2;
-        assert_eq!(costs.get_labor("miner"), dec!(6.0) - dec!(2.0));
-        assert_eq!(costs.get_labor("widgetmaker"), dec!(-3.0));
-        assert_eq!(costs.get_labor("joker"), dec!(0.0));
-        assert_eq!(costs.get_labor_hours("miner"), dec!(0.5) - dec!(0.7));
-        assert_eq!(costs.get_labor_hours("birthday clown"), dec!(-0.3));
-        assert_eq!(costs.get_labor_hours("magical wish pony"), dec!(0.0));
-        assert_eq!(costs.get_resource("widget"), dec!(3.1) - dec!(1.8));
-        assert_eq!(costs.get_resource("iron"), dec!(8.5) - dec!(0.0));
-        assert_eq!(costs.get_resource("oil"), dec!(-5.6));
+        assert_eq!(costs.get_labor("miner"), num!(6.0) - num!(2.0));
+        assert_eq!(costs.get_labor("widgetmaker"), num!(-3.0));
+        assert_eq!(costs.get_labor("joker"), num!(0.0));
+        assert_eq!(costs.get_labor_hours("miner"), num!(0.5) - num!(0.7));
+        assert_eq!(costs.get_labor_hours("birthday clown"), num!(-0.3));
+        assert_eq!(costs.get_labor_hours("magical wish pony"), num!(0.0));
+        assert_eq!(costs.get_resource("widget"), num!(3.1) - num!(1.8));
+        assert_eq!(costs.get_resource("iron"), num!(8.5) - num!(0.0));
+        assert_eq!(costs.get_resource("oil"), num!(-5.6));
         assert_eq!(costs.get_currency("usd"), Decimal::new(500, 2) - Decimal::new(1490, 2));
         assert_eq!(costs.get_currency("eur"), Decimal::new(-230, 2));
         assert_eq!(costs.get_currency("cny"), Decimal::new(-3000, 0));
@@ -289,88 +450,37 @@ mod tests {
     #[test]
     fn mul() {
         let mut costs1 = Costs::new();
-        costs1.track_labor("miner", dec!(6.0));
-        costs1.track_labor("widgetmaker", dec!(3.0));
-        costs1.track_resource("widget", dec!(3.1));
-        costs1.track_resource("iron", dec!(8.5));
-        costs1.track_labor_hours("miner", dec!(3.0));
-        costs1.track_currency("cny", Decimal::new(140000, 2));
+        costs1.track_labor("miner", num!(6.0));
+        costs1.track_labor("widgetmaker", num!(3.0));
+        costs1.track_resource("widget", num!(3.1), num!(1.0));
+        costs1.track_resource("iron", num!(8.5), num!(0.0019));
+        costs1.track_labor_hours("miner", num!(3.0));
+        costs1.track_currency("cny", Decimal::new(140000, 2), num!(0.99891));
 
-        let costs = costs1 * dec!(5.2);
-        assert_eq!(costs.get_labor("miner"), dec!(6.0) * dec!(5.2));
-        assert_eq!(costs.get_labor("widgetmaker"), dec!(3.0) * dec!(5.2));
-        assert_eq!(costs.get_resource("widget"), dec!(3.1) * dec!(5.2));
-        assert_eq!(costs.get_resource("iron"), dec!(8.5) * dec!(5.2));
-        assert_eq!(costs.get_labor_hours("miner"), dec!(3.0) * dec!(5.2));
+        let costs = costs1 * num!(5.2);
+        assert_eq!(costs.get_labor("miner"), num!(6.0) * num!(5.2));
+        assert_eq!(costs.get_labor("widgetmaker"), num!(3.0) * num!(5.2));
+        assert_eq!(costs.get_resource("widget"), num!(3.1) * num!(5.2));
+        assert_eq!(costs.get_resource("iron"), num!(8.5) * num!(5.2));
+        assert_eq!(costs.get_labor_hours("miner"), num!(3.0) * num!(5.2));
         assert_eq!(costs.get_currency("cny"), Decimal::new(140000, 2) * Decimal::from_f64(5.2).unwrap());
-
-        let mut costs1 = Costs::new();
-        let mut costs2 = Costs::new();
-        costs1.track_labor("miner", dec!(1.3));
-        costs1.track_resource("widget", dec!(8.7));
-        costs1.track_labor_hours("miner", dec!(42.0));
-        costs1.track_currency("usd", Decimal::new(1300, 2));
-        costs1.track_currency("eur", Decimal::new(6900, 2));
-        costs2.track_labor("miner", dec!(6.0));
-        costs2.track_labor("widgetmaker", dec!(5.0));
-        costs2.track_resource("widget", dec!(3.1));
-        costs2.track_resource("iron", dec!(8.5));
-        costs2.track_labor_hours("miner", dec!(3.0));
-        costs2.track_labor_hours("axe murdererer", dec!(3.0));
-        costs2.track_currency("usd", Decimal::new(4200, 2));
-
-        let costs = costs1 * costs2;
-        assert_eq!(costs.get_labor("miner"), dec!(1.3) * dec!(6.0));
-        assert_eq!(costs.get_labor("widgetmaker"), dec!(0.0) * dec!(5.0));
-        assert_eq!(costs.get_resource("widget"), dec!(8.7) * dec!(3.1));
-        assert_eq!(costs.get_resource("iron"), dec!(0.0) * dec!(8.5));
-        assert_eq!(costs.get_labor_hours("miner"), dec!(42.0) * dec!(3.0));
-        assert_eq!(costs.get_labor_hours("axe murdererer"), dec!(0.0));
-        assert_eq!(costs.get_currency("usd"), Decimal::new(1300, 2) * Decimal::new(4200, 2));
-        assert_eq!(costs.get_currency("eur"), Zero::zero());
-    }
-
-    #[test]
-    fn div_costs() {
-        let mut costs1 = Costs::new();
-        let mut costs2 = Costs::new();
-
-        costs1.track_labor("miner", dec!(6.0));
-        costs1.track_labor("singer", dec!(2.0));
-        costs1.track_resource("widget", dec!(3.1));
-        costs1.track_labor_hours("dog walker", dec!(5.2));
-        costs1.track_currency("usd", Decimal::new(7800, 2));
-        costs2.track_labor("miner", dec!(2.0));
-        costs2.track_labor("singer", dec!(6.0));
-        costs2.track_resource("widget", dec!(1.8));
-        costs2.track_resource("oil", dec!(5.6));
-        costs2.track_labor_hours("dog walker", dec!(2.2));
-        costs2.track_currency("usd", Decimal::new(1200, 2));
-
-        let costs = costs1 / costs2;
-        assert_eq!(costs.get_labor("miner"), dec!(6.0) / dec!(2.0));
-        assert_eq!(costs.get_labor("singer"), dec!(2.0) / dec!(6.0));
-        assert_eq!(costs.get_resource("widget"), dec!(3.1) / dec!(1.8));
-        assert_eq!(costs.get_resource("oil"), dec!(0.0) / dec!(5.6));
-        assert_eq!(costs.get_labor_hours("dog walker"), dec!(5.2) / dec!(2.2));
-        assert_eq!(costs.get_currency("usd"), Decimal::new(7800, 2) / Decimal::new(1200, 2));
     }
 
     #[test]
     fn div_f64() {
         let mut costs1 = Costs::new();
 
-        costs1.track_labor("widgetmaker", dec!(6.0));
-        costs1.track_resource("widget", dec!(3.1));
-        costs1.track_resource("oil", dec!(5.6));
-        costs1.track_labor_hours("doctor", dec!(14.0));
-        costs1.track_currency("eur", Decimal::new(43301, 2));
+        costs1.track_labor("widgetmaker", num!(6.0));
+        costs1.track_resource("widget", num!(3.1), num!(1));
+        costs1.track_resource("oil", num!(5.6), num!(2.2));
+        costs1.track_labor_hours("doctor", num!(14.0));
+        costs1.track_currency("eur", Decimal::new(43301, 2), num!(0.99891));
 
-        let costs = costs1 / dec!(1.3);
-        assert_eq!(costs.get_labor("widgetmaker"), dec!(6.0) / dec!(1.3));
-        assert_eq!(costs.get_resource("widget"), dec!(3.1) / dec!(1.3));
-        assert_eq!(costs.get_resource("oil"), dec!(5.6) / dec!(1.3));
-        assert_eq!(costs.get_labor_hours("doctor"), dec!(14.0) / dec!(1.3));
+        let costs = costs1 / num!(1.3);
+        assert_eq!(costs.get_labor("widgetmaker"), num!(6.0) / num!(1.3));
+        assert_eq!(costs.get_resource("widget"), num!(3.1) / num!(1.3));
+        assert_eq!(costs.get_resource("oil"), num!(5.6) / num!(1.3));
+        assert_eq!(costs.get_labor_hours("doctor"), num!(14.0) / num!(1.3));
         assert_eq!(costs.get_currency("eur"), Decimal::new(43301, 2) / Decimal::from_f64(1.3).unwrap());
     }
 
@@ -379,8 +489,8 @@ mod tests {
         let mut costs = Costs::new();
         costs.track_labor("hippie", 0);
         costs.track_labor_hours("treeslider", 0);
-        costs.track_currency("usd", 0);
-        costs.track_resource("oil", 0);
+        costs.track_currency("usd", 0, num!(0.99891));
+        costs.track_resource("oil", 0, num!(3.2));
         assert_eq!(costs, Costs::new());
     }
 
@@ -402,40 +512,39 @@ mod tests {
 
     #[test]
     fn div_0_by_0() {
-        let costs1 = Costs::new_with_labor("clown", dec!(0.0));
-        let costs2 = Costs::new();
+        let costs1 = Costs::new_with_labor("clown", num!(0.0));
 
-        let costs = costs1 / costs2;
-        assert_eq!(costs.get_labor("clown"), dec!(0.0));
+        let costs = costs1 / num!(0);
+        assert_eq!(costs.get_labor("clown"), num!(0.0));
     }
 
     #[test]
     fn is_sub_lt_0() {
-        let costs1 = Costs::new_with_labor("clown", dec!(0.0));
+        let costs1 = Costs::new_with_labor("clown", num!(0.0));
         let costs2 = Costs::new();
         assert_eq!(Costs::is_sub_lt_0(&costs1, &costs2), false);
         assert_eq!(Costs::is_sub_lt_0(&costs2, &costs1), false);
 
-        let costs1 = Costs::new_with_labor("clown", dec!(32.0));
+        let costs1 = Costs::new_with_labor("clown", num!(32.0));
         let costs2 = Costs::new();
         assert_eq!(Costs::is_sub_lt_0(&costs1, &costs2), false);
         assert_eq!(Costs::is_sub_lt_0(&costs2, &costs1), true);
 
-        let costs1 = Costs::new_with_labor("machinist", dec!(42.0));
-        let costs2 = Costs::new_with_resource("steel", dec!(13.0));
+        let costs1 = Costs::new_with_labor("machinist", num!(42.0));
+        let costs2 = Costs::new_with_resource("steel", num!(13.0), num!(0.031));
         assert_eq!(Costs::is_sub_lt_0(&costs1, &costs2), true);
         assert_eq!(Costs::is_sub_lt_0(&costs2, &costs1), true);
 
         let mut costs1 = Costs::new();
-        costs1.track_labor("machinist", dec!(42.0));
-        costs1.track_labor("janitor", dec!(16.0));
-        costs1.track_labor("doctor", dec!(49.0));
-        costs1.track_labor_hours("machinist", dec!(3.001));
-        costs1.track_labor_hours("janitor", dec!(1.2));
-        costs1.track_labor_hours("doctor", dec!(0.89002));
-        costs1.track_resource("steel", dec!(13.0002292));
-        costs1.track_resource("crude oil", dec!(1.34411));
-        costs1.track_currency("usd", Decimal::new(4298, 2));
+        costs1.track_labor("machinist", num!(42.0));
+        costs1.track_labor("janitor", num!(16.0));
+        costs1.track_labor("doctor", num!(49.0));
+        costs1.track_labor_hours("machinist", num!(3.001));
+        costs1.track_labor_hours("janitor", num!(1.2));
+        costs1.track_labor_hours("doctor", num!(0.89002));
+        costs1.track_resource("steel", num!(13.0002292), num!(0.03));
+        costs1.track_resource("crude oil", num!(1.34411), num!(1.2));
+        costs1.track_currency("usd", Decimal::new(4298, 2), num!(1.0019));
         let costs2 = costs1.clone();
         assert_eq!(Costs::is_sub_lt_0(&costs1, &costs2), false);
         assert_eq!(Costs::is_sub_lt_0(&costs2, &costs1), false);
@@ -446,9 +555,9 @@ mod tests {
         let mut costs = Costs::new();
         assert!(!costs.is_gt_0());
 
-        costs.track_labor("athlete", dec!(23.4));
-        costs.track_resource("water", dec!(4.6));
-        costs.track_currency("usd", dec!(3.42));
+        costs.track_labor("athlete", num!(23.4));
+        costs.track_resource("water", num!(4.6), num!(0.004));
+        costs.track_currency("usd", num!(3.42), num!(0.99891));
         assert!(costs.is_gt_0());
 
         let costs2 = costs.clone() - Costs::new_with_labor("plumber", 50);
@@ -456,121 +565,27 @@ mod tests {
     }
 
     #[test]
-    fn is_div_0() {
-        let costs1 = Costs::new_with_labor("clown", dec!(0.0));
-        let costs2 = Costs::new();
-        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), false);
-
-        let costs1 = Costs::new_with_labor("clown", dec!(0.0));
-        let costs2 = Costs::new_with_labor("clown", dec!(0.0));
-        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), false);
-
-        let costs1 = Costs::new_with_labor("violinist", dec!(5.2));
-        let costs2 = Costs::new();
-        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), true);
-
-        let costs1 = Costs::new_with_labor("violinist", dec!(5.2));
-        let costs2 = Costs::new_with_labor("violinist", dec!(0.0));
-        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), true);
-
-        let mut costs1 = Costs::new();
-        costs1.track_resource("iron", dec!(4.2));
-        costs1.track_labor("clown", dec!(69.0));
-        costs1.track_labor_hours("clown", dec!(1.1));
-        costs1.track_currency("usd", Decimal::new(1300, 2));
-        let mut costs2 = Costs::new();
-        costs2.track_resource("iron", dec!(4.2));
-        costs2.track_labor("clown", dec!(69.0));
-        costs2.track_labor_hours("clown", dec!(1.1));
-        costs2.track_currency("usd", Decimal::new(1300, 2));
-        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), false);
-
-        let mut costs1 = Costs::new();
-        costs1.track_resource("iron", dec!(4.2));
-        costs1.track_labor("clown", dec!(69.0));
-        costs1.track_labor_hours("clown", dec!(0.0));
-        costs1.track_currency("usd", Decimal::new(1300, 2));
-        let mut costs2 = Costs::new();
-        costs2.track_resource("iron", dec!(4.2));
-        costs2.track_labor("clown", dec!(69.0));
-        costs2.track_labor_hours("clown", dec!(0.0));
-        costs2.track_currency("usd", Decimal::new(1200, 2));
-        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), false);
-
-        let mut costs1 = Costs::new();
-        costs1.track_resource("iron", dec!(4.2));
-        costs1.track_labor("clown", dec!(69.0));
-        costs1.track_labor_hours("clown", dec!(1.1));
-        costs1.track_currency("usd", Decimal::new(1300, 2));
-        costs1.track_currency("cny", Decimal::new(1, 2));
-        let mut costs2 = Costs::new();
-        costs2.track_resource("iron", dec!(4.2));
-        costs2.track_labor("clown", dec!(69.0));
-        costs2.track_labor_hours("clown", dec!(1.1));
-        costs2.track_currency("usd", Decimal::new(1300, 2));
-        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), true);
-
-        let mut costs1 = Costs::new();
-        costs1.track_resource("iron", dec!(4.2));
-        costs1.track_labor("clown", dec!(69.0));
-        costs1.track_labor_hours("clown", dec!(1.1));
-        costs1.track_currency("usd", Decimal::new(1300, 2));
-        costs1.track_currency("cny", Decimal::new(1, 2));
-        let mut costs2 = Costs::new();
-        costs2.track_resource("iron", dec!(4.2));
-        costs2.track_labor("clown", dec!(69.0));
-        costs2.track_labor_hours("clown", dec!(1.1));
-        costs2.track_currency("usd", Decimal::new(0, 2));
-        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), true);
-
-        let mut costs1 = Costs::new();
-        costs1.track_resource("iron", dec!(4.2));
-        costs1.track_labor("clown", dec!(69.0));
-        costs1.track_labor_hours("clown", dec!(1.1));
-        costs1.track_currency("usd", Decimal::new(1300, 2));
-        costs1.track_currency("cny", Decimal::new(1, 2));
-        let mut costs2 = Costs::new();
-        costs2.track_resource("iron", dec!(4.2));
-        costs2.track_labor("clown", dec!(69.0));
-        costs2.track_labor_hours("clown", dec!(0.0));
-        costs2.track_currency("usd", Decimal::new(1200, 2));
-        assert_eq!(Costs::is_div_by_0(&costs1, &costs2), true);
-    }
-
-    #[test]
-    #[should_panic]
-    fn div_by_0() {
-        let mut costs1 = Costs::new();
-        let costs2 = Costs::new();
-
-        costs1.track_resource("iron", dec!(8.5));
-
-        let costs = costs1 / costs2;
-        assert_eq!(costs.get_resource("iron"), dec!(8.5) / dec!(0.0));
-    }
-
-    #[test]
     #[should_panic]
     fn div_f64_by_0() {
         let mut costs1 = Costs::new();
 
-        costs1.track_labor("dancer", dec!(6.0));
-        costs1.track_resource("widget", dec!(3.1));
-        costs1.track_resource("oil", dec!(5.6));
+        costs1.track_labor("dancer", num!(6.0));
+        costs1.track_resource("widget", num!(3.1), num!(1.2));
+        costs1.track_resource("oil", num!(5.6), num!(0.0401));
 
-        let costs = costs1 / dec!(0.0);
-        assert_eq!(costs.get_labor("dancer"), dec!(6.0) / dec!(0.0));
-        assert_eq!(costs.get_resource("widget"), dec!(3.1) / dec!(0.0));
-        assert_eq!(costs.get_resource("oil"), dec!(5.6) / dec!(0.0));
+        let costs = costs1 / num!(0.0);
+        assert_eq!(costs.get_labor("dancer"), num!(6.0) / num!(0.0));
+        assert_eq!(costs.get_resource("widget"), num!(3.1) / num!(0.0));
+        assert_eq!(costs.get_resource("oil"), num!(5.6) / num!(0.0));
     }
 
     #[test]
     fn is_zero() {
         let mut costs = Costs::new();
         assert!(costs.is_zero());
-        costs.track_resource("widget", dec!(5.0));
+        costs.track_resource("widget", num!(5.0), num!(0.3));
         assert!(!costs.is_zero());
-        assert!(!Costs::new_with_labor("dictator", dec!(4.0)).is_zero());
+        assert!(!Costs::new_with_labor("dictator", num!(4.0)).is_zero());
     }
 
     #[test]
@@ -581,6 +596,33 @@ mod tests {
         let costs = Costs::new();
         let ser = serde_json::to_string(&costs).unwrap();
         assert_eq!(ser, "{}");
+    }
+
+    #[test]
+    fn credit_value() {
+        let mut costs = Costs::new();
+        let mut total = Decimal::zero();
+        assert_eq!(costs.credits(), &total);
+        costs.track_labor_hours("fisher", num!(2.5));
+        assert_eq!(costs.credits(), &Decimal::zero());
+        costs.track_labor("fisher", num!(20));
+        total += num!(20);
+        assert_eq!(costs.credits(), &total);
+        costs.track_labor("ceo", num!(40.5));
+        total += num!(40.5);
+        assert_eq!(costs.credits(), &total);
+        costs.track_resource("iron", num!(80), num!(0.0031));
+        total += num!(80) * num!(0.0031);
+        assert_eq!(costs.credits(), &total);
+        costs.track_resource("iron", num!(80), num!(0.0037));
+        total += num!(80) * num!(0.0037);
+        assert_eq!(costs.credits(), &total);
+        costs.track_currency("usd", num!(12), num!(0.9973));
+        total += num!(12) * num!(0.9973);
+        assert_eq!(costs.credits(), &total);
+        let ratio = Ratio::new(num!(1) / num!(3)).unwrap();
+        let costs2 = costs * ratio.clone();
+        assert_eq!(costs2.credits(), &(total * ratio.inner().clone()));
     }
 
     #[test]
@@ -606,20 +648,20 @@ mod tests {
         let mut rec = Resource::default();
         let mut proc = Process::default();
 
-        match rec.release_costs(&Costs::new_with_labor("jumper", dec!(34.2))) {
+        match rec.release_costs(&Costs::new_with_labor("jumper", num!(34.2))) {
             Err(Error::NegativeCosts) => {}
             _ => panic!("should have gotten NegativeCosts error"),
         }
 
-        rec.costs.track_labor("firefighter", dec!(12.1));
-        match rec.move_costs_to(&mut proc, &Costs::new_with_labor("firefighter", dec!(12.2))) {
+        rec.costs.track_labor("firefighter", num!(12.1));
+        match rec.move_costs_to(&mut proc, &Costs::new_with_labor("firefighter", num!(12.2))) {
             Err(Error::NegativeCosts) => {}
             _ => panic!("should have gotten NegativeCosts error"),
         }
 
-        rec.move_costs_to(&mut proc, &Costs::new_with_labor("firefighter", dec!(12.0))).unwrap();
-        assert_eq!(rec.costs, Costs::new_with_labor("firefighter", dec!(12.1) - dec!(12.0)));
-        assert_eq!(proc.costs, Costs::new_with_labor("firefighter", dec!(12.0)));
+        rec.move_costs_to(&mut proc, &Costs::new_with_labor("firefighter", num!(12.0))).unwrap();
+        assert_eq!(rec.costs, Costs::new_with_labor("firefighter", num!(12.1) - num!(12.0)));
+        assert_eq!(proc.costs, Costs::new_with_labor("firefighter", num!(12.0)));
     }
 }
 

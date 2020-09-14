@@ -110,7 +110,6 @@ mod tests {
     use crate::{
         util::{self, test::{self, *}},
     };
-    use rust_decimal_macros::*;
 
     #[test]
     fn can_create() {
@@ -135,7 +134,7 @@ mod tests {
         assert_eq!(account.multisig(), &multisig);
         assert_eq!(account.name(), "Jerry's account");
         assert_eq!(account.description(), "Hi I'm Jerry");
-        assert_eq!(account.balance(), &dec!(0));
+        assert_eq!(account.balance(), &num!(0));
         assert_eq!(account.ubi(), &false);
         assert_eq!(account.active(), &true);
         assert_eq!(account.created(), &now);
@@ -225,8 +224,8 @@ mod tests {
     fn can_transfer() {
         let now = util::time::now();
         let mut state = TestState::standard(vec![], &now);
-        let account1 = make_account(&AccountID::create(), state.user().id(), dec!(50), "Jerry's account", &now);
-        let account2 = make_account(&AccountID::create(), &UserID::create(), dec!(0), "Larry's account", &now);
+        let account1 = make_account(&AccountID::create(), state.user().id(), num!(50), "Jerry's account", &now);
+        let account2 = make_account(&AccountID::create(), &UserID::create(), num!(0), "Larry's account", &now);
         state.company = None;
         state.member = None;
         state.model = Some(account1);
@@ -237,14 +236,14 @@ mod tests {
             transfer(state.user(), state.model().clone(), state.model2().clone(), amount, &now2)
         };
         let testfn = |state: &TestState<Account, Account>| {
-            testfn_inner(state, dec!(10))
+            testfn_inner(state, num!(10))
         };
         test::standard_transaction_tests(&state, &testfn);
 
         let mods = testfn(&state).unwrap().into_vec();
         assert_eq!(mods.len(), 2);
         let account3 = mods[0].clone().expect_op::<Account>(Op::Update).unwrap();
-        assert_eq!(account3.balance(), &dec!(40));
+        assert_eq!(account3.balance(), &num!(40));
         assert_eq!(account3.id(), state.model().id());
         assert_eq!(account3.user_ids(), state.model().user_ids());
         assert_eq!(account3.multisig(), state.model().multisig());
@@ -255,7 +254,7 @@ mod tests {
         assert_eq!(account3.updated(), &now2);
         assert_eq!(account3.deleted(), &None);
         let account4 = mods[1].clone().expect_op::<Account>(Op::Update).unwrap();
-        assert_eq!(account4.balance(), &dec!(10));
+        assert_eq!(account4.balance(), &num!(10));
         assert_eq!(account4.id(), state.model2().id());
         assert_eq!(account4.user_ids(), state.model2().user_ids());
         assert_eq!(account4.multisig(), state.model2().multisig());
@@ -274,7 +273,7 @@ mod tests {
         let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
-        let res = testfn_inner(&state, dec!(56));
+        let res = testfn_inner(&state, num!(56));
         assert_eq!(res, Err(Error::NegativeAccountBalance));
     }
 
@@ -317,7 +316,7 @@ mod tests {
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut state3 = state.clone();
-        state3.model_mut().set_balance(dec!(21.55));
+        state3.model_mut().set_balance(num!(21.55));
         let res = testfn(&state3);
         assert_eq!(res, Err(Error::CannotEraseCredits));
     }

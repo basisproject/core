@@ -74,46 +74,15 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
         _ => panic!("costs-derive::derive_costs() -- can only derive costs on a struct"),
     };
 
-    let fn_new_with = fields.iter().map(|f| format_ident!("new_with_{}", f.name)).collect::<Vec<_>>();
-    let fn_new_with_comment = fields.iter().map(|f| format!("Create a new Cost, with one {} entry", f.name)).collect::<Vec<_>>();
-    let fn_track = fields.iter().map(|f| format_ident!("track_{}", f.name)).collect::<Vec<_>>();
-    let fn_track_comment = fields.iter().map(|f| format!("Add a {} cost to this Cost", f.name)).collect::<Vec<_>>();
-    let fn_track_panic = fields.iter().map(|f| format!("Costs::track_{}() -- given value must be >= 0", f.name)).collect::<Vec<_>>();
     let fn_get = fields.iter().map(|f| format_ident!("get_{}", f.name)).collect::<Vec<_>>();
     let fn_get_comment = fields.iter().map(|f| format!("Get a {} value out of this cost object, defaulting to zero if not found", f.name)).collect::<Vec<_>>();
     let field_name = fields.iter().map(|f| f.name.clone()).collect::<Vec<_>>();
     let field_name_mut = fields.iter().map(|f| format_ident!("{}_mut", f.name)).collect::<Vec<_>>();
     let field_hashkey = fields.iter().map(|f| f.hash_key.clone()).collect::<Vec<_>>();
     let field_hashval = fields.iter().map(|f| f.hash_val.clone()).collect::<Vec<_>>();
-    let fn_div_panic = fields.iter().map(|f| format!("Costs::div() -- divide by zero for {} {{:?}}", f.name)).collect::<Vec<_>>();
 
     let cost_impl = quote! {
         impl #name {
-            #(
-                #[doc = #fn_new_with_comment]
-                pub fn #fn_new_with<T, V>(id: T, #field_name: V) -> Self
-                    where T: Into<#field_hashkey>,
-                          V: Into<#field_hashval> + Copy,
-                {
-                    let mut costs = Self::new();
-                    costs.#fn_track(id, #field_name);
-                    costs
-                }
-            )*
-            #(
-                #[doc = #fn_track_comment]
-                pub fn #fn_track<T, V>(&mut self, id: T, val: V)
-                    where T: Into<#field_hashkey>,
-                          V: Into<#field_hashval> + Copy,
-                {
-                    if val.into() < #field_hashval::zero() {
-                        panic!(#fn_track_panic);
-                    }
-                    let entry = self.#field_name_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
-                    *entry += val.into();
-                    self.dezero();
-                }
-            )*
             #(
                 #[doc = #fn_get_comment]
                 pub fn #fn_get<T: Into<#field_hashkey>>(&self, id: T) -> #field_hashval {
@@ -121,7 +90,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 }
             )*
 
-            /// Test if we hve an empty cost set
+            /// Test if we have an empty cost set
             pub fn is_zero(&self) -> bool {
                 #(
                     for (_, val) in self.#field_name().iter() {
@@ -148,22 +117,26 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 )*
             }
 
-            /// Given a set of costs, subtract them from our current costs, but only if
-            /// the result is >= 0 for each cost tracked. Then, return a costs object
-            /// showing exactly how much was taken.
-            pub fn take(&mut self, costs: &Costs) -> Costs {
-                let mut new_costs = Costs::new();
+            /// round all values to a standard decimal place
+            fn round(&mut self) {
+                let credits = self.credits_mut();
+                *credits = Costs::do_round(credits);
                 #(
-                    for (k, lval) in self.#field_name_mut().iter_mut() {
-                        let mut rval = costs.#fn_get(k.clone());
-                        let val = if lval > &mut rval { rval } else { lval.clone() };
-                        *lval -= val;
-                        new_costs.#fn_track(k.clone(), val.clone());
+                    for val in self.#field_name_mut().values_mut() {
+                        *val = Costs::do_round(val);
                     }
                 )*
-                new_costs.dezero();
-                self.dezero();
-                new_costs
+            }
+
+            /// Strip zeros from our Costs values
+            fn strip(&mut self) {
+                let credits = self.credits_mut();
+                *credits = credits.normalize();
+                #(
+                    for val in self.#field_name_mut().values_mut() {
+                        *val = val.normalize();
+                    }
+                )*
             }
 
             /// Determine if subtracting one set of costs from another results
@@ -198,6 +171,18 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 count > 0
             }
 
+            /// Determine if any of our costs are below 0
+            pub fn is_lt_0(&self) -> bool {
+                #(
+                    for (_, v) in self.#field_name().iter() {
+                        if *v < #field_hashval::zero() {
+                            return true;
+                        }
+                    }
+                )*
+                false
+            }
+
             /// Determine if dividing one set of costs by another will result in
             /// a divide-by-zero panic.
             pub fn is_div_by_0(costs1: &Costs, costs2: &Costs) -> bool {
@@ -220,13 +205,14 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             type Output = Self;
 
             fn add(mut self, other: Self) -> Self {
+                self.credits += other.credits().clone();
                 #(
                     for k in other.#field_name().keys() {
                         let entry = self.#field_name_mut().entry(k.clone()).or_insert(#field_hashval::zero());
                         *entry += other.#field_name().get(k).unwrap();
                     }
                 )*
-                self.dezero();
+                self.normalize();
                 self
             }
         }
@@ -235,27 +221,14 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             type Output = Self;
 
             fn sub(mut self, other: Self) -> Self {
+                self.credits -= other.credits().clone();
                 #(
                     for k in other.#field_name().keys() {
                         let entry = self.#field_name_mut().entry(k.clone()).or_insert(#field_hashval::zero());
                         *entry -= other.#field_name().get(k).unwrap();
                     }
                 )*
-                self.dezero();
-                self
-            }
-        }
-
-        impl Mul for Costs {
-            type Output = Self;
-
-            fn mul(mut self, rhs: Self) -> Self {
-                #(
-                    for (k, val) in self.#field_name_mut().iter_mut() {
-                        *val *= rhs.#field_name().get(k).unwrap_or(&#field_hashval::zero());
-                    }
-                )*
-                self.dezero();
+                self.normalize();
                 self
             }
         }
@@ -264,41 +237,13 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             type Output = Self;
 
             fn mul(mut self, rhs: rust_decimal::Decimal) -> Self {
+                self.credits *= rhs.clone();
                 #(
                     for (_, val) in self.#field_name_mut().iter_mut() {
                         *val *= rhs;
                     }
                 )*
-                self.dezero();
-                self
-            }
-        }
-
-        impl Div for Costs {
-            type Output = Self;
-
-            fn div(mut self, rhs: Self) -> Self::Output {
-                #(
-                    for (k, v) in self.#field_name_mut().iter_mut() {
-                        let div = rhs.#field_name().get(k).map(|x| x.clone()).unwrap_or(#field_hashval::zero());
-                        if v == &#field_hashval::zero() {
-                            continue;
-                        }
-                        if div == #field_hashval::zero() {
-                            panic!(#fn_div_panic, k);
-                        }
-                        *v /= div;
-                    }
-                    for (k, _) in rhs.#field_name().iter() {
-                        match self.#field_name().get(k) {
-                            None => {
-                                self.#field_name_mut().insert(k.clone(), #field_hashval::zero());
-                            }
-                            _ => {}
-                        }
-                    }
-                )*
-                self.dezero();
+                self.normalize();
                 self
             }
         }
@@ -307,15 +252,19 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             type Output = Self;
 
             fn div(mut self, rhs: Decimal) -> Self::Output {
+                if self.is_zero() {
+                    return self;
+                }
                 if rhs == Decimal::zero() {
                     panic!("Costs::div() -- divide by zero");
                 }
+                self.credits /= rhs.clone();
                 #(
                     for (_, v) in self.#field_name_mut().iter_mut() {
                         *v /= rhs;
                     }
                 )*
-                self.dezero();
+                self.normalize();
                 self
             }
         }
