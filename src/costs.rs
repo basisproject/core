@@ -2,14 +2,26 @@
 //! treating the result like any number that can be added, subtracted,
 //! multiplied, or divided.
 //!
+//! While `Costs` track disaggregate cost values (labor, resources, currency,
+//! etc) they also track an *aggregate* credit value that is used to memorialize
+//! costs at the point of inception and to keep the credit value of costs from
+//! fluctuating over time as the credit value of the underlying resources and
+//! currencies being tracked change. This aggregate value, `credits`, can be
+//! thought of as a "price" in the parlance of our times.
+//!
+//! The tracking of the aggregate `credits` value means that when we add a
+//! resource or currency cost to a `Costs` object, we must also specify that
+//! item's "price" in credits (thus we have a third parameter, which is our
+//! credit price multiplier). See the examples below.
+//!
 //! ```rust
 //! use basis_core::{
 //!     costs::Costs,
 //!     num,
 //! };
-//! use rust_decimal::prelude::*;
 //!
 //! let mut costs = Costs::new();
+//! // notice the "price" parameter when tracking resources/currencies.
 //! costs.track_resource("gasoline", num!(0.4), num!(1.3));
 //! costs.track_resource("iron", num!(2.2), num!(0.0019));
 //! costs.track_labor("ceo", num!(42.0));
@@ -17,8 +29,12 @@
 //! costs.track_labor_hours("ceo", num!(2.0));
 //! costs.track_labor_hours("machinist", num!(8.0));
 //! costs.track_currency("usd", num!(42.00), num!(0.99891));
+//! // read the aggregate value of the costs' credits
+//! assert_eq!(costs.credits(), &num!(206.4784));
 //!
+//! // we can multiple costs by arbitrary decimals
 //! let costs2 = costs * num!(2.5);
+//! assert_eq!(costs2.credits(), &(num!(206.4784) * num!(2.5)));
 //! assert_eq!(costs2.get_resource("gasoline"), num!(0.4) * num!(2.5));
 //! assert_eq!(costs2.get_resource("iron"), num!(2.2) * num!(2.5));
 //! assert_eq!(costs2.get_labor("ceo"), num!(42.0) * num!(2.5));
@@ -27,7 +43,9 @@
 //! assert_eq!(costs2.get_labor_hours("machinist"), num!(8.0) * num!(2.5));
 //! assert_eq!(costs2.get_currency("usd"), num!(42.00) * num!(2.5));
 //!
+//! // and divide them as well
 //! let costs3 = costs2 / num!(3.2);
+//! assert_eq!(costs3.credits(), &((num!(206.4784) * num!(2.5))/ num!(3.2)));
 //! assert_eq!(costs3.get_resource("gasoline"), (num!(0.4) * num!(2.5)) / num!(3.2));
 //! assert_eq!(costs3.get_resource("iron"), (num!(2.2) * num!(2.5)) / num!(3.2));
 //! assert_eq!(costs3.get_labor("ceo"), (num!(42.0) * num!(2.5)) / num!(3.2));
@@ -66,8 +84,13 @@
 //!
 //! The best way we can represent this without having enormous tree structures
 //! that are the size of the economy itself is through the Costs object which
-//! aggregates costs on the level of four hash objects:
+//! aggregates costs on the level of four hash objects as well as a total credit
+//! value:
 //!
+//! - **total-credit-value** (`credits`) -- How much credits *total* it took to
+//! make something as a sum of `labor + resource + currency` where `resource`
+//! and `currency` are multiplied by their price-per-unit (in credits) when
+//! initially tracked.
 //! - **labor-occupation-wage** (`labor`) -- How much total cost *in wages* it
 //! took to make something, per-occupation.
 //! - **labor-occupation-hours** (`labor_hours`) -- How many *total hours* it
@@ -78,9 +101,9 @@
 //! purchasing inputs, useful for pricing either within or without the network.
 //!
 //! Labor hours are not used for cost/price value when charging consumers for
-//! end products (we use the wage value), but are there to track the actual cost
-//! of human labor time outside of the negotiations and fluctiations of wages.
-//! This also makes it so in a future society where all wages are zero
+//! end products (we use the wage value, ie `labor`), but are there to track the
+//! actual cost of human labor time outside of the negotiations and fluctiations
+//! of wages. This also makes it so in a future society where all wages are zero
 //! (communism) we can *still track labor costs in units of hours*.
 //!
 //! Resources are interesting, because the ultimate goal is to track them *as
@@ -573,6 +596,33 @@ mod tests {
         let costs = Costs::new();
         let ser = serde_json::to_string(&costs).unwrap();
         assert_eq!(ser, "{}");
+    }
+
+    #[test]
+    fn credit_value() {
+        let mut costs = Costs::new();
+        let mut total = Decimal::zero();
+        assert_eq!(costs.credits(), &total);
+        costs.track_labor_hours("fisher", num!(2.5));
+        assert_eq!(costs.credits(), &Decimal::zero());
+        costs.track_labor("fisher", num!(20));
+        total += num!(20);
+        assert_eq!(costs.credits(), &total);
+        costs.track_labor("ceo", num!(40.5));
+        total += num!(40.5);
+        assert_eq!(costs.credits(), &total);
+        costs.track_resource("iron", num!(80), num!(0.0031));
+        total += num!(80) * num!(0.0031);
+        assert_eq!(costs.credits(), &total);
+        costs.track_resource("iron", num!(80), num!(0.0037));
+        total += num!(80) * num!(0.0037);
+        assert_eq!(costs.credits(), &total);
+        costs.track_currency("usd", num!(12), num!(0.9973));
+        total += num!(12) * num!(0.9973);
+        assert_eq!(costs.credits(), &total);
+        let ratio = Ratio::new(num!(1) / num!(3)).unwrap();
+        let costs2 = costs * ratio.clone();
+        assert_eq!(costs2.credits(), &(total * ratio.inner().clone()));
     }
 
     #[test]

@@ -208,7 +208,6 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             type Output = Self;
 
             fn mul(mut self, rhs: rust_decimal::Decimal) -> Self {
-                let rhs = Costs::do_round(&rhs);
                 self.credits *= rhs.clone();
                 #(
                     for (_, val) in self.#field_name_mut().iter_mut() {
@@ -227,7 +226,6 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 if self.is_zero() {
                     return self;
                 }
-                let rhs = Costs::do_round(&rhs);
                 if rhs == Decimal::zero() {
                     panic!("Costs::div() -- divide by zero");
                 }

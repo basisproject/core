@@ -8,12 +8,21 @@ use rust_decimal::prelude::*;
 use serde::{Serialize, Deserialize};
 use std::ops::Mul;
 
-/// Create a number.
+/// Create a number used in the costing system.
 ///
 /// This is mostly a wrapper around a standard number type that makes it easier
 /// to swap out test values/Costs types project-wide without having to change
 /// each instance by hand, but can also be used by callers of the core to create
 /// numbers more seamlessly.
+///
+/// ```rust
+/// use basis_core::{
+///     costs::Costs,
+///     models::occupation::OccupationID,
+///     num
+/// };
+/// let costs = Costs::new_with_labor(OccupationID::new("plumber"), num!(45.8));
+/// ```
 ///
 /// Right now, this wraps `rust_decimal::Decimal`'s `dec!()` macro.
 #[macro_export]
