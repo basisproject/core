@@ -24,7 +24,7 @@ macro_rules! num {
 }
 
 /// Represents a ratio: a value such that `0 <= v <= 1`.
-#[derive(Default, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Ratio {
     /// The inner ratio value.
     inner: Decimal,

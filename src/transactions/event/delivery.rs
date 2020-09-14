@@ -20,6 +20,7 @@ use crate::{
         resource::Resource,
         user::User,
     },
+    util::number::Ratio,
 };
 use vf_rs::{vf, geo::SpatialThing};
 
@@ -28,7 +29,7 @@ use vf_rs::{vf, geo::SpatialThing};
 /// created.
 ///
 /// This operates on a whole resource.
-pub fn dropoff(caller: &User, member: &Member, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn dropoff(caller: &User, member: &Member, company: &Company, id: EventID, process: Process, resource: Resource, move_costs_ratio: Ratio, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Dropoff)?;
     if !company.is_active() {
@@ -37,6 +38,7 @@ pub fn dropoff(caller: &User, member: &Member, company: &Company, id: EventID, p
 
     let process_id = process.id().clone();
     let resource_id = resource.id().clone();
+    let move_costs = process.costs().clone() * move_costs_ratio;
 
     let state = EventProcessState::builder()
         .output_of(process)
@@ -149,11 +151,12 @@ mod tests {
         let costs = Costs::new_with_labor(occupation_id.clone(), num!(42.2));
         let process = make_process(&ProcessID::create(), state.company().id(), "deliver widgets", &costs, &now);
         let resource = make_resource(&ResourceID::new("widget"), state.company().id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("machinist", 157), &now);
+        let move_costs_ratio = Ratio::new(1).unwrap();
         state.model = Some(process);
         state.model2 = Some(resource);
 
         let testfn = |state: &TestState<Process, Resource>| {
-            dropoff(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), state.model().costs().clone(), Some(state.loc().clone()), Some("memo".into()), &now)
+            dropoff(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), move_costs_ratio.clone(), Some(state.loc().clone()), Some("memo".into()), &now)
         };
         test::standard_transaction_tests(&state, &testfn);
 

@@ -6,7 +6,6 @@
 use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
-    costs::Costs,
     error::{Error, Result},
     models::{
         Op,
@@ -22,12 +21,13 @@ use crate::{
         process::Process,
         user::User,
     },
+    util::number::Ratio,
 };
 use url::Url;
 use vf_rs::vf;
 
 /// Provide a service to another agent, moving costs along the way.
-pub fn deliver_service(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, process_from: Process, process_to: Process, move_costs: Costs, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn deliver_service(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, process_from: Process, process_to: Process, move_costs_ratio: Ratio, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::DeliverService)?;
     if !company_from.is_active() {
@@ -43,6 +43,7 @@ pub fn deliver_service(caller: &User, member: &Member, company_from: &Company, c
 
     let process_from_id = process_from.id().clone();
     let process_to_id = process_to.id().clone();
+    let move_costs = process_from.costs().clone() * move_costs_ratio;
 
     let state = EventProcessState::builder()
         .output_of(process_from)
@@ -86,6 +87,7 @@ pub fn deliver_service(caller: &User, member: &Member, company_from: &Company, c
 mod tests {
     use super::*;
     use crate::{
+        costs::Costs,
         models::{
             agreement::AgreementID,
             company::CompanyID,
@@ -109,12 +111,13 @@ mod tests {
         let occupation_id = OccupationID::new("lawyer");
         let process_from = make_process(&ProcessID::create(), company_from.id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), num!(177.25)), &now);
         let process_to = make_process(&ProcessID::create(), company_to.id(), "employee legal agreement drafting", &Costs::new_with_labor(occupation_id.clone(), num!(804)), &now);
-        let costs_to_move = process_from.costs().clone() * num!(0.777777777);
+        let move_costs_ratio = Ratio::new(num!(0.777777777)).unwrap();
+        let costs_to_move = process_from.costs().clone() * move_costs_ratio.clone();
         state.model = Some(process_from);
         state.model2 = Some(process_to);
 
         let testfn_inner = |state: &TestState<Process, Process>, company_from: &Company, company_to: &Company, agreement: &Agreement| {
-            deliver_service(state.user(), state.member(), company_from, company_to, agreement, id.clone(), state.model().clone(), state.model2().clone(), costs_to_move.clone(), Some(agreed_in.clone()), Some("making planks lol".into()), &now)
+            deliver_service(state.user(), state.member(), company_from, company_to, agreement, id.clone(), state.model().clone(), state.model2().clone(), move_costs_ratio.clone(), Some(agreed_in.clone()), Some("making planks lol".into()), &now)
         };
         let testfn_from = |state: &TestState<Process, Process>| {
             testfn_inner(state, state.company(), &company_to, &agreement)

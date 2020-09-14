@@ -7,7 +7,6 @@
 use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
-    costs::Costs,
     error::{Error, Result},
     models::{
         Op,
@@ -21,6 +20,7 @@ use crate::{
         user::User,
     },
     transactions::event::ResourceMover,
+    util::number::Ratio,
 };
 use om2::{Measure, NumericUnion};
 use vf_rs::{vf, geo::SpatialThing};
@@ -77,7 +77,7 @@ pub fn lower<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Co
 ///
 /// This can be useful to send costs from one process to another, for instance
 /// if a process has an excess of costs that should be moved somewhere else.
-pub fn move_costs(caller: &User, member: &Member, company: &Company, id: EventID, process_from: Process, process_to: Process, move_costs: Costs, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn move_costs(caller: &User, member: &Member, company: &Company, id: EventID, process_from: Process, process_to: Process, move_costs_ratio: Ratio, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::MoveCosts)?;
     if !company.is_active() {
@@ -86,6 +86,7 @@ pub fn move_costs(caller: &User, member: &Member, company: &Company, id: EventID
 
     let process_from_id = process_from.id().clone();
     let process_to_id = process_to.id().clone();
+    let move_costs = process_from.costs().clone() * move_costs_ratio;
 
     let state = EventProcessState::builder()
         .output_of(process_from)
@@ -125,7 +126,7 @@ pub fn move_costs(caller: &User, member: &Member, company: &Company, id: EventID
 
 /// Move a resource internally. This can split a resource into two, or move one
 /// resource entirely into another one.
-pub fn move_resource<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, resource_measure: T, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn move_resource<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs_ratio: Ratio, resource_measure: T, new_location: Option<SpatialThing>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::MoveResource)?;
     if !company.is_active() {
@@ -137,6 +138,7 @@ pub fn move_resource<T: Into<NumericUnion>>(caller: &User, member: &Member, comp
         Measure::new(resource_measure, unit)
     };
     let resource_from_id = resource_from.id().clone();
+    let move_costs = resource_from.costs().clone() * move_costs_ratio;
 
     let mut statebuilder = EventProcessState::builder()
         .resource(resource_from);
@@ -237,6 +239,7 @@ pub fn raise<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Co
 mod tests {
     use super::*;
     use crate::{
+        costs::Costs,
         models::{
             lib::agent::Agent,
             company::CompanyID,
@@ -307,12 +310,13 @@ mod tests {
         let occupation_id = OccupationID::new("lawyer");
         let process_from = make_process(&ProcessID::create(), state.company().id(), "various lawyerings", &Costs::new_with_labor(occupation_id.clone(), num!(177.25)), &now);
         let process_to = make_process(&ProcessID::create(), state.company().id(), "overflow labor", &Costs::new_with_labor(occupation_id.clone(), num!(804)), &now);
-        let costs_to_move = process_from.costs().clone() * num!(0.45);
+        let move_costs_ratio = Ratio::new(num!(0.45)).unwrap();
+        let costs_to_move = process_from.costs().clone() * move_costs_ratio.clone();
         state.model = Some(process_from);
         state.model2 = Some(process_to);
 
         let testfn = |state: &TestState<Process, Process>| {
-            move_costs(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), costs_to_move.clone(), Some("my note".into()), &now)
+            move_costs(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), move_costs_ratio.clone(), Some("my note".into()), &now)
         };
         test::standard_transaction_tests(&state, &testfn);
 
@@ -366,12 +370,13 @@ mod tests {
         let mut state = TestState::standard(vec![CompanyPermission::MoveResource], &now);
         let resource = make_resource(&ResourceID::new("plank"), state.company().id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let resource_to = make_resource(&ResourceID::new("plank"), state.company().id(), &Measure::new(num!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
-        let costs_to_move = resource.costs().clone() * (num!(8) / num!(15));
+        let move_costs_ratio = Ratio::new(num!(8) / num!(15)).unwrap();
+        let costs_to_move = resource.costs().clone() * move_costs_ratio.clone();
         state.model = Some(resource);
         state.model2 = Some(resource_to);
 
         let testfn_inner = |state: &TestState<Resource, Resource>, mover: ResourceMover| {
-            move_resource(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), mover, costs_to_move.clone(), 8, Some(state.loc().clone()), Some("lol".into()), &now)
+            move_resource(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), mover, move_costs_ratio.clone(), 8, Some(state.loc().clone()), Some("lol".into()), &now)
         };
         let testfn_update = |state: &TestState<Resource, Resource>| {
             testfn_inner(state, ResourceMover::Update(state.model2().clone()))

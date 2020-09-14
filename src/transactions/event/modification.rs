@@ -20,6 +20,7 @@ use crate::{
         resource::Resource,
         user::User,
     },
+    util::number::Ratio,
 };
 use om2::{Measure, NumericUnion};
 use vf_rs::vf;
@@ -82,7 +83,7 @@ pub fn accept<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &C
 ///
 /// Effectively, you `accept` a resource into a repair process, and the output
 /// of that process would be `modify`.
-pub fn modify<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, process: Process, resource: Resource, move_costs: Costs, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn modify<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &Company, id: EventID, process: Process, resource: Resource, move_costs_ratio: Ratio, resource_measure: T, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company.id(), CompanyPermission::Modify)?;
     if !company.is_active() {
@@ -95,6 +96,7 @@ pub fn modify<T: Into<NumericUnion>>(caller: &User, member: &Member, company: &C
     };
     let process_id = process.id().clone();
     let resource_id = resource.id().clone();
+    let move_costs = process.costs().clone() * move_costs_ratio;
 
     let state = EventProcessState::builder()
         .output_of(process)
@@ -216,11 +218,12 @@ mod tests {
         let costs = Costs::new_with_labor(occupation_id.clone(), num!(102.3));
         let process = make_process(&ProcessID::create(), state.company().id(), "repair car", &costs, &now);
         let resource = make_resource(&ResourceID::new("car"), state.company().id(), &Measure::new(num!(3), Unit::One), &Costs::new_with_resource("steel", 157, num!(0.01)), &now);
+        let move_costs_ratio = Ratio::new(1).unwrap();
         state.model = Some(process);
         state.model2 = Some(resource);
 
         let testfn = |state: &TestState<Process, Resource>| {
-            modify(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), state.model().costs().clone(), 12, Some("memo lol".into()), &now)
+            modify(state.user(), state.member(), state.company(), id.clone(), state.model().clone(), state.model2().clone(), move_costs_ratio.clone(), 12, Some("memo lol".into()), &now)
         };
         test::standard_transaction_tests(&state, &testfn);
 

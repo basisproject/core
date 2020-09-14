@@ -8,7 +8,6 @@
 use chrono::{DateTime, Utc};
 use crate::{
     access::Permission,
-    costs::Costs,
     error::{Error, Result},
     models::{
         Op,
@@ -25,6 +24,7 @@ use crate::{
         user::User,
     },
     transactions::event::ResourceMover,
+    util::number::Ratio,
 };
 use om2::{Measure, NumericUnion};
 use url::Url;
@@ -32,7 +32,7 @@ use vf_rs::vf;
 
 /// Transfer a resource (custody and ownership) from one company to another,
 /// moving a set of costs with it.
-pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs_ratio: Ratio, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::Transfer)?;
     if !company_from.is_active() {
@@ -51,6 +51,7 @@ pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &Member, company_f
     };
 
     let resource_id = resource_from.id().clone();
+    let move_costs = resource_from.costs().clone() * move_costs_ratio;
 
     let mut statebuilder = EventProcessState::builder()
         .resource(resource_from);
@@ -101,7 +102,7 @@ pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &Member, company_f
 
 /// Transfer ownership (but not custody) of a resource from one company to
 /// another, moving a set of costs with it.
-pub fn transfer_all_rights<T: Into<NumericUnion>>(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn transfer_all_rights<T: Into<NumericUnion>>(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs_ratio: Ratio, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::TransferAllRights)?;
     if !company_from.is_active() {
@@ -120,6 +121,7 @@ pub fn transfer_all_rights<T: Into<NumericUnion>>(caller: &User, member: &Member
     };
 
     let resource_id = resource_from.id().clone();
+    let move_costs = resource_from.costs().clone() * move_costs_ratio;
 
     let mut statebuilder = EventProcessState::builder()
         .resource(resource_from);
@@ -170,7 +172,7 @@ pub fn transfer_all_rights<T: Into<NumericUnion>>(caller: &User, member: &Member
 
 /// Transfer custody (but not ownership) of a resource from one company to
 /// another, moving a set of costs with it.
-pub fn transfer_custody<T: Into<NumericUnion>>(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs: Costs, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn transfer_custody<T: Into<NumericUnion>>(caller: &User, member: &Member, company_from: &Company, company_to: &Company, agreement: &Agreement, id: EventID, resource_from: Resource, resource_to: ResourceMover, move_costs_ratio: Ratio, move_measure: T, agreed_in: Option<Url>, note: Option<String>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::EventCreate)?;
     member.access_check(caller.id(), company_from.id(), CompanyPermission::TransferCustody)?;
     if !company_from.is_active() {
@@ -189,6 +191,7 @@ pub fn transfer_custody<T: Into<NumericUnion>>(caller: &User, member: &Member, c
     };
 
     let resource_id = resource_from.id().clone();
+    let move_costs = resource_from.costs().clone() * move_costs_ratio;
 
     let mut statebuilder = EventProcessState::builder()
         .resource(resource_from);
@@ -241,6 +244,7 @@ pub fn transfer_custody<T: Into<NumericUnion>>(caller: &User, member: &Member, c
 mod tests {
     use super::*;
     use crate::{
+        costs::Costs,
         models::{
             agreement::AgreementID,
             company::CompanyID,
@@ -263,12 +267,13 @@ mod tests {
         let agreed_in: Url = "https://legalzoom.com/standard-boilerplate-hereto-notwithstanding-each-of-them-damage-to-the-hood-ornament-alone".parse().unwrap();
         let resource_from = make_resource(&ResourceID::new("plank"), company_from.id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let resource_to = make_resource(&ResourceID::new("plank"), company_to.id(), &Measure::new(num!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
-        let costs_to_move = resource_from.costs().clone() * num!(0.67777777);
+        let move_costs_ratio = Ratio::new(num!(0.67777777)).unwrap();
+        let costs_to_move = resource_from.costs().clone() * move_costs_ratio.clone();
         state.model = Some(resource_from);
         state.model2 = Some(resource_to);
 
         let testfn_inner = |state: &TestState<Resource, Resource>, company_from: &Company, company_to: &Company, agreement: &Agreement, resource_to: ResourceMover| {
-            transfer(state.user(), state.member(), &company_from, &company_to, &agreement, id.clone(), state.model().clone(), resource_to, costs_to_move.clone(), 8, Some(agreed_in.clone()), Some("giving jinkey some post-capitalist planks".into()), &now)
+            transfer(state.user(), state.member(), &company_from, &company_to, &agreement, id.clone(), state.model().clone(), resource_to, move_costs_ratio.clone(), 8, Some(agreed_in.clone()), Some("giving jinkey some post-capitalist planks".into()), &now)
         };
         let testfn_update = |state: &TestState<Resource, Resource>| {
             testfn_inner(state, state.company(), &company_to, &agreement, ResourceMover::Update(state.model2().clone()))
@@ -397,12 +402,13 @@ mod tests {
         let agreed_in: Url = "https://legalzoom.com/is-it-too-much-to-ask-for-todays-pedestrian-to-wear-at-least-one-piece-of-reflective-clothing".parse().unwrap();
         let resource_from = make_resource(&ResourceID::new("plank"), company_from.id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let resource_to = make_resource(&ResourceID::new("plank"), company_to.id(), &Measure::new(num!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
-        let costs_to_move = resource_from.costs().clone() * num!(0.1555232);
+        let move_costs_ratio = Ratio::new(num!(0.1555232)).unwrap();
+        let costs_to_move = resource_from.costs().clone() * move_costs_ratio.clone();
         state.model = Some(resource_from);
         state.model2 = Some(resource_to);
 
         let testfn_inner = |state: &TestState<Resource, Resource>, company_from: &Company, company_to: &Company, agreement: &Agreement, resource_to: ResourceMover| {
-            transfer_all_rights(state.user(), state.member(), &company_from, &company_to, &agreement, id.clone(), state.model().clone(), resource_to, costs_to_move.clone(), 8, Some(agreed_in.clone()), Some("note blah blah".into()), &now)
+            transfer_all_rights(state.user(), state.member(), &company_from, &company_to, &agreement, id.clone(), state.model().clone(), resource_to, move_costs_ratio.clone(), 8, Some(agreed_in.clone()), Some("note blah blah".into()), &now)
         };
         let testfn_update = |state: &TestState<Resource, Resource>| {
             testfn_inner(state, state.company(), &company_to, &agreement, ResourceMover::Update(state.model2().clone()))
@@ -527,12 +533,13 @@ mod tests {
         let agreed_in: Url = "https://legaldoom.com/trade-secrets-trade-secrets".parse().unwrap();
         let resource_from = make_resource(&ResourceID::new("plank"), company_from.id(), &Measure::new(num!(15), Unit::One), &Costs::new_with_labor("homemaker", 157), &now);
         let resource_to = make_resource(&ResourceID::new("plank"), company_to.id(), &Measure::new(num!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
-        let costs_to_move = resource_from.costs().clone() * (num!(8) / num!(15));
+        let move_costs_ratio = Ratio::new(num!(8) / num!(15)).unwrap();
+        let costs_to_move = resource_from.costs().clone() * move_costs_ratio.clone();
         state.model = Some(resource_from);
         state.model2 = Some(resource_to);
 
         let testfn_inner = |state: &TestState<Resource, Resource>, company_from: &Company, company_to: &Company, agreement: &Agreement, resource_to: ResourceMover| {
-            transfer_custody(state.user(), state.member(), &company_from, &company_to, &agreement, id.clone(), state.model().clone(), resource_to, costs_to_move.clone(), 8, Some(agreed_in.clone()), Some("nomnomnom".into()), &now)
+            transfer_custody(state.user(), state.member(), &company_from, &company_to, &agreement, id.clone(), state.model().clone(), resource_to, move_costs_ratio.clone(), 8, Some(agreed_in.clone()), Some("nomnomnom".into()), &now)
         };
         let testfn_update = |state: &TestState<Resource, Resource>| {
             testfn_inner(state, state.company(), &company_to, &agreement, ResourceMover::Update(state.model2().clone()))
