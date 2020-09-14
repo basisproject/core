@@ -27,6 +27,10 @@ pub enum Error {
     /// commitment doesn't match the action being performed.
     #[error("commitment is invalid")]
     CommitmentInvalid,
+    /// When trying to move a set of Costs from a Costs object where all values
+    /// of the moving Cost to not have the same proportion to the original cost.
+    #[error("costs being moved are not proportional")]
+    CostsNotProportional,
     /// An error while processing an event.
     #[error("event error {0:?}")]
     Event(#[from] EventError),

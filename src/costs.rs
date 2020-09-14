@@ -166,6 +166,26 @@ impl Costs {
         Self::default()
     }
 
+    /// Standard abstraction around decimal rounding
+    pub fn do_round(val: &Decimal) -> Decimal {
+        val.round_dp(16)
+    }
+
+    /// Determine if two cost objects are proportional.
+    pub fn is_ratio_of(costs1: &Costs, costs2: &Costs) -> bool {
+        let reference_ratio = (costs2.credits().clone() / costs1.credits().clone()).normalize();
+        let compare = costs1.clone() * reference_ratio;
+        return &compare == costs2;
+    }
+
+    /// Make sure this Costs object is a standard format. This means we do any
+    /// rounding needed and remove and zero values.
+    pub fn normalize(&mut self) {
+        //self.round();
+        self.strip();
+        self.dezero();
+    }
+
     /// Create a new Cost, with one resource entry
     pub fn new_with_resource<T, V, C>(id: T, resource: V, credit_value_per_unit: C) -> Self
         where T: Into<ResourceSpecID>,
@@ -212,7 +232,7 @@ impl Costs {
     pub fn track_credits<V>(&mut self, val: V)
         where V: Into<Decimal> + Copy,
     {
-        self.set_credits(self.credits().clone() + val.into());
+        self.set_credits(self.credits() + val.into());
     }
 
     /// Add a resource cost to this Cost
@@ -226,9 +246,9 @@ impl Costs {
         }
         let val = val.into();
         let entry = self.resource_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
-        *entry += val.clone();
+        *entry += val;
         self.track_credits(val * credit_value_per_unit.into());
-        self.dezero();
+        self.normalize();
     }
 
     /// Add a labor cost to this Cost
@@ -241,9 +261,9 @@ impl Costs {
         }
         let val = val.into();
         let entry = self.labor_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
-        *entry += val.clone();
+        *entry += val;
         self.track_credits(val);
-        self.dezero();
+        self.normalize();
     }
 
     /// Add a labor_hours cost to this Cost
@@ -256,7 +276,7 @@ impl Costs {
         }
         let entry = self.labor_hours_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
         *entry += val.into();
-        self.dezero();
+        self.normalize();
     }
 
     /// Add a currency cost to this Cost
@@ -270,9 +290,9 @@ impl Costs {
         }
         let entry = self.currency_mut().entry(id.into()).or_insert(rust_decimal::prelude::Zero::zero());
         let val = val.into();
-        *entry += val.clone();
+        *entry += val;
         self.track_credits(val * conversion_rate.into());
-        self.dezero();
+        self.normalize();
     }
 }
 
@@ -293,6 +313,9 @@ pub(crate) trait CostMover {
         let costs = self.costs().clone();
         if Costs::is_sub_lt_0(&costs, costs_to_release) {
             Err(Error::NegativeCosts)?;
+        }
+        if !Costs::is_ratio_of(&costs, costs_to_release) {
+            Err(Error::CostsNotProportional)?;
         }
         let new_costs = costs - costs_to_release.clone();
         self.set_costs(new_costs);
@@ -540,6 +563,35 @@ mod tests {
         costs.track_resource("widget", dec!(5.0), dec!(0.3));
         assert!(!costs.is_zero());
         assert!(!Costs::new_with_labor("dictator", dec!(4.0)).is_zero());
+    }
+
+    #[test]
+    fn is_ratio_of() {
+        let mut costs1 = Costs::new();
+        costs1.track_labor("dog walker", 42);
+        costs1.track_labor("leash maker", 42);
+        costs1.track_resource("oil", 17, 3);
+        costs1.track_resource("linen", 20, 1);
+        costs1.track_currency("usd", dec!(3.14), dec!(0.991592654));
+        assert!(Costs::is_ratio_of(&costs1, &(costs1.clone() * dec!(0.333))));
+
+        let mut costs2 = Costs::new();
+        costs2.track_labor("dog walker", 42);
+        costs2.track_labor("leash maker", 42);
+        costs2.track_resource("oil", 17, 3);
+        costs2.track_resource("linen", 20, 1);
+        costs2.track_currency("usd", dec!(3.14), dec!(0.991592654));
+        assert!(Costs::is_ratio_of(&costs2, &(costs2.clone() * dec!(0.67723))));
+
+        let mut costs3 = Costs::new();
+        costs3.track_labor("dog walker", 42);
+        costs3.track_labor("leash maker", 42);
+        costs3.track_resource("oil", 17, 3);
+        costs3.track_resource("linen", 20, 1);
+        costs3.track_currency("usd", dec!(3.14), dec!(0.991592654));
+        let mut compare = costs3.clone() * dec!(0.522);
+        compare.track_labor("leash maker", dec!(0.01));
+        assert!(!Costs::is_ratio_of(&costs3, &compare));
     }
 
     #[test]

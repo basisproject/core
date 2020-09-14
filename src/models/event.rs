@@ -147,7 +147,11 @@ basis_model! {
         /// The event's core VF type
         inner: vf::EconomicEvent<Url, AgentID, ProcessID, AgentID, AgreementID, (), ResourceSpecID, ResourceID, EventID>,
         /// If this event is an input/output of a process or resource, move some
-        /// fixed amount of costs between the two objects.
+        /// fixed amount of costs between the two objects. Note that the values
+        /// of the costs being moved *must all* be of the same ratio. In other
+        /// words, if you're moving 50% of the labor::CEO costs, you must also
+        /// move 50% of all the other costs. Failure to do so will result in a
+        /// transaction error.
         move_costs: Option<Costs>,
         /// The type of move (if using `Action::Move`). Can be cost-based
         /// (exclusively for moving costs between resources and processes) or
