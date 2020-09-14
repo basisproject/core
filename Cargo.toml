@@ -18,7 +18,6 @@ categories = ["algorithms", "data-structures"]
 chrono = { version = "0.4", features = ["serde"] }
 costs-derive = { path = "./costs-derive" }
 derive_builder = "0.9"
-fraction = { version = "0.6", features = ["with-serde-support"] }
 getset = "0.1"
 om2 = "0.1"
 rust_decimal = { version = "1.6", features = ["serde-float"] }
