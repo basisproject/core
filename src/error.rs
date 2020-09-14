@@ -6,6 +6,7 @@ use crate::{
         event::EventError,
     },
 };
+use rust_decimal::Decimal;
 use thiserror::Error;
 
 /// This is our error enum. It contains an entry for any part of the system in
@@ -27,16 +28,15 @@ pub enum Error {
     /// commitment doesn't match the action being performed.
     #[error("commitment is invalid")]
     CommitmentInvalid,
-    /// When trying to move a set of Costs from a Costs object where all values
-    /// of the moving Cost to not have the same proportion to the original cost.
-    #[error("costs being moved are not proportional")]
-    CostsNotProportional,
     /// An error while processing an event.
     #[error("event error {0:?}")]
     Event(#[from] EventError),
     /// You don't have permission to perform this action
     #[error("insufficient privileges")]
     InsufficientPrivileges,
+    /// The given ratio is not a value between 0 and 1 (inclusive)
+    #[error("invalid ratio {0} (must be 0 <= R <= 1")]
+    InvalidRatio(Decimal),
     /// We get this when trying to pull a measure out of a resource and come up
     /// blank, for instance when using `consume` on a resource that hasn't had
     /// its quantities initialized via `produce`/`raise`/`transfer`/etc.

@@ -106,6 +106,7 @@ use crate::{
         occupation::OccupationID,
         resource_spec::ResourceSpecID,
     },
+    util::number::Ratio,
 };
 use getset::{Getters, MutGetters, Setters};
 use rust_decimal::prelude::*;
@@ -170,13 +171,6 @@ impl Costs {
     /// Standard abstraction around decimal rounding
     pub fn do_round(val: &Decimal) -> Decimal {
         val.round_dp(16)
-    }
-
-    /// Determine if two cost objects are proportional.
-    pub fn is_ratio_of(costs1: &Costs, costs2: &Costs) -> bool {
-        let reference_ratio = (costs2.credits().clone() / costs1.credits().clone()).normalize();
-        let compare = costs1.clone() * reference_ratio;
-        return &compare == costs2;
     }
 
     /// Make sure this Costs object is a standard format. This means we do any
@@ -297,6 +291,14 @@ impl Costs {
     }
 }
 
+impl Mul<Ratio> for Costs {
+    type Output = Costs;
+
+    fn mul(self, rhs: Ratio) -> Costs {
+        self * rhs.inner().clone()
+    }
+}
+
 /// A standard interface around moving costs from one object to another.
 pub(crate) trait CostMover {
     /// Get the costs associated with this object
@@ -314,9 +316,6 @@ pub(crate) trait CostMover {
         let costs = self.costs().clone();
         if Costs::is_sub_lt_0(&costs, costs_to_release) {
             Err(Error::NegativeCosts)?;
-        }
-        if !Costs::is_ratio_of(&costs, costs_to_release) {
-            Err(Error::CostsNotProportional)?;
         }
         let new_costs = costs - costs_to_release.clone();
         self.set_costs(new_costs);
@@ -564,38 +563,6 @@ mod tests {
         costs.track_resource("widget", num!(5.0), num!(0.3));
         assert!(!costs.is_zero());
         assert!(!Costs::new_with_labor("dictator", num!(4.0)).is_zero());
-    }
-
-    #[test]
-    fn is_ratio_of() {
-        let mut costs1 = Costs::new();
-        costs1.track_labor("dog walker", 42);
-        costs1.track_labor("leash maker", 42);
-        costs1.track_resource("oil", 17, 3);
-        costs1.track_resource("linen", 20, 1);
-        costs1.track_currency("usd", num!(3.14), num!(0.991592654));
-        assert!(Costs::is_ratio_of(&costs1, &(costs1.clone() * num!(0.333))));
-
-        let mut costs2 = Costs::new();
-        costs2.track_labor("dog walker", 42);
-        costs2.track_labor("leash maker", 42);
-        costs2.track_resource("oil", 17, 3);
-        costs2.track_resource("linen", 20, 1);
-        costs2.track_currency("usd", num!(3.14), num!(0.991592654));
-        assert!(Costs::is_ratio_of(&costs2, &(costs2.clone() * num!(0.67723))));
-
-        let mut costs3 = Costs::new();
-        costs3.track_labor("dog walker", 42);
-        costs3.track_labor("leash maker", 42);
-        costs3.track_resource("oil", 17, 3);
-        costs3.track_resource("linen", 20, 1);
-        costs3.track_currency("usd", num!(3.14), num!(0.991592654));
-        let mut compare = costs3.clone() * num!(0.522);
-        compare.track_labor("leash maker", num!(0.01));
-        assert!(!Costs::is_ratio_of(&costs3, &compare));
-
-        let costs4 = Costs::new_with_labor("machinist", num!(34.91));
-        assert!(Costs::is_ratio_of(&costs4, &Costs::new_with_labor("machinist", 30)));
     }
 
     #[test]
