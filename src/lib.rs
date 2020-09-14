@@ -36,6 +36,7 @@
 //! [transactions]: transactions/
 
 pub mod error;
+#[macro_use]
 mod util;
 #[macro_use]
 pub mod access;

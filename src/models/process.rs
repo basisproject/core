@@ -55,7 +55,6 @@ mod tests {
         },
         util::{self, test::*},
     };
-    use rust_decimal_macros::*;
 
     #[test]
     fn compare() {
@@ -64,9 +63,9 @@ mod tests {
         let id2 = ProcessID::new("widget2");
         let company_id1 = CompanyID::new("jerry's widgets");
         let company_id2 = CompanyID::new("frank's widgets");
-        let costs = Costs::new_with_labor("machinist", dec!(23.2));
+        let costs = Costs::new_with_labor("machinist", num!(23.2));
         let mut costs2 = costs.clone();
-        costs2.track_labor("mayor", dec!(2.4));
+        costs2.track_labor("mayor", num!(2.4));
         let process1 = make_process(&id1, &company_id1, "make widgets", &costs, &now);
         let process2 = make_process(&id2, &company_id2, "burn widgets", &costs, &now);
 
@@ -85,7 +84,7 @@ mod tests {
         assert!(process1 == process3);
         process3.set_costs(costs2);
         assert!(process1 != process3);
-        process3.set_costs(Costs::new_with_labor("machinist", dec!(23.2)));
+        process3.set_costs(Costs::new_with_labor("machinist", num!(23.2)));
         assert!(process1 == process3);
     }
 }

@@ -205,7 +205,6 @@ mod tests {
         util::{self, test::*},
     };
     use om2::{Measure, Unit};
-    use rust_decimal_macros::*;
 
     #[test]
     fn totals_costs() {
@@ -213,27 +212,27 @@ mod tests {
         let company = make_company(&company_id, "jerry's delicious widgets", &util::time::now());
 
         let now = util::time::now();
-        let process1 = make_process(&ProcessID::create(), &company_id, "make widgets", &Costs::new_with_labor("lumberjack", dec!(16.9)), &now);
-        let process2 = make_process(&ProcessID::create(), &company_id, "market widgets", &Costs::new_with_labor("marketer", dec!(123.4)), &now);
-        let resource1 = make_resource(&ResourceID::create(), &company_id, &Measure::new(dec!(10.0), Unit::One), &Costs::new_with_labor("lumberjack", dec!(23.1)), &now);
-        let resource2 = make_resource(&ResourceID::create(), &company_id, &Measure::new(dec!(10.0), Unit::One), &Costs::new_with_labor("trucker", dec!(12.5)), &now);
+        let process1 = make_process(&ProcessID::create(), &company_id, "make widgets", &Costs::new_with_labor("lumberjack", num!(16.9)), &now);
+        let process2 = make_process(&ProcessID::create(), &company_id, "market widgets", &Costs::new_with_labor("marketer", num!(123.4)), &now);
+        let resource1 = make_resource(&ResourceID::create(), &company_id, &Measure::new(num!(10.0), Unit::One), &Costs::new_with_labor("lumberjack", num!(23.1)), &now);
+        let resource2 = make_resource(&ResourceID::create(), &company_id, &Measure::new(num!(10.0), Unit::One), &Costs::new_with_labor("trucker", num!(12.5)), &now);
 
         let costs = company.total_costs(&vec![process1, process2], &vec![resource1, resource2]);
         let mut expected_costs = Costs::new();
-        expected_costs.track_labor("lumberjack", dec!(40));
-        expected_costs.track_labor("trucker", dec!(12.5));
-        expected_costs.track_labor("marketer", dec!(123.4));
+        expected_costs.track_labor("lumberjack", num!(40));
+        expected_costs.track_labor("trucker", num!(12.5));
+        expected_costs.track_labor("marketer", num!(123.4));
         assert_eq!(costs, expected_costs);
 
-        let process1 = make_process(&ProcessID::create(), &CompanyID::create(), "make widgets", &Costs::new_with_labor("lumberjack", dec!(16.9)), &now);
-        let process2 = make_process(&ProcessID::create(), &company_id, "market widgets", &Costs::new_with_labor("marketer", dec!(123.4)), &now);
-        let resource1 = make_resource(&ResourceID::create(), &CompanyID::create(), &Measure::new(dec!(10.0), Unit::One), &Costs::new_with_labor("lumberjack", dec!(23.1)), &now);
-        let resource2 = make_resource(&ResourceID::create(), &company_id, &Measure::new(dec!(10.0), Unit::One), &Costs::new_with_labor("trucker", dec!(12.5)), &now);
+        let process1 = make_process(&ProcessID::create(), &CompanyID::create(), "make widgets", &Costs::new_with_labor("lumberjack", num!(16.9)), &now);
+        let process2 = make_process(&ProcessID::create(), &company_id, "market widgets", &Costs::new_with_labor("marketer", num!(123.4)), &now);
+        let resource1 = make_resource(&ResourceID::create(), &CompanyID::create(), &Measure::new(num!(10.0), Unit::One), &Costs::new_with_labor("lumberjack", num!(23.1)), &now);
+        let resource2 = make_resource(&ResourceID::create(), &company_id, &Measure::new(num!(10.0), Unit::One), &Costs::new_with_labor("trucker", num!(12.5)), &now);
 
         let costs = company.total_costs(&vec![process1, process2], &vec![resource1, resource2]);
         let mut expected_costs = Costs::new();
-        expected_costs.track_labor("trucker", dec!(12.5));
-        expected_costs.track_labor("marketer", dec!(123.4));
+        expected_costs.track_labor("trucker", num!(12.5));
+        expected_costs.track_labor("marketer", num!(123.4));
         assert_eq!(costs, expected_costs);
     }
 }
