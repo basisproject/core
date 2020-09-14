@@ -592,6 +592,9 @@ mod tests {
         let mut compare = costs3.clone() * dec!(0.522);
         compare.track_labor("leash maker", dec!(0.01));
         assert!(!Costs::is_ratio_of(&costs3, &compare));
+
+        let costs4 = Costs::new_with_labor("machinist", dec!(34.91));
+        assert!(Costs::is_ratio_of(&costs4, &Costs::new_with_labor("machinist", 30)));
     }
 
     #[test]
