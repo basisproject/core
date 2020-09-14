@@ -117,6 +117,28 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 )*
             }
 
+            /// round all values to a standard decimal place
+            fn round(&mut self) {
+                let credits = self.credits_mut();
+                *credits = Costs::do_round(credits);
+                #(
+                    for val in self.#field_name_mut().values_mut() {
+                        *val = Costs::do_round(val);
+                    }
+                )*
+            }
+
+            /// Strip zeros from our Costs values
+            fn strip(&mut self) {
+                let credits = self.credits_mut();
+                *credits = credits.normalize();
+                #(
+                    for val in self.#field_name_mut().values_mut() {
+                        *val = val.normalize();
+                    }
+                )*
+            }
+
             /// Determine if subtracting one set of costs from another results
             /// in any negative values
             pub fn is_sub_lt_0(costs1: &Costs, costs2: &Costs) -> bool {
@@ -161,7 +183,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                         *entry += other.#field_name().get(k).unwrap();
                     }
                 )*
-                self.dezero();
+                self.normalize();
                 self
             }
         }
@@ -177,7 +199,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                         *entry -= other.#field_name().get(k).unwrap();
                     }
                 )*
-                self.dezero();
+                self.normalize();
                 self
             }
         }
@@ -186,13 +208,14 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
             type Output = Self;
 
             fn mul(mut self, rhs: rust_decimal::Decimal) -> Self {
+                let rhs = Costs::do_round(&rhs);
                 self.credits *= rhs.clone();
                 #(
                     for (_, val) in self.#field_name_mut().iter_mut() {
                         *val *= rhs;
                     }
                 )*
-                self.dezero();
+                self.normalize();
                 self
             }
         }
@@ -204,6 +227,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                 if self.is_zero() {
                     return self;
                 }
+                let rhs = Costs::do_round(&rhs);
                 if rhs == Decimal::zero() {
                     panic!("Costs::div() -- divide by zero");
                 }
@@ -213,7 +237,7 @@ pub fn derive_costs(input: TokenStream) -> TokenStream {
                         *v /= rhs;
                     }
                 )*
-                self.dezero();
+                self.normalize();
                 self
             }
         }
