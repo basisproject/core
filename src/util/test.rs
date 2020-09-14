@@ -245,7 +245,7 @@ pub fn make_company<T: Into<String>>(id: &CompanyID, name: T, now: &DateTime<Utc
         .inner(vf::Agent::builder().name(name).build().unwrap())
         .email("jerry@widgets.biz")
         .active(true)
-        .max_costs(Decimal::zero())
+        .max_costs(num!(1000))
         .total_costs(Costs::new())
         .created(now.clone())
         .updated(now.clone())

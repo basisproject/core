@@ -172,7 +172,7 @@ basis_model! {
 impl Company {
     /// Add a set of costs to this company, checking to make sure we are not
     /// above `max_costs`. Returns the company's post-op `total_costs` value.
-    pub fn increase_costs(&mut self, costs: Costs) -> Result<&Costs> {
+    fn increase_costs(&mut self, costs: Costs) -> Result<&Costs> {
         if costs.is_lt_0() {
             Err(Error::NegativeCosts)?;
         }
@@ -190,7 +190,7 @@ impl Company {
     ///
     /// Note that we don't need to check if we're over our `max_costs` value
     /// because we are reducing costs here.
-    pub fn decrease_costs(&mut self, costs: Costs) -> Result<&Costs> {
+    fn decrease_costs(&mut self, costs: Costs) -> Result<&Costs> {
         if costs.is_lt_0() {
             Err(Error::NegativeCosts)?;
         }
@@ -199,6 +199,14 @@ impl Company {
             Err(Error::NegativeCosts)?;
         }
         self.set_total_costs(total - costs);
+        Ok(self.total_costs())
+    }
+
+    /// Transfer a set of costs from this company to another. The receiving
+    /// company must not go over their `max_costs` value.
+    pub fn transfer_costs_to(&mut self, company_to: &mut Company, costs: Costs) -> Result<&Costs> {
+        self.decrease_costs(costs.clone())?;
+        company_to.increase_costs(costs)?;
         Ok(self.total_costs())
     }
 }
