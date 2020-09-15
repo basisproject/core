@@ -37,7 +37,7 @@
 
 pub mod error;
 #[macro_use]
-mod util;
+pub mod util;
 #[macro_use]
 pub mod access;
 #[macro_use]

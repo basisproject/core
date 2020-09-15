@@ -1,3 +1,5 @@
+//! A set of utility structs and functions used when operating the core.
+
 pub(crate) mod measure;
 #[macro_use]
 pub mod number;
