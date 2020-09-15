@@ -335,8 +335,11 @@ mod tests {
             }
         }
         let now2 = util::time::now();
+        let testfn_inner = |state: &TestState<Company, Company>, accounts, processes| {
+            payroll(state.user(), state.member(), state.company().clone(), accounts, processes, &work_events, &now2)
+        };
         let testfn = |state: &TestState<Company, Company>| {
-            payroll(state.user(), state.member(), state.company().clone(), accounts.clone(), processes.clone(), &work_events, &now2)
+            testfn_inner(state, accounts.clone(), processes.clone())
         };
         test::permissions_checks(&state, &testfn);
 
@@ -370,6 +373,18 @@ mod tests {
         state4.company_mut().set_deleted(Some(now2.clone()));
         let res = testfn(&state4);
         assert_eq!(res, Err(Error::ObjectIsDeleted("company".into())));
+
+        let mut accounts2 = accounts.clone();
+        let key = accounts2.keys().collect::<Vec<_>>()[0].clone();
+        accounts2.remove(&key).unwrap();
+        let res = testfn_inner(&state, accounts2, processes.clone());
+        assert_eq!(res, Err(Error::MissingFields(vec![format!("accounts::{}", key.as_str())])));
+
+        let mut processes2 = processes.clone();
+        let key = processes2.keys().collect::<Vec<_>>()[0].clone();
+        processes2.remove(&key).unwrap();
+        let res = testfn_inner(&state, accounts, processes2.clone());
+        assert_eq!(res, Err(Error::MissingFields(vec![format!("processes::{}", key.as_str())])));
     }
 
     #[test]
