@@ -254,6 +254,11 @@ mod tests {
         state2.user_mut().set_id(UserID::create());
         let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut state3 = state.clone();
+        state3.model_mut().set_ubi(Some(Ubi::new(now2.clone())));
+        let res = testfn(&state3);
+        assert_eq!(res, Err(Error::UBIAccountError));
     }
 
     #[test]
@@ -311,6 +316,11 @@ mod tests {
 
         let res = testfn_inner(&state, num!(56));
         assert_eq!(res, Err(Error::NegativeAccountBalance));
+
+        let mut state3 = state.clone();
+        state3.model_mut().set_ubi(Some(Ubi::new(now2.clone())));
+        let res = testfn(&state3);
+        assert_eq!(res, Err(Error::UBIAccountError));
     }
 
     #[test]
@@ -361,6 +371,11 @@ mod tests {
         state2.user_mut().set_id(UserID::create());
         let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
+
+        let mut state3 = state.clone();
+        state3.model_mut().set_ubi(None);
+        let res = testfn(&state3);
+        assert_eq!(res, Err(Error::UBIAccountRequired));
     }
 
     #[test]
@@ -405,6 +420,11 @@ mod tests {
         state3.model_mut().set_balance(num!(21.55));
         let res = testfn(&state3);
         assert_eq!(res, Err(Error::CannotEraseCredits));
+
+        let mut state4 = state.clone();
+        state4.model_mut().set_ubi(Some(Ubi::new(now2.clone())));
+        let res = testfn(&state4);
+        assert_eq!(res, Err(Error::UBIAccountError));
     }
 }
 
