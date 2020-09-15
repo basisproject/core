@@ -215,7 +215,7 @@ pub fn make_account<T: Into<String>, D: Into<Decimal>>(id: &AccountID, user_id: 
         .name(name.into())
         .description("THIS IS MY ACCOUNT. IF YOU SHOUT A STATEMENT IT MAKES IT MORE TRUE. ASK RON.")
         .balance(balance.into())
-        .ubi(false)
+        .ubi(None)
         .active(true)
         .created(now.clone())
         .updated(now.clone())

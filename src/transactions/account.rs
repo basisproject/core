@@ -28,7 +28,7 @@ pub fn create<T: Into<String>>(caller: &User, id: AccountID, user_ids: Vec<UserI
         .name(name)
         .description(description)
         .balance(0)
-        .ubi(false)
+        .ubi(None)
         .active(active)
         .created(now.clone())
         .updated(now.clone())
@@ -59,6 +59,9 @@ pub fn update(caller: &User, mut subject: Account, name: Option<String>, descrip
 /// Set the owners and multisig of an account.
 pub fn set_owners(caller: &User, mut subject: Account, user_ids: Option<Vec<UserID>>, multisig: Option<Vec<Multisig>>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::AccountSetOwners)?;
+    if subject.ubi().is_some() {
+        Err(Error::UBIAccountError)?;
+    }
     if !subject.user_ids().contains(caller.id()) {
         Err(Error::InsufficientPrivileges)?;
     }
@@ -75,6 +78,9 @@ pub fn set_owners(caller: &User, mut subject: Account, user_ids: Option<Vec<User
 /// Transfer credits from one account to another.
 pub fn transfer(caller: &User, mut subject: Account, mut to_account: Account, amount: Decimal, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::AccountTransfer)?;
+    if subject.ubi().is_some() {
+        Err(Error::UBIAccountError)?;
+    }
     if !subject.user_ids().contains(caller.id()) {
         Err(Error::InsufficientPrivileges)?;
     }
@@ -91,6 +97,9 @@ pub fn transfer(caller: &User, mut subject: Account, mut to_account: Account, am
 /// Delete an account. Must have a 0 balance.
 pub fn delete(caller: &User, mut subject: Account, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::AccountDelete)?;
+    if subject.ubi().is_some() {
+        Err(Error::UBIAccountError)?;
+    }
     if !subject.user_ids().contains(caller.id()) {
         Err(Error::InsufficientPrivileges)?;
     }
@@ -135,7 +144,7 @@ mod tests {
         assert_eq!(account.name(), "Jerry's account");
         assert_eq!(account.description(), "Hi I'm Jerry");
         assert_eq!(account.balance(), &num!(0));
-        assert_eq!(account.ubi(), &false);
+        assert_eq!(account.ubi(), &None);
         assert_eq!(account.active(), &true);
         assert_eq!(account.created(), &now);
         assert_eq!(account.updated(), &now);

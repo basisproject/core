@@ -3,6 +3,7 @@ use basis_core::{
     models::{
         Op,
 
+        account::AccountID,
         company::{Company, CompanyID},
         member::{Member, MemberID, MemberClass, MemberWorker},
         occupation::{Occupation, OccupationID},
@@ -31,7 +32,7 @@ fn example() -> Result<(User, Member, Company)> {
     //
     // transactions don't pass back models, but rather modifications on models
     // (aka, "add User" or "Update company" or "delete Member" etc).
-    let mods = user::create(UserID::new("389f9613-1ac6-435d-9d73-e96118e0ea71"), "user-8171287127nnx78.233b2c@basisproject.net", "Jerry", true, &Utc::now())?.into_vec();
+    let mods = user::create(UserID::new("389f9613-1ac6-435d-9d73-e96118e0ea71"), "user-8171287127nnx78.233b2c@basisproject.net", "Jerry", AccountID::new("9b7c9b40-b759-4a15-8615-4012be92f06a"), true, &Utc::now())?.into_vec();
     let user = mods[0].clone().expect_op::<User>(Op::Create)?;
 
     // create our first occupation (by democratic vote)

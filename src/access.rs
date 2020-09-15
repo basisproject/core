@@ -28,6 +28,7 @@ pub enum Permission {
     AccountDelete,
     AccountSetOwners,
     AccountTransfer,
+    AccountUBIClaim,
     AccountUpdate,
 
     CompanyCreate,
@@ -119,6 +120,7 @@ impl Role {
                     Permission::ResourceSpecUpdate,
                     Permission::ResourceSpecDelete,
                     Permission::AccountCreate,
+                    Permission::AccountUBIClaim,
                     Permission::AccountUpdate,
                     Permission::AccountSetOwners,
                     Permission::AccountTransfer,
