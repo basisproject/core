@@ -11,15 +11,16 @@ use crate::{
     models::{
         Op,
         Modifications,
+        account::{Account, AccountID, Multisig, Ubi},
         lib::basis_model::Model,
         user::{User, UserID},
     },
 };
 
 /// Create a user (private implementation, meant to be wrapped).
-fn create_inner<T: Into<String>>(id: UserID, roles: Vec<Role>, email: T, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+fn create_inner<T: Into<String>>(id: UserID, roles: Vec<Role>, email: T, name: T, ubi_account_id: AccountID, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     let model = User::builder()
-        .id(id)
+        .id(id.clone())
         .roles(roles)
         .email(email)
         .name(name)
@@ -28,21 +29,40 @@ fn create_inner<T: Into<String>>(id: UserID, roles: Vec<Role>, email: T, name: T
         .updated(now.clone())
         .build()
         .map_err(|e| Error::BuilderFailed(e))?;
-    Ok(Modifications::new_single(Op::Create, model))
+    let ubi = Account::builder()
+        .id(ubi_account_id)
+        .user_ids(vec![id])
+        .multisig(vec![Multisig::new(1)])
+        .name("UBI")
+        .description("Your UBI account")
+        .balance(0)
+        .ubi(Some(Ubi::new(now.clone())))
+        .created(now.clone())
+        .updated(now.clone())
+        .build()
+        .map_err(|e| Error::BuilderFailed(e))?;
+    let mut mods = Modifications::new();
+    mods.push(Op::Create, model);
+    mods.push(Op::Create, ubi);
+    Ok(mods)
 }
 
 /// Create a new user with a `Role::User` role. No permissions required.
-pub fn create<T: Into<String>>(id: UserID, email: T, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+///
+/// Also creates a UBI account for the user.
+pub fn create<T: Into<String>>(id: UserID, email: T, name: T, ubi_account_id: AccountID, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     access::guest_check(Permission::UserCreate)?;
-    create_inner(id, vec![Role::User], email, name, active, now)
+    create_inner(id, vec![Role::User], email, name, ubi_account_id, active, now)
 }
 
 /// Create a new user with a specific set of permissions using a current user as
 /// the originator. Effectively an admin create. Requires the 
 /// `Permission::UserCreate` permission.
-pub fn create_permissioned<T: Into<String>>(caller: &User, id: UserID, roles: Vec<Role>, email: T, name: T, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
+///
+/// Also creates a UBI account for the user.
+pub fn create_permissioned<T: Into<String>>(caller: &User, id: UserID, roles: Vec<Role>, email: T, name: T, ubi_account_id: AccountID, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::UserAdminCreate)?;
-    create_inner(id, roles, email, name, active, now)
+    create_inner(id, roles, email, name, ubi_account_id, active, now)
 }
 
 /// Update a user object
@@ -103,36 +123,58 @@ mod tests {
     #[test]
     fn can_create() {
         let id = UserID::create();
+        let account_id = AccountID::create();
         let now = util::time::now();
-        let mods = create(id.clone(), "zing@lyonbros.com", "leonard", true, &now).unwrap().into_vec();
-        assert_eq!(mods.len(), 1);
+        let mods = create(id.clone(), "zing@lyonbros.com", "leonard", account_id.clone(), true, &now).unwrap().into_vec();
+        assert_eq!(mods.len(), 2);
 
         let model = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
+        let account = mods[1].clone().expect_op::<Account>(Op::Create).unwrap();
         assert_eq!(model.id(), &id);
         assert_eq!(model.email(), "zing@lyonbros.com");
         assert_eq!(model.name(), "leonard");
         assert_eq!(model.active(), &true);
+
+        assert_eq!(account.id(), &account_id);
+        assert_eq!(account.user_ids(), &vec![id.clone()]);
+        assert_eq!(account.name(), "UBI");
+        assert_eq!(account.balance(), &num!(0));
+        assert_eq!(account.ubi(), &Some(Ubi::new(now.clone())));
+        assert_eq!(account.created(), &now);
+        assert_eq!(account.updated(), &now);
+        assert_eq!(account.deleted(), &None);
     }
 
     #[test]
     fn can_create_permissioned() {
         let id = UserID::create();
+        let account_id = AccountID::create();
         let now = util::time::now();
         let mut state = TestState::standard(vec![], &now);
         let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
         state.user = Some(user);
 
         let testfn = |state: &TestState<User, User>| {
-            create_permissioned(state.user(), id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now)
+            create_permissioned(state.user(), id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", account_id.clone(), true, &now)
         };
 
         let mods = testfn(&state).unwrap().into_vec();
-        assert_eq!(mods.len(), 1);
+        assert_eq!(mods.len(), 2);
         let model = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
+        let account = mods[1].clone().expect_op::<Account>(Op::Create).unwrap();
         assert_eq!(model.id(), &id);
         assert_eq!(model.email(), "zing@lyonbros.com");
         assert_eq!(model.name(), "leonard");
         assert_eq!(model.active(), &true);
+
+        assert_eq!(account.id(), &account_id);
+        assert_eq!(account.user_ids(), &vec![id.clone()]);
+        assert_eq!(account.name(), "UBI");
+        assert_eq!(account.balance(), &num!(0));
+        assert_eq!(account.ubi(), &Some(Ubi::new(now.clone())));
+        assert_eq!(account.created(), &now);
+        assert_eq!(account.updated(), &now);
+        assert_eq!(account.deleted(), &None);
 
         let mut state2 = state.clone();
         state2.user_mut().set_roles(vec![Role::User]);
@@ -143,10 +185,11 @@ mod tests {
     #[test]
     fn can_update() {
         let id = UserID::create();
+        let account_id = AccountID::create();
         let now = util::time::now();
         let mut state = TestState::standard(vec![], &now);
         let user = make_user(&id, Some(vec![Role::IdentityAdmin]), &now);
-        let mods = create_permissioned(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", true, &now).unwrap().into_vec();
+        let mods = create_permissioned(&user, id.clone(), vec![Role::User], "zing@lyonbros.com", "leonard", account_id.clone(), true, &now).unwrap().into_vec();
         let new_user = mods[0].clone().expect_op::<User>(Op::Create).unwrap();
         state.user = Some(user);
         state.model = Some(new_user);

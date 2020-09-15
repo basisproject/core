@@ -1,6 +1,7 @@
 //! Accounts are a place to hold credits earned through labor. Think of them
 //! like a bank account or crypto wallet.
 
+use chrono::{DateTime, Utc};
 use crate::{
     error::{Error, Result},
     models:: {
@@ -33,7 +34,28 @@ impl Multisig {
     }
 }
 
+/// Holds information about a basic income account.
+#[derive(Clone, Debug, PartialEq, Getters, Setters, Serialize, Deserialize)]
+#[getset(get = "pub", set = "pub(crate)")]
+pub struct Ubi {
+    last_claim: DateTime<Utc>,
+}
+
+impl Ubi {
+    /// Create a new UBI spec
+    pub fn new(now: DateTime<Utc>) -> Self {
+        Self {
+            last_claim: now,
+        }
+    }
+}
+
 basis_model! {
+    /// Effectively a bank account or crypto "wallet" which stores credits
+    /// earned via labor/wages.
+    ///
+    /// Can be either a regular account (can transfer value freely) or a UBI
+    /// account which has some additional restrictions.
     pub struct Account {
         id: <<AccountID>>,
         /// The user ids of the account owners
@@ -46,8 +68,9 @@ basis_model! {
         description: String,
         /// The account's balance
         balance: Decimal,
-        /// Whether or not this is a UBI account
-        ubi: bool,
+        /// Whether or not this is a UBI account, and if so, some information
+        /// about the UBI
+        ubi: Option<Ubi>,
     }
     AccountBuilder
 }

@@ -78,6 +78,7 @@ impl Modification {
     ///         Model,
     ///         Modification,
     ///         Op,
+    ///         account::AccountID,
     ///         user::{User, UserID},
     ///     },
     ///     transactions,
@@ -94,7 +95,7 @@ impl Modification {
     ///     Ok(())
     /// }
     ///
-    /// let mods = transactions::user::create(UserID::new("eb5af35f-8f48-4794-8d75-0cd07d7c6650"), "andrew@lyonbros.com", "andrew", true, &Utc::now()).unwrap();
+    /// let mods = transactions::user::create(UserID::new("eb5af35f-8f48-4794-8d75-0cd07d7c6650"), "andrew@lyonbros.com", "andrew", AccountID::new("5fcf7f71-d965-4f10-a4af-5a289335c586"), true, &Utc::now()).unwrap();
     /// for modification in mods {
     ///     save_mod(modification).unwrap();
     /// }
@@ -112,13 +113,14 @@ impl Modification {
     /// use basis_core::{
     ///     models::{
     ///         Op,
+    ///         account::AccountID,
     ///         user::{User, UserID},
     ///     },
     ///     transactions,
     /// };
     /// use chrono::Utc;
     ///
-    /// let mods = transactions::user::create(UserID::new("571c5e2b-1fde-43d4-a15b-9cbcb929849f"), "andrew@lyonbros.com", "andrew", true, &Utc::now()).unwrap().into_vec();
+    /// let mods = transactions::user::create(UserID::new("571c5e2b-1fde-43d4-a15b-9cbcb929849f"), "andrew@lyonbros.com", "andrew", AccountID::new("af1d3c55-a737-4979-b1b5-0ad18a810bb0"), true, &Utc::now()).unwrap().into_vec();
     /// // verifies that the first modification is User Create, and returns the
     /// // User model.
     /// let user = mods[0].clone().expect_op::<User>(Op::Create).unwrap();

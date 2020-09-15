@@ -85,6 +85,12 @@ pub enum Error {
     /// its quantities initialized via `produce`/`raise`/`transfer`/etc.
     #[error("a resource measurement (account/onhand quantity) is missing")]
     ResourceMeasureMissing,
+    /// We're trying to perform an action on a UBI account that isn't allowed.
+    #[error("operation cannot be performed on a UBI account")]
+    UBIAccountError,
+    /// A UBI account is required for the action you wish to perform.
+    #[error("operation can only be performed on a UBI account")]
+    UBIAccountRequired,
     /// When we try to convert an AgentID to another ID type but it fails (like
     /// `let company_id: CompanyID = AgentID::UserID(user_id).try_from()?;`).
     #[error("AgentID is the wrong type")]
