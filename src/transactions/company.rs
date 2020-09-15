@@ -122,6 +122,9 @@ pub fn delete(caller: &User, member: Option<&Member>, mut subject: Company, now:
     if subject.is_deleted() {
         Err(Error::ObjectIsDeleted("company".into()))?;
     }
+    if subject.total_costs().is_gt_0() {
+        Err(Error::CannotEraseCosts)?;
+    }
     subject.set_deleted(Some(now.clone()));
     Ok(Modifications::new_single(Op::Delete, subject))
 }
@@ -264,12 +267,18 @@ mod tests {
         let res = testfn(&state2);
         assert_eq!(res, Err(Error::InsufficientPrivileges));
 
+        let mut state3 = state.clone();
+        state3.model = state.company.clone();
+        state3.model_mut().set_total_costs(Costs::new_with_labor("zookeeper", num!(50.2)));
+        let res = testfn(&state3);
+        assert_eq!(res, Err(Error::CannotEraseCosts));
+
         // set the model inot the state, which makes testfn use the model
         // instead of the company for the `subject` param, making our test
         // actually mean something.
-        let mut state2 = state.clone();
-        state2.model = Some(state.company().clone());
-        test::double_deleted_tester(&state2, "company", &testfn);
+        let mut state4 = state.clone();
+        state4.model = Some(state.company().clone());
+        test::double_deleted_tester(&state4, "company", &testfn);
     }
 }
 
