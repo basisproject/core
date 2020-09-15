@@ -357,10 +357,10 @@ mod tests {
         assert_eq!(account3.created(), state.model().created());
         assert_eq!(account3.updated(), &now2);
 
-        //let mut state2 = state.clone();
-        //state2.user_mut().set_id(UserID::create());
-        //let res = testfn(&state2);
-        //assert_eq!(res, Err(Error::InsufficientPrivileges));
+        let mut state2 = state.clone();
+        state2.user_mut().set_id(UserID::create());
+        let res = testfn(&state2);
+        assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
     #[test]
