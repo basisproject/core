@@ -19,14 +19,14 @@
 //! };
 //! use chrono::Utc;
 //!
-//! let user_id = UserID::create();
+//! let user_id = UserID::new("d183116f-85ac-4c6d-a553-b947b1f677a9");
 //! let systemic_voter = Vote::systemic(user_id.clone(), &Utc::now()).unwrap();
 //! assert_eq!(systemic_voter.user().id(), &user_id);
 //! assert_eq!(systemic_voter.user().roles(), &vec![Role::SuperAdmin]);
 //! assert_eq!(systemic_voter.member(), &None);
 //!
-//! let user_id = UserID::create();
-//! let member_id = MemberID::create();
+//! let user_id = UserID::new("d7142ca2-c7a0-4125-a879-2aace236b2c0");
+//! let member_id = MemberID::new("4826728e-003a-4fde-a5c8-f43084c5d530");
 //! let company_id = CompanyID::new("hairy larry's scrumptious dairies");
 //! let company_voter = Vote::company(user_id.clone(), member_id.clone(), &company_id, &Utc::now()).unwrap();
 //! assert_eq!(company_voter.user().id(), &user_id);

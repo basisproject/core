@@ -34,6 +34,7 @@ pub enum Permission {
     CompanyAdminUpdate,
     CompanyCreate,
     CompanyDelete,
+    CompanyPayroll,
     CompanyUpdate,
     CompanyUpdateAgreements,
     CompanyUpdateCommitments,
@@ -113,6 +114,7 @@ impl Role {
                     Permission::UserDelete,
                     Permission::CompanyCreate,
                     Permission::CompanyDelete,
+                    Permission::CompanyPayroll,     // hey, milton. what's happening.
                     Permission::CompanyUpdate,
                     Permission::CompanyUpdateAgreements,
                     Permission::CompanyUpdateCommitments,

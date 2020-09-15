@@ -84,7 +84,7 @@ pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &Member, company_f
                 .build()
                 .map_err(|e| Error::BuilderFailed(e))?
         )
-        .move_costs(Some(move_costs))
+        .move_costs(Some(move_costs.clone()))
         .active(true)
         .created(now.clone())
         .updated(now.clone())
@@ -97,6 +97,17 @@ pub fn transfer<T: Into<NumericUnion>>(caller: &User, member: &Member, company_f
     for evmod in evmods {
         mods.push_raw(evmod);
     }
+
+    // NOTE: AL - really considered making company_from/company_to passed as mut
+    // "owned" objects but it's so inconsistent with the rest of the API that i
+    // decided against it for now. that said, it's somewhat inconsistent that an
+    // object being modified isn't passed in as owned. choose your poison i
+    // guess.
+    let mut company_from_new = company_from.clone();
+    let mut company_to_new = company_to.clone();
+    company_from_new.transfer_costs_to(&mut company_to_new, move_costs)?;
+    mods.push(Op::Update, company_from_new);
+    mods.push(Op::Update, company_to_new);
     Ok(mods)
 }
 
@@ -154,7 +165,7 @@ pub fn transfer_all_rights<T: Into<NumericUnion>>(caller: &User, member: &Member
                 .build()
                 .map_err(|e| Error::BuilderFailed(e))?
         )
-        .move_costs(Some(move_costs))
+        .move_costs(Some(move_costs.clone()))
         .active(true)
         .created(now.clone())
         .updated(now.clone())
@@ -167,6 +178,17 @@ pub fn transfer_all_rights<T: Into<NumericUnion>>(caller: &User, member: &Member
     for evmod in evmods {
         mods.push_raw(evmod);
     }
+
+    // NOTE: AL - really considered making company_from/company_to passed as mut
+    // "owned" objects but it's so inconsistent with the rest of the API that i
+    // decided against it for now. that said, it's somewhat inconsistent that an
+    // object being modified isn't passed in as owned. choose your poison i
+    // guess.
+    let mut company_from_new = company_from.clone();
+    let mut company_to_new = company_to.clone();
+    company_from_new.transfer_costs_to(&mut company_to_new, move_costs)?;
+    mods.push(Op::Update, company_from_new);
+    mods.push(Op::Update, company_to_new);
     Ok(mods)
 }
 
@@ -261,7 +283,7 @@ mod tests {
         let now = util::time::now();
         let id = EventID::create();
         let mut state = TestState::standard(vec![CompanyPermission::Transfer], &now);
-        let company_from = state.company().clone();
+        let mut company_from = state.company().clone();
         let company_to = make_company(&CompanyID::create(), "jinkey's skateboards", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 1234", "gotta get some planks", &now);
         let agreed_in: Url = "https://legalzoom.com/standard-boilerplate-hereto-notwithstanding-each-of-them-damage-to-the-hood-ornament-alone".parse().unwrap();
@@ -269,11 +291,13 @@ mod tests {
         let resource_to = make_resource(&ResourceID::new("plank"), company_to.id(), &Measure::new(num!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
         let move_costs_ratio = Ratio::new(num!(0.67777777)).unwrap();
         let costs_to_move = resource_from.costs().clone() * move_costs_ratio.clone();
+        company_from.set_total_costs(costs_to_move.clone() * num!(5));
+        state.company = Some(company_from.clone());
         state.model = Some(resource_from);
         state.model2 = Some(resource_to);
 
         let testfn_inner = |state: &TestState<Resource, Resource>, company_from: &Company, company_to: &Company, agreement: &Agreement, resource_to: ResourceMover| {
-            transfer(state.user(), state.member(), &company_from, &company_to, &agreement, id.clone(), state.model().clone(), resource_to, move_costs_ratio.clone(), 8, Some(agreed_in.clone()), Some("giving jinkey some post-capitalist planks".into()), &now)
+            transfer(state.user(), state.member(), company_from, company_to, &agreement, id.clone(), state.model().clone(), resource_to, move_costs_ratio.clone(), 8, Some(agreed_in.clone()), Some("giving jinkey some post-capitalist planks".into()), &now)
         };
         let testfn_update = |state: &TestState<Resource, Resource>| {
             testfn_inner(state, state.company(), &company_to, &agreement, ResourceMover::Update(state.model2().clone()))
@@ -289,10 +313,12 @@ mod tests {
 
         // test ResourceMover::Update()
         let mods = testfn_update(&state).unwrap().into_vec();
-        assert_eq!(mods.len(), 3);
+        assert_eq!(mods.len(), 5);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         let resource2 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
         let resource_to2 = mods[2].clone().expect_op::<Resource>(Op::Update).unwrap();
+        let company_from2 = mods[3].clone().expect_op::<Company>(Op::Update).unwrap();
+        let company_to2 = mods[4].clone().expect_op::<Company>(Op::Update).unwrap();
 
         assert_eq!(event.id(), &id);
         assert_eq!(event.inner().agreed_in(), &Some(agreed_in.clone()));
@@ -322,12 +348,20 @@ mod tests {
         assert_eq!(resource_to2.in_custody_of(), &company_to.agent_id());
         assert_eq!(resource_to2.costs(), &(state.model2().costs().clone() + costs_to_move.clone()));
 
+        assert_eq!(company_from2.id(), company_from.id());
+        assert_eq!(company_from2.total_costs(), &(company_from.total_costs().clone() - costs_to_move.clone()));
+
+        assert_eq!(company_to2.id(), company_to.id());
+        assert_eq!(company_to2.total_costs(), &(company_to.total_costs().clone() + costs_to_move.clone()));
+
         // test ResourceMover::Create()
         let mods = testfn_create(&state).unwrap().into_vec();
-        assert_eq!(mods.len(), 3);
+        assert_eq!(mods.len(), 5);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         let resource3 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
         let resource_created = mods[2].clone().expect_op::<Resource>(Op::Create).unwrap();
+        let company_from3 = mods[3].clone().expect_op::<Company>(Op::Update).unwrap();
+        let company_to3 = mods[4].clone().expect_op::<Company>(Op::Update).unwrap();
 
         assert_eq!(event.id(), &id);
         assert_eq!(event.inner().agreed_in(), &Some(agreed_in.clone()));
@@ -355,6 +389,12 @@ mod tests {
         assert_eq!(resource_created.inner().onhand_quantity(), &Some(Measure::new(num!(8), Unit::One)));
         assert_eq!(resource_created.in_custody_of(), &company_to.agent_id());
         assert_eq!(resource_created.costs(), &costs_to_move);
+
+        assert_eq!(company_from3.id(), company_from.id());
+        assert_eq!(company_from3.total_costs(), &(company_from.total_costs().clone() - costs_to_move.clone()));
+
+        assert_eq!(company_to3.id(), company_to.id());
+        assert_eq!(company_to3.total_costs(), &(company_to.total_costs().clone() + costs_to_move.clone()));
 
         // can't transfer into a resource you don't own
         let mut state2 = state.clone();
@@ -389,6 +429,12 @@ mod tests {
         let mut state5 = state.clone();
         state5.company = Some(company_to.clone());
         test::deleted_company_tester(&state5, &testfn_update_to);
+
+        let mut state6 = state.clone();
+        state6.company = Some(company_to.clone());
+        state6.company_mut().set_max_costs(company_to.total_costs().credits().clone());
+        let res = testfn_update_to(&state6);
+        assert_eq!(res, Err(Error::MaxCostsReached));
     }
 
     #[test]
@@ -396,7 +442,7 @@ mod tests {
         let now = util::time::now();
         let id = EventID::create();
         let mut state = TestState::standard(vec![CompanyPermission::TransferAllRights], &now);
-        let company_from = state.company().clone();
+        let mut company_from = state.company().clone();
         let company_to = make_company(&CompanyID::create(), "jinkey's skateboards", &now);
         let agreement = make_agreement(&AgreementID::create(), &vec![company_from.agent_id(), company_to.agent_id()], "order 1234", "gotta get some planks", &now);
         let agreed_in: Url = "https://legalzoom.com/is-it-too-much-to-ask-for-todays-pedestrian-to-wear-at-least-one-piece-of-reflective-clothing".parse().unwrap();
@@ -404,6 +450,8 @@ mod tests {
         let resource_to = make_resource(&ResourceID::new("plank"), company_to.id(), &Measure::new(num!(3), Unit::One), &Costs::new_with_labor("homemaker", 2), &now);
         let move_costs_ratio = Ratio::new(num!(0.1555232)).unwrap();
         let costs_to_move = resource_from.costs().clone() * move_costs_ratio.clone();
+        company_from.set_total_costs(costs_to_move.clone() * num!(5));
+        state.company = Some(company_from.clone());
         state.model = Some(resource_from);
         state.model2 = Some(resource_to);
 
@@ -424,10 +472,12 @@ mod tests {
 
         // test ResourceMover::Update()
         let mods = testfn_update(&state).unwrap().into_vec();
-        assert_eq!(mods.len(), 3);
+        assert_eq!(mods.len(), 5);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         let resource2 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
         let resource_to2 = mods[2].clone().expect_op::<Resource>(Op::Update).unwrap();
+        let company_from2 = mods[3].clone().expect_op::<Company>(Op::Update).unwrap();
+        let company_to2 = mods[4].clone().expect_op::<Company>(Op::Update).unwrap();
 
         assert_eq!(event.id(), &id);
         assert_eq!(event.inner().agreed_in(), &Some(agreed_in.clone()));
@@ -457,12 +507,20 @@ mod tests {
         assert_eq!(resource_to2.in_custody_of(), &company_to.agent_id());
         assert_eq!(resource_to2.costs(), &(state.model2().costs().clone() + costs_to_move.clone()));
 
+        assert_eq!(company_from2.id(), company_from.id());
+        assert_eq!(company_from2.total_costs(), &(company_from.total_costs().clone() - costs_to_move.clone()));
+
+        assert_eq!(company_to2.id(), company_to.id());
+        assert_eq!(company_to2.total_costs(), &(company_to.total_costs().clone() + costs_to_move.clone()));
+
         // test ResourceMover::Create()
         let mods = testfn_create(&state).unwrap().into_vec();
-        assert_eq!(mods.len(), 3);
+        assert_eq!(mods.len(), 5);
         let event = mods[0].clone().expect_op::<Event>(Op::Create).unwrap();
         let resource3 = mods[1].clone().expect_op::<Resource>(Op::Update).unwrap();
         let resource_created = mods[2].clone().expect_op::<Resource>(Op::Create).unwrap();
+        let company_from3 = mods[3].clone().expect_op::<Company>(Op::Update).unwrap();
+        let company_to3 = mods[4].clone().expect_op::<Company>(Op::Update).unwrap();
 
         assert_eq!(event.id(), &id);
         assert_eq!(event.inner().agreed_in(), &Some(agreed_in.clone()));
@@ -495,6 +553,12 @@ mod tests {
         assert_eq!(resource_created.in_custody_of(), &company_from.agent_id());
         assert_eq!(resource_created.costs(), &costs_to_move);
 
+        assert_eq!(company_from3.id(), company_from.id());
+        assert_eq!(company_from3.total_costs(), &(company_from.total_costs().clone() - costs_to_move.clone()));
+
+        assert_eq!(company_to3.id(), company_to.id());
+        assert_eq!(company_to3.total_costs(), &(company_to.total_costs().clone() + costs_to_move.clone()));
+
         // can't transfer into a resource you don't own
         let mut state2 = state.clone();
         state2.model2_mut().inner_mut().set_primary_accountable(Some(CompanyID::new("zing").into()));
@@ -520,6 +584,12 @@ mod tests {
         let mut state5 = state.clone();
         state5.company = Some(company_to.clone());
         test::deleted_company_tester(&state5, &testfn_update_to);
+
+        let mut state6 = state.clone();
+        state6.company = Some(company_to.clone());
+        state6.company_mut().set_max_costs(company_to.total_costs().credits().clone());
+        let res = testfn_update_to(&state6);
+        assert_eq!(res, Err(Error::MaxCostsReached));
     }
 
     #[test]
