@@ -51,6 +51,11 @@ impl Ubi {
 }
 
 basis_model! {
+    /// Effectively a bank account or crypto "wallet" which stores credits
+    /// earned via labor/wages.
+    ///
+    /// Can be either a regular account (can transfer value freely) or a UBI
+    /// account which has some additional restrictions.
     pub struct Account {
         id: <<AccountID>>,
         /// The user ids of the account owners

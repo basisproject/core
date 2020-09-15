@@ -48,6 +48,8 @@ fn create_inner<T: Into<String>>(id: UserID, roles: Vec<Role>, email: T, name: T
 }
 
 /// Create a new user with a `Role::User` role. No permissions required.
+///
+/// Also creates a UBI account for the user.
 pub fn create<T: Into<String>>(id: UserID, email: T, name: T, ubi_account_id: AccountID, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     access::guest_check(Permission::UserCreate)?;
     create_inner(id, vec![Role::User], email, name, ubi_account_id, active, now)
@@ -56,6 +58,8 @@ pub fn create<T: Into<String>>(id: UserID, email: T, name: T, ubi_account_id: Ac
 /// Create a new user with a specific set of permissions using a current user as
 /// the originator. Effectively an admin create. Requires the 
 /// `Permission::UserCreate` permission.
+///
+/// Also creates a UBI account for the user.
 pub fn create_permissioned<T: Into<String>>(caller: &User, id: UserID, roles: Vec<Role>, email: T, name: T, ubi_account_id: AccountID, active: bool, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::UserAdminCreate)?;
     create_inner(id, roles, email, name, ubi_account_id, active, now)
