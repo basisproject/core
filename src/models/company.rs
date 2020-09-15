@@ -175,7 +175,7 @@ basis_model! {
 impl Company {
     /// Add a set of costs to this company, checking to make sure we are not
     /// above `max_costs`. Returns the company's post-op `total_costs` value.
-    fn increase_costs(&mut self, costs: Costs) -> Result<&Costs> {
+    pub(crate) fn increase_costs(&mut self, costs: Costs) -> Result<&Costs> {
         if costs.is_lt_0() {
             Err(Error::NegativeCosts)?;
         }
