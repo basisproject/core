@@ -40,6 +40,9 @@ pub struct Ratio {
 
 impl Ratio {
     /// Create a new ratio from a Decimal.
+    ///
+    /// If the given `ratio_val` is outside the range 0 <= r <= 1 then we return
+    /// `Error::InvalidRatio`.
     pub fn new<T: Into<Decimal>>(ratio_val: T) -> Result<Self> {
         let ratio: Decimal = ratio_val.into();
         if ratio < Decimal::zero() || ratio > num!(1) {
