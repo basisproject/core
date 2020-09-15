@@ -28,7 +28,7 @@ macro_rules! basis_model {
 
     ) => {
         /// ID type for this model.
-        #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, serde::Serialize, serde::Deserialize)]
         #[serde(transparent)]
         pub struct $id(String);
 
@@ -39,7 +39,8 @@ macro_rules! basis_model {
             }
 
             /// Create a new random id (UUIDv4)
-            pub fn create() -> Self {
+            #[allow(dead_code)]
+            pub(crate) fn create() -> Self {
                 Self(uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut uuid::Uuid::encode_buffer()).to_string())
             }
 
@@ -70,6 +71,12 @@ macro_rules! basis_model {
         impl std::convert::From<&str> for $id {
             fn from(id: &str) -> Self {
                 Self(id.to_string())
+            }
+        }
+
+        impl std::cmp::Ord for $id {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                self.0.cmp(&other.0)
             }
         }
 
