@@ -99,10 +99,9 @@ pub fn create<T: Into<String>>(caller: &User, id: CompanyID, company_name: T, co
 }
 
 /// Update a private company
-pub fn update(caller: &User, member: Option<&Member>, mut subject: Company, name: Option<String>, email: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn update(caller: &User, member: &Member, mut subject: Company, name: Option<String>, email: Option<String>, active: Option<bool>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyUpdate)?;
-    caller.access_check(Permission::CompanyAdminUpdate)
-        .or_else(|_| member.ok_or(Error::InsufficientPrivileges)?.access_check(caller.id(), subject.id(), CompanyPermission::CompanyUpdate))?;
+    member.access_check(caller.id(), subject.id(), CompanyPermission::CompanyUpdate)?;
     if subject.is_deleted() {
         Err(Error::ObjectIsInactive("company".into()))?;
     }
@@ -181,10 +180,9 @@ pub fn payroll(caller: &User, member: &Member, mut subject: Company, mut account
 }
 
 /// Delete a private company
-pub fn delete(caller: &User, member: Option<&Member>, mut subject: Company, now: &DateTime<Utc>) -> Result<Modifications> {
+pub fn delete(caller: &User, member: &Member, mut subject: Company, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::CompanyDelete)?;
-    caller.access_check(Permission::CompanyAdminDelete)
-        .or_else(|_| member.ok_or(Error::InsufficientPrivileges)?.access_check(caller.id(), subject.id(), CompanyPermission::CompanyDelete))?;
+    member.access_check(caller.id(), subject.id(), CompanyPermission::CompanyDelete)?;
     if subject.is_deleted() {
         Err(Error::ObjectIsDeleted("company".into()))?;
     }
@@ -266,11 +264,8 @@ mod tests {
         state.company = Some(company);
 
         let now2 = util::time::now();
-        let testfn_inner = |state: &TestState<Company, Company>, member: Option<&Member>| {
-            update(state.user(), member, state.company().clone(), Some("Cool Widgets Ltd".into()), None, Some(false), &now2)
-        };
         let testfn = |state: &TestState<Company, Company>| {
-            testfn_inner(state, Some(state.member()))
+            update(state.user(), state.member(), state.company().clone(), Some("Cool Widgets Ltd".into()), None, Some(false), &now2)
         };
         test::permissions_checks(&state, &testfn);
 
@@ -284,9 +279,6 @@ mod tests {
         assert_eq!(company2.active(), &false);
         assert_eq!(company2.created(), &now);
         assert_eq!(company2.updated(), &now2);
-
-        let res = testfn_inner(&state, None);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut state2 = state.clone();
         state2.user_mut().set_id(UserID::create());
@@ -404,15 +396,12 @@ mod tests {
         state.member = Some(member);
 
         let now2 = util::time::now();
-        let testfn_inner = |state: &TestState<Company, Company>, member: Option<&Member>| {
+        let testfn = |state: &TestState<Company, Company>| {
             // note we prefer the model here, and fallback onto the company. the
             // reason is that we want to use the company for our tests until we
             // get to the double-delete test, which operates on the model itself
             // (which is a general assumption but generally works well).
-            delete(state.user(), member, state.model.clone().unwrap_or(state.company().clone()), &now2)
-        };
-        let testfn = |state: &TestState<Company, Company>| {
-            testfn_inner(&state, Some(state.member()))
+            delete(state.user(), state.member(), state.model.clone().unwrap_or(state.company().clone()), &now2)
         };
         test::permissions_checks(&state, &testfn);
 
@@ -422,9 +411,6 @@ mod tests {
         assert_eq!(company2.created(), &now);
         assert_eq!(company2.updated(), &now);
         assert_eq!(company2.deleted(), &Some(now2));
-
-        let res = testfn_inner(&state, None);
-        assert_eq!(res, Err(Error::InsufficientPrivileges));
 
         let mut state2 = state.clone();
         state2.user_mut().set_id(UserID::create());

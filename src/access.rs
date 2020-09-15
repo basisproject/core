@@ -30,8 +30,6 @@ pub enum Permission {
     AccountTransfer,
     AccountUpdate,
 
-    CompanyAdminDelete,
-    CompanyAdminUpdate,
     CompanyCreate,
     CompanyDelete,
     CompanyPayroll,
@@ -73,7 +71,6 @@ pub enum Permission {
 pub enum Role {
     SuperAdmin,
     IdentityAdmin,
-    CompanyAdmin,
     Bank,
     User,
     Guest,
@@ -95,12 +92,6 @@ impl Role {
                     Permission::UserDelete,
                 ]
             },
-            Role::CompanyAdmin => {
-                vec![
-                    Permission::CompanyAdminUpdate,
-                    Permission::CompanyAdminDelete,
-                ]
-            }
             Role::Bank => {
                 vec![
                     Permission::CurrencyCreate,
@@ -190,17 +181,6 @@ pub mod tests {
         assert!(super_admin.can(&Permission::UserAdminUpdate));
         assert!(super_admin.can(&Permission::UserDelete));
         assert!(super_admin.can(&Permission::CompanyCreate));
-        assert!(super_admin.can(&Permission::CompanyAdminUpdate));
-        assert!(super_admin.can(&Permission::CompanyAdminDelete));
-
-        let comp_admin = Role::CompanyAdmin;
-        assert!(!comp_admin.can(&Permission::UserCreate));
-        assert!(!comp_admin.can(&Permission::UserUpdate));
-        assert!(!comp_admin.can(&Permission::UserAdminUpdate));
-        assert!(!comp_admin.can(&Permission::UserDelete));
-        assert!(!comp_admin.can(&Permission::CompanyCreate));
-        assert!(comp_admin.can(&Permission::CompanyAdminUpdate));
-        assert!(comp_admin.can(&Permission::CompanyAdminDelete));
     }
 }
 

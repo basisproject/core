@@ -76,29 +76,29 @@ mod tests {
         let user = make_user(&UserID::create(), None, &now);
         assert!(user.can(&Permission::UserDelete));
         assert!(user.access_check(Permission::UserDelete).is_ok());
-        assert!(user.access_check(Permission::CompanyAdminDelete).is_err());
+        assert!(user.access_check(Permission::UserAdminCreate).is_err());
 
-        let user2 = make_user(&UserID::create(), Some(vec![Role::User, Role::CompanyAdmin]), &now);
+        let user2 = make_user(&UserID::create(), Some(vec![Role::User, Role::SuperAdmin]), &now);
         assert!(user2.can(&Permission::UserDelete));
         assert!(user2.access_check(Permission::UserDelete).is_ok());
-        assert!(user2.access_check(Permission::CompanyAdminDelete).is_ok());
+        assert!(user2.access_check(Permission::UserAdminCreate).is_ok());
 
         let user3 = make_user(&UserID::create(), Some(vec![]), &now);
         assert!(!user3.can(&Permission::UserDelete));
         assert!(user3.access_check(Permission::UserDelete).is_err());
-        assert!(user3.access_check(Permission::CompanyAdminDelete).is_err());
+        assert!(user3.access_check(Permission::UserAdminCreate).is_err());
 
         let mut user4 = user2.clone();
         user4.set_deleted(Some(now.clone()));
         assert!(!user4.can(&Permission::UserDelete));
         assert!(user4.access_check(Permission::UserDelete).is_err());
-        assert!(user4.access_check(Permission::CompanyAdminDelete).is_err());
+        assert!(user4.access_check(Permission::UserAdminCreate).is_err());
 
         let mut user5 = user2.clone();
         user5.set_active(false);
         assert!(!user5.can(&Permission::UserDelete));
         assert!(user5.access_check(Permission::UserDelete).is_err());
-        assert!(user5.access_check(Permission::CompanyAdminDelete).is_err());
+        assert!(user5.access_check(Permission::UserAdminCreate).is_err());
     }
 }
 
