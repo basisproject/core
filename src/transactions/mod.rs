@@ -28,7 +28,7 @@ pub mod agreement;
 pub mod commitment;
 pub mod company;
 pub mod member;
-//pub mod currency;
+pub mod currency;
 pub mod event;
 pub mod intent;
 pub mod occupation;

@@ -3,6 +3,7 @@
 //! job types to be accounted for (as opposed to using freeform entry).
 //!
 //! Note that occupations require global systemic management.
+
 use vf_rs::vf;
 
 basis_model! {
