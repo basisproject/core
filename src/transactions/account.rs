@@ -12,6 +12,7 @@ use crate::{
         lib::basis_model::Model,
         user::{User, UserID},
     },
+    system::ubi::UBIParameters,
 };
 use rust_decimal::prelude::*;
 
@@ -59,11 +60,11 @@ pub fn update(caller: &User, mut subject: Account, name: Option<String>, descrip
 /// Set the owners and multisig of an account.
 pub fn set_owners(caller: &User, mut subject: Account, user_ids: Option<Vec<UserID>>, multisig: Option<Vec<Multisig>>, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::AccountSetOwners)?;
-    if subject.ubi().is_some() {
-        Err(Error::UBIAccountError)?;
-    }
     if !subject.user_ids().contains(caller.id()) {
         Err(Error::InsufficientPrivileges)?;
+    }
+    if subject.ubi().is_some() {
+        Err(Error::UBIAccountError)?;
     }
     if let Some(user_ids) = user_ids {
         subject.set_user_ids(user_ids);
@@ -78,11 +79,11 @@ pub fn set_owners(caller: &User, mut subject: Account, user_ids: Option<Vec<User
 /// Transfer credits from one account to another.
 pub fn transfer(caller: &User, mut subject: Account, mut to_account: Account, amount: Decimal, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::AccountTransfer)?;
-    if subject.ubi().is_some() {
-        Err(Error::UBIAccountError)?;
-    }
     if !subject.user_ids().contains(caller.id()) {
         Err(Error::InsufficientPrivileges)?;
+    }
+    if subject.ubi().is_some() {
+        Err(Error::UBIAccountError)?;
     }
     subject.adjust_balance(-amount)?;
     subject.set_updated(now.clone());
@@ -94,14 +95,37 @@ pub fn transfer(caller: &User, mut subject: Account, mut to_account: Account, am
     Ok(mods)
 }
 
+/// Claim UBI. This reads the difference between now and the last time UBI was
+/// claimed and puts the appropriate amount into the account (with an upper
+/// ceiling).
+///
+/// Takes a systemic `UBIParameters` object which tells us how the UBI behaves.
+pub fn claim_ubi(caller: &User, mut subject: Account, ubi_params: &UBIParameters, now: &DateTime<Utc>) -> Result<Modifications> {
+    caller.access_check(Permission::AccountUBIClaim)?;
+    if !subject.user_ids().contains(caller.id()) {
+        Err(Error::InsufficientPrivileges)?;
+    }
+    let ubi = if let Some(ubi) = subject.ubi().clone() {
+        ubi
+    } else {
+        return Err(Error::UBIAccountRequired);
+    };
+    let days_elapsed = Decimal::from(now.timestamp() - ubi.last_claim().timestamp()) / num!(86400);
+    let balance_adjustment = days_elapsed * ubi_params.balance_per_day().clone();
+    subject.adjust_balance(balance_adjustment)?;
+    subject.set_balance(subject.balance().clone().min(ubi_params.ceiling().clone()).normalize());
+    subject.set_updated(now.clone());
+    Ok(Modifications::new_single(Op::Update, subject))
+}
+
 /// Delete an account. Must have a 0 balance.
 pub fn delete(caller: &User, mut subject: Account, now: &DateTime<Utc>) -> Result<Modifications> {
     caller.access_check(Permission::AccountDelete)?;
-    if subject.ubi().is_some() {
-        Err(Error::UBIAccountError)?;
-    }
     if !subject.user_ids().contains(caller.id()) {
         Err(Error::InsufficientPrivileges)?;
+    }
+    if subject.ubi().is_some() {
+        Err(Error::UBIAccountError)?;
     }
     if subject.balance() != &Zero::zero() {
         Err(Error::CannotEraseCredits)?;
@@ -117,6 +141,9 @@ pub fn delete(caller: &User, mut subject: Account, now: &DateTime<Utc>) -> Resul
 mod tests {
     use super::*;
     use crate::{
+        models::{
+            account::Ubi,
+        },
         util::{self, test::{self, *}},
     };
 
@@ -284,6 +311,56 @@ mod tests {
 
         let res = testfn_inner(&state, num!(56));
         assert_eq!(res, Err(Error::NegativeAccountBalance));
+    }
+
+    #[test]
+    fn can_claim_ubi() {
+        let id = AccountID::create();
+        let now = util::time::now();
+        let mut state = TestState::standard(vec![], &now);
+        let multisig = vec![Multisig::new(1)];
+        let mods = create(state.user(), id.clone(), vec![state.user().id().clone()], multisig.clone(), "UBI", "UBI", true, &now).unwrap().into_vec();
+        let mut account = mods[0].clone().expect_op::<Account>(Op::Create).unwrap();
+        let mut ubi_params = UBIParameters::new();
+        ubi_params.set_ceiling(num!(100));
+        ubi_params.set_balance_per_day(num!(900) / num!(30));
+        account.set_ubi(Some(Ubi::new("2020-01-01T00:00:00Z".parse().unwrap())));
+        state.company = None;
+        state.member = None;
+        state.model = Some(account);
+
+        let now2 = "2020-01-06T12:30:00Z".parse().unwrap();
+        let testfn_inner = |state: &TestState<Account, Account>, ubi_params: &UBIParameters| {
+            claim_ubi(state.user(), state.model().clone(), ubi_params, &now2)
+        };
+        let testfn = |state: &TestState<Account, Account>| {
+            testfn_inner(state, &ubi_params)
+        };
+        test::standard_transaction_tests(&state, &testfn);
+
+        let mods = testfn(&state).unwrap().into_vec();
+        assert_eq!(mods.len(), 1);
+        let account2 = mods[0].clone().expect_op::<Account>(Op::Update).unwrap();
+        assert_eq!(account2.id(), state.model().id());
+        assert_eq!(account2.balance(), &num!(100));
+        assert_eq!(account2.created(), state.model().created());
+        assert_eq!(account2.updated(), &now2);
+        assert_eq!(account2.deleted(), &None);
+
+        let mut ubi_params2 = ubi_params.clone();
+        ubi_params2.set_ceiling(num!(5000));
+        let mods = testfn_inner(&state, &ubi_params2).unwrap().into_vec();
+        assert_eq!(mods.len(), 1);
+        let account3 = mods[0].clone().expect_op::<Account>(Op::Update).unwrap();
+        assert_eq!(account3.id(), state.model().id());
+        assert_eq!(account3.balance(), &num!(165.625));
+        assert_eq!(account3.created(), state.model().created());
+        assert_eq!(account3.updated(), &now2);
+
+        //let mut state2 = state.clone();
+        //state2.user_mut().set_id(UserID::create());
+        //let res = testfn(&state2);
+        //assert_eq!(res, Err(Error::InsufficientPrivileges));
     }
 
     #[test]
