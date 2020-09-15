@@ -15,44 +15,42 @@
 //! credit price multiplier). See the examples below.
 //!
 //! ```rust
-//! use basis_core::{
-//!     costs::Costs,
-//!     num,
-//! };
+//! use basis_core::costs::Costs;
+//! use rust_decimal_macros::*;
 //!
 //! let mut costs = Costs::new();
 //! // notice the "price" parameter when tracking resources/currencies.
-//! costs.track_resource("gasoline", num!(0.4), num!(1.3));
-//! costs.track_resource("iron", num!(2.2), num!(0.0019));
-//! costs.track_labor("ceo", num!(42.0));
-//! costs.track_labor("machinist", num!(122.0));
-//! costs.track_labor_hours("ceo", num!(2.0));
-//! costs.track_labor_hours("machinist", num!(8.0));
-//! costs.track_currency("usd", num!(42.00), num!(0.99891));
+//! costs.track_resource("gasoline", dec!(0.4), dec!(1.3));
+//! costs.track_resource("iron", dec!(2.2), dec!(0.0019));
+//! costs.track_labor("ceo", dec!(42.0));
+//! costs.track_labor("machinist", dec!(122.0));
+//! costs.track_labor_hours("ceo", dec!(2.0));
+//! costs.track_labor_hours("machinist", dec!(8.0));
+//! costs.track_currency("usd", dec!(42.00), dec!(0.99891));
 //! // read the aggregate value of the costs' credits
-//! assert_eq!(costs.credits(), &num!(206.4784));
+//! assert_eq!(costs.credits(), &dec!(206.4784));
 //!
 //! // we can multiple costs by arbitrary decimals
-//! let costs2 = costs * num!(2.5);
-//! assert_eq!(costs2.credits(), &(num!(206.4784) * num!(2.5)));
-//! assert_eq!(costs2.get_resource("gasoline"), num!(0.4) * num!(2.5));
-//! assert_eq!(costs2.get_resource("iron"), num!(2.2) * num!(2.5));
-//! assert_eq!(costs2.get_labor("ceo"), num!(42.0) * num!(2.5));
-//! assert_eq!(costs2.get_labor("machinist"), num!(122.0) * num!(2.5));
-//! assert_eq!(costs2.get_labor_hours("ceo"), num!(2.0) * num!(2.5));
-//! assert_eq!(costs2.get_labor_hours("machinist"), num!(8.0) * num!(2.5));
-//! assert_eq!(costs2.get_currency("usd"), num!(42.00) * num!(2.5));
+//! let costs2 = costs * dec!(2.5);
+//! assert_eq!(costs2.credits(), &(dec!(206.4784) * dec!(2.5)));
+//! assert_eq!(costs2.get_resource("gasoline"), dec!(0.4) * dec!(2.5));
+//! assert_eq!(costs2.get_resource("iron"), dec!(2.2) * dec!(2.5));
+//! assert_eq!(costs2.get_labor("ceo"), dec!(42.0) * dec!(2.5));
+//! assert_eq!(costs2.get_labor("machinist"), dec!(122.0) * dec!(2.5));
+//! assert_eq!(costs2.get_labor_hours("ceo"), dec!(2.0) * dec!(2.5));
+//! assert_eq!(costs2.get_labor_hours("machinist"), dec!(8.0) * dec!(2.5));
+//! assert_eq!(costs2.get_currency("usd"), dec!(42.00) * dec!(2.5));
 //!
 //! // and divide them as well
-//! let costs3 = costs2 / num!(3.2);
-//! assert_eq!(costs3.credits(), &((num!(206.4784) * num!(2.5))/ num!(3.2)));
-//! assert_eq!(costs3.get_resource("gasoline"), (num!(0.4) * num!(2.5)) / num!(3.2));
-//! assert_eq!(costs3.get_resource("iron"), (num!(2.2) * num!(2.5)) / num!(3.2));
-//! assert_eq!(costs3.get_labor("ceo"), (num!(42.0) * num!(2.5)) / num!(3.2));
-//! assert_eq!(costs3.get_labor("machinist"), (num!(122.0) * num!(2.5)) / num!(3.2));
-//! assert_eq!(costs3.get_labor_hours("ceo"), (num!(2.0) * num!(2.5)) / num!(3.2));
-//! assert_eq!(costs3.get_labor_hours("machinist"), (num!(8.0) * num!(2.5)) / num!(3.2));
-//! assert_eq!(costs3.get_currency("usd"), (num!(42.00) * num!(2.5)) / num!(3.2));
+//! let costs3 = costs2 / dec!(3.2);
+//! assert_eq!(costs3.credits(), &((dec!(206.4784) * dec!(2.5))/ dec!(3.2)));
+//! assert_eq!(costs3.get_resource("gasoline"), (dec!(0.4) * dec!(2.5)) / dec!(3.2));
+//! assert_eq!(costs3.get_resource("iron"), (dec!(2.2) * dec!(2.5)) / dec!(3.2));
+//! assert_eq!(costs3.get_labor("ceo"), (dec!(42.0) * dec!(2.5)) / dec!(3.2));
+//! assert_eq!(costs3.get_labor("machinist"), (dec!(122.0) * dec!(2.5)) / dec!(3.2));
+//! assert_eq!(costs3.get_labor_hours("ceo"), (dec!(2.0) * dec!(2.5)) / dec!(3.2));
+//! assert_eq!(costs3.get_labor_hours("machinist"), (dec!(8.0) * dec!(2.5)) / dec!(3.2));
+//! assert_eq!(costs3.get_currency("usd"), (dec!(42.00) * dec!(2.5)) / dec!(3.2));
 //! ```
 //!
 //! In effect, Costs are an abstraction around Basis' view of production. While

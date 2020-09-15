@@ -8,7 +8,7 @@ use rust_decimal::prelude::*;
 use serde::{Serialize, Deserialize};
 use std::ops::Mul;
 
-/// Create a number used in the costing system.
+/// Create a number used in the costing system. Internal use only.
 ///
 /// This is mostly a wrapper around a standard number type that makes it easier
 /// to swap out test values/Costs types project-wide without having to change
@@ -25,7 +25,6 @@ use std::ops::Mul;
 /// ```
 ///
 /// Right now, this wraps `rust_decimal::Decimal`'s `dec!()` macro.
-#[macro_export]
 macro_rules! num {
     ($val:expr) => {
         rust_decimal_macros::dec!($val)
