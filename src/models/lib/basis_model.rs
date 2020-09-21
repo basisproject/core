@@ -41,6 +41,7 @@ macro_rules! basis_model {
 
             /// Create a new random id (UUIDv4)
             #[allow(dead_code)]
+            #[cfg(test)]
             pub(crate) fn create() -> Self {
                 Self(uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut uuid::Uuid::encode_buffer()).to_string())
             }
