@@ -4,10 +4,12 @@
 
 use getset::{Getters, Setters};
 use rust_decimal::Decimal;
+#[cfg(feature = "with_serde")]
 use serde::{Serialize, Deserialize};
 
 /// Holds systemic UBI parameters.
-#[derive(Clone, Default, Debug, PartialEq, Getters, Setters, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, PartialEq, Getters, Setters)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 #[getset(get = "pub", set = "pub(crate)")]
 pub struct UBIParameters {
     /// The maximum balance a UBI account can hold

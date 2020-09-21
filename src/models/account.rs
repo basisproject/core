@@ -10,6 +10,7 @@ use crate::{
 };
 use getset::{Getters, Setters};
 use rust_decimal::prelude::*;
+#[cfg(feature = "with_serde")]
 use serde::{Serialize, Deserialize};
 
 /// Describes a multi-signature relationship to an account, allowing the owners
@@ -18,7 +19,8 @@ use serde::{Serialize, Deserialize};
 ///
 /// This can be used to model things like beneficiaries or set up joint accounts
 /// for families.
-#[derive(Clone, Debug, PartialEq, Getters, Setters, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Getters, Setters)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 #[getset(get = "pub", set = "pub(crate)")]
 pub struct Multisig {
     /// Requires at least N signatures to complete transactions
@@ -35,7 +37,8 @@ impl Multisig {
 }
 
 /// Holds information about a basic income account.
-#[derive(Clone, Debug, PartialEq, Getters, Setters, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Getters, Setters)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 #[getset(get = "pub", set = "pub(crate)")]
 pub struct Ubi {
     last_claim: DateTime<Utc>,

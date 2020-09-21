@@ -19,13 +19,15 @@ use crate::{
     },
 };
 use rust_decimal::prelude::*;
+#[cfg(feature = "with_serde")]
 use serde::{Serialize, Deserialize};
 use vf_rs::vf;
 
 /// A permission gives a Member the ability to perform certain actions
 /// within the context of a company they have a relationship (a set of roles)
 /// with. 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 pub enum Permission {
     /// Can do anything
     All,

@@ -30,6 +30,7 @@
 use crate::{
     error::{Error, Result},
 };
+#[cfg(feature = "with_serde")]
 use serde::{Serialize, Deserialize};
 use std::convert::TryFrom;
 
@@ -45,7 +46,8 @@ load_models!{ pub mod }
 load_models!{ pub enum Model }
 
 /// A type for determining if a model should be created, updated, or deleted.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 pub enum Op {
     /// Create a model
     Create,
@@ -56,7 +58,8 @@ pub enum Op {
 }
 
 /// Documents a modification to a model.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 pub struct Modification {
     /// The type of modification
     op: Op,
@@ -141,7 +144,8 @@ impl Modification {
 /// This is passed back by successfully run transactions. You can use a set of
 /// modifications either by converting into a vec (`into_vec()`), or using an
 /// iterator.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 pub struct Modifications {
     /// The model modifications we're making
     modifications: Vec<Modification>,

@@ -5,6 +5,7 @@ use crate::{
     error::{Error, Result},
 };
 use rust_decimal::prelude::*;
+#[cfg(feature = "with_serde")]
 use serde::{Serialize, Deserialize};
 use std::ops::Mul;
 
@@ -32,7 +33,8 @@ macro_rules! num {
 }
 
 /// Represents a ratio: a value such that `0 <= v <= 1`.
-#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, PartialEq)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 pub struct Ratio {
     /// The inner ratio value.
     inner: Decimal,

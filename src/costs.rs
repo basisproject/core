@@ -131,6 +131,7 @@ use crate::{
 };
 use getset::{Getters, MutGetters, Setters};
 use rust_decimal::prelude::*;
+#[cfg(feature = "with_serde")]
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::ops::{Add, Sub, Mul, Div};
@@ -148,28 +149,29 @@ use std::ops::{Add, Sub, Mul, Div};
 /// immediately recognize what we're trying to do, and littering generics all
 /// over the place isn't my cup of tea for an object that's supposed to be
 /// conceptually and operationally simple.
-#[derive(Costs, Clone, Debug, Default, PartialEq, Getters, MutGetters, Setters, Serialize, Deserialize)]
+#[derive(Costs, Clone, Debug, Default, PartialEq, Getters, MutGetters, Setters)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 #[getset(get = "pub", get_mut, set)]
 pub struct Costs {
     /// An aggregate total (in credit value) of this cost object.
-    #[serde(default = "Decimal::zero", skip_serializing_if = "rust_decimal::prelude::Zero::is_zero")]
+    #[cfg_attr(feature = "with_serde", serde(default = "Decimal::zero", skip_serializing_if = "rust_decimal::prelude::Zero::is_zero"))]
     credits: Decimal,
     /// Stores resource content. Resources are ResourceSpec instances that have
     /// a resource tracking information attached, so we link to them via their
     /// ResourceSpecID
-    #[serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty")]
+    #[cfg_attr(feature = "with_serde", serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty"))]
     resource: HashMap<ResourceSpecID, Decimal>,
     /// Stores labor *as is has been paid in credits* per-occupation. In other
     /// words, we don't track raw hours here, but rather the social labor value
     /// as negotiated between workers and their companies.
-    #[serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty")]
+    #[cfg_attr(feature = "with_serde", serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty"))]
     labor: HashMap<OccupationID, Decimal>,
     /// Stores raw labor hours per-occupation. This information might be more
     /// useful in the future, as it's a measure of the occupation-time that went
     /// into building something, as opposed to the credits paid out. Cases where
     /// this might be handy is a system where all wages are 0, but we still want
     /// to track labor content.
-    #[serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty")]
+    #[cfg_attr(feature = "with_serde", serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty"))]
     labor_hours: HashMap<OccupationID, Decimal>,
     /// Stores currency values of products. This is a strange one to have in a
     /// moneyless system, but supports the banking process of the system by
@@ -179,7 +181,7 @@ pub struct Costs {
     /// (or how many credits to destroy if being purchased internally). The idea
     /// is that in a hopeful future, this bucket will be obsolete and always
     /// empty as currency-based markets are phased out.
-    #[serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty")]
+    #[cfg_attr(feature = "with_serde", serde(default = "Default::default", skip_serializing_if = "std::collections::HashMap::is_empty"))]
     currency: HashMap<CurrencyID, Decimal>,
 }
 
@@ -586,6 +588,7 @@ mod tests {
         assert!(!Costs::new_with_labor("dictator", num!(4.0)).is_zero());
     }
 
+    #[cfg(feature = "with_serde")]
     #[test]
     fn serialize() {
         // yes, this seems dumb, but in the past has failed to even compile so

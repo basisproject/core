@@ -14,12 +14,14 @@
 use crate::{
     error::{Error, Result},
 };
+#[cfg(feature = "with_serde")]
 use serde::{Serialize, Deserialize};
 
 /// Define the system-wide permissions.
 ///
 /// Note there may be per-model permissions that are handled separately.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 pub enum Permission {
     All,
     AllBut(Vec<Permission>),
@@ -68,7 +70,8 @@ pub enum Permission {
 }
 
 /// Define the system-wide roles users can have.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 pub enum Role {
     SuperAdmin,
     IdentityAdmin,

@@ -37,13 +37,15 @@ use crate::{
 use getset::{Getters, Setters};
 use om2::{Measure, Unit, NumericUnion};
 use rust_decimal::prelude::*;
+#[cfg(feature = "with_serde")]
 use serde::{Serialize, Deserialize};
 use std::convert::TryInto;
 use url::Url;
 use vf_rs::vf;
 
 /// How often we pay workers.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 pub enum PayrollSchedule {
     /// Once every two weeks
     BiWeekly,
@@ -55,7 +57,8 @@ pub enum PayrollSchedule {
 /// account information.
 ///
 /// Can account for hourly wages or salary.
-#[derive(Clone, Debug, PartialEq, Getters, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Getters)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 #[getset(get = "pub")]
 pub struct Compensation {
     /// A measure of value per time (ie, credits per hour, or credits per year)
@@ -115,7 +118,8 @@ impl Compensation {
 }
 
 /// Describes a company that is a member of a company.
-#[derive(Clone, Debug, PartialEq, Getters, Setters, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Getters, Setters)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 #[getset(get = "pub", set = "pub(crate)")]
 pub struct MemberCompany {
 }
@@ -128,7 +132,8 @@ impl MemberCompany {
 }
 
 /// Describes an individual user who is a member of a company.
-#[derive(Clone, Debug, PartialEq, Getters, Setters, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Getters, Setters)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 #[getset(get = "pub", set = "pub(crate)")]
 pub struct MemberUser {
 }
@@ -141,7 +146,8 @@ impl MemberUser {
 }
 
 /// Describes a worker who is a member of a company.
-#[derive(Clone, Debug, PartialEq, Getters, Setters, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Getters, Setters)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 #[getset(get = "pub", set = "pub(crate)")]
 pub struct MemberWorker {
     /// Holds the id of this worker's occupation at this company.
@@ -167,7 +173,8 @@ impl MemberWorker {
 }
 
 /// Describes the type of membership for a particular Member record.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 pub enum MemberClass {
     /// This member is another company.
     ///

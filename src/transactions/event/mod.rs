@@ -9,6 +9,7 @@ use crate::{
         resource::{ResourceID, Resource},
     },
 };
+#[cfg(feature = "with_serde")]
 use serde::{Serialize, Deserialize};
 
 /// Helps us signify whether we want an operation that moves a resource from one
@@ -17,7 +18,8 @@ use serde::{Serialize, Deserialize};
 ///
 /// This is used mainly for the move, transfer, transfer-all-rights, and
 /// transfer-custody events.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 pub enum ResourceMover {
     /// Create a new resource using the given ID
     Create(ResourceID),

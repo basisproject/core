@@ -18,7 +18,8 @@ macro_rules! load_models {
         /// An enum that allows returning *any* model type. This is mainly used
         /// along with [Op](enum.Op.html) to specify modifications (ie
         /// `[Op::Create, User]`).
-        #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+        #[derive(Debug, Clone, PartialEq)]
+        #[cfg_attr(feature = "with_serde", derive(serde::Serialize, serde::Deserialize))]
         pub enum $enumname {
             $(
                 $model(crate::models::$path::$model),

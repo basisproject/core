@@ -28,8 +28,9 @@ macro_rules! basis_model {
 
     ) => {
         /// ID type for this model.
-        #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, serde::Serialize, serde::Deserialize)]
-        #[serde(transparent)]
+        #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd)]
+        #[cfg_attr(feature = "with_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[cfg_attr(feature = "with_serde", serde(transparent))]
         pub struct $id(String);
 
         impl $id {
@@ -87,7 +88,8 @@ macro_rules! basis_model {
 
             basis_model_inner! {
                 $(#[$struct_meta])*
-                #[derive(Clone, Debug, PartialEq, getset::Getters, getset::MutGetters, getset::Setters, derive_builder::Builder, serde::Serialize, serde::Deserialize)]
+                #[derive(Clone, Debug, PartialEq, getset::Getters, getset::MutGetters, getset::Setters, derive_builder::Builder)]
+                #[cfg_attr(feature = "with_serde", derive(serde::Serialize, serde::Deserialize))]
                 #[builder(pattern = "owned", setter(into))]
                 #[getset(get = "pub", get_mut = "pub(crate)", set = "pub(crate)")]
                 pub struct $model {
@@ -176,7 +178,7 @@ macro_rules! basis_model_inner {
 
                 $(#[$field_meta])*
                 #[builder(default)]
-                #[serde(default = "Default::default", skip_serializing_if = "Vec::is_empty")]
+                #[cfg_attr(feature = "with_serde", serde(default = "Default::default", skip_serializing_if = "Vec::is_empty"))]
                 $field_name: Vec<$field_type>,
             )
             $(#[$struct_meta])*
@@ -203,7 +205,7 @@ macro_rules! basis_model_inner {
 
                 $(#[$field_meta])*
                 #[builder(default)]
-                #[serde(default = "Default::default", skip_serializing_if = "Option::is_none")]
+                #[cfg_attr(feature = "with_serde", serde(default = "Default::default", skip_serializing_if = "Option::is_none"))]
                 $field_name: Option<$field_type>,
             )
             $(#[$struct_meta])*

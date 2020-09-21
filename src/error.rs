@@ -7,11 +7,14 @@ use crate::{
     },
 };
 use rust_decimal::Decimal;
+#[cfg(feature = "with_serde")]
+use serde::{Serialize, Deserialize};
 use thiserror::Error;
 
 /// This is our error enum. It contains an entry for any part of the system in
 /// which an expectation is not met or a problem occurs.
 #[derive(Error, Debug, PartialEq)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 pub enum Error {
     /// There was an error while using a builder (likely an internal error)
     #[error("error building object {0}")]

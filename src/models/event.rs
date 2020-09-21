@@ -41,6 +41,7 @@ use crate::{
 use derive_builder::Builder;
 use om2::{Measure, NumericUnion, Unit};
 use rust_decimal::prelude::*;
+#[cfg(feature = "with_serde")]
 use serde::{Serialize, Deserialize};
 use thiserror::Error;
 use url::Url;
@@ -48,6 +49,7 @@ use vf_rs::vf::{self, Action, InputOutput, ResourceEffect};
 
 /// An error type for when event processing goes awry.
 #[derive(Error, Debug, PartialEq)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 pub enum EventError {
     /// An event's end date must be after its begin date
     #[error("end time must be after begin time")]
@@ -125,7 +127,8 @@ pub enum EventError {
 /// When creating a `transfer` event, we need to know if that event transfers
 /// costs internally between processes or if it transfers resources between
 /// different agents.
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 pub enum MoveType {
     /// This is an internal cost transfer *between two processes*.
     ProcessCosts,
@@ -1013,10 +1016,8 @@ mod tests {
         };
         let process = mod_process(process_new.clone());
         let process_prev = mod_process(process_previous.clone());
-        let proc_ser = serde_json::to_string(&process).unwrap();
-        let proc2_ser = serde_json::to_string(&process_prev).unwrap();
         // only process.costs should be changed
-        assert_eq!(proc_ser, proc2_ser);
+        assert_eq!(process, process_prev);
     }
 
     /// Check that a resource, compared against its previous version, has only
@@ -1041,10 +1042,8 @@ mod tests {
         };
         let resource = mod_resource(resource_new.clone());
         let resource_prev = mod_resource(resource_previous.clone());
-        let res_ser = serde_json::to_string(&resource).unwrap();
-        let res2_ser = serde_json::to_string(&resource_prev).unwrap();
         // only resource.costs/custody/quantity/accountable should be changed
-        assert_eq!(res_ser, res2_ser);
+        assert_eq!(resource, resource_prev);
     }
 
     // -------------------------------------------------------------------------

@@ -7,6 +7,7 @@ use crate::{
         user::UserID,
     },
 };
+#[cfg(feature = "with_serde")]
 use serde::{Serialize, Deserialize};
 use std::convert::TryFrom;
 
@@ -21,13 +22,14 @@ pub trait Agent: Model {
 /// that have "agency" so here we define the objects that have agency within the
 /// Basis system. This lets us use a more generic `AgentID` object that fulfills
 /// VF's model while still constraining ourselves to a limited set of actors.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "with_serde", derive(Serialize, Deserialize))]
 pub enum AgentID {
-    #[serde(rename = "company")]
+    #[cfg_attr(feature = "with_serde", serde(rename = "company"))]
     CompanyID(CompanyID),
-    #[serde(rename = "member")]
+    #[cfg_attr(feature = "with_serde", serde(rename = "member"))]
     MemberID(MemberID),
-    #[serde(rename = "user")]
+    #[cfg_attr(feature = "with_serde", serde(rename = "user"))]
     UserID(UserID),
 }
 
